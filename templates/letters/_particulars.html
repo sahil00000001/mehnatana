@@ -1,0 +1,6 @@
+{% load i18n %}<table class="print particulars">
+<thead><tr><th class="sl">{% translate "No." %}</th><th>{% translate "Particular" %}</th><th>{% translate "Details" %}</th></tr></thead>
+<tbody>
+{% for n, label, value in rows %}<tr><td class="sl">{{ n }}</td><td>{{ label }}</td><td>{{ value }}</td></tr>
+{% endfor %}</tbody>
+</table>

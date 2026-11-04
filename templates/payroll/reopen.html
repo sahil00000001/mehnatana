@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+{% if blockers %}
+  {% for b in blockers %}<div class="msg msg-error">{{ b }}</div>{% endfor %}
+  <p><a class="btn" href="{% url 'payroll:month' run.month %}">{% translate "Go back" %}</a></p>
+{% else %}
+<div class="msg msg-warning"><p>{% translate "Reopening unlocks the month. Advance recoveries and increments saved by finalising are taken back until you finalise again. Payslips printed after this will say 'Revised'." %}</p></div>
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  {% include "includes/form_fields.html" %}
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Reopen" %}</button>
+    <a class="btn" href="{% url 'payroll:month' run.month %}">{% translate "Go back" %}</a></div>
+</form>
+{% endif %}
+{% endblock %}

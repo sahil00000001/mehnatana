@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<form method="get" class="filters inline-fields">
+  <div class="field"><label for="year">{% translate "Tax year" %}</label>
+    <select id="year" name="year" data-autosubmit>{% for y, label in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <button type="submit" class="btn">{% translate "Show" %}</button>
+</form>
+
+<div class="table-wrap">
+<table class="ledger">
+  <thead><tr><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th class="num">{% translate "Gross paid ₹" %}</th><th class="num">{% translate "TDS ₹" %}</th><th class="num">{% translate "PT ₹" %}</th><th class="num">{% translate "Previous employer income ₹" %}</th><th class="num">{% translate "Previous employer TDS ₹" %}</th><th></th></tr></thead>
+  <tbody>{% for row in rows %}
+    <tr><td>{{ row.emp.emp_code }}</td><td>{{ row.emp.full_name }}</td>
+      <td class="num">{{ row.ob.ytd_gross|inr }}</td><td class="num">{{ row.ob.ytd_tds|inr }}</td><td class="num">{{ row.ob.ytd_pt|inr }}</td>
+      <td class="num">{{ row.ob.prev_employer_income|inr }}</td><td class="num">{{ row.ob.prev_employer_tds|inr }}</td>
+      <td><a href="{% url 'companies:opening_balance_edit' row.emp.pk %}?year={{ year }}">{% if row.ob %}{% translate "Change" %}{% else %}{% translate "Add" %}{% endif %}</a></td></tr>
+  {% empty %}<tr><td colspan="8">{% translate "No employees yet." %}</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+
+<h2>{% translate "Upload from Excel" %}</h2>
+<form method="post" action="{% url 'companies:opening_upload' %}" enctype="multipart/form-data" class="form" novalidate>
+  {% csrf_token %}
+  {% include "includes/field.html" with field=upload_form.file %}
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Upload and check" %}</button>
+    <a href="{% url 'companies:opening_sample' %}?year={{ year }}">{% translate "Download sample file" %}</a></div>
+</form>
+{% endblock %}

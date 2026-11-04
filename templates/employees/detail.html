@@ -1,0 +1,83 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% if emp.status == "RELIEVED" %}<div class="msg msg-info">{% blocktranslate with d=emp.date_of_leaving|dmy r=emp.get_leaving_reason_display %}Relieved. Last working day {{ d }} ({{ r }}).{% endblocktranslate %}</div>{% endif %}
+
+<div class="actions">
+  <a class="btn btn-primary" href="{% url 'employees:edit' emp.pk %}">{% translate "Edit" %}</a>
+  <a class="btn" href="{% url 'employees:revise' emp.pk %}">{% translate "Revise salary" %}</a>
+  {% if emp.status == "ACTIVE" %}
+    <a class="btn" href="{% url 'advances:add' %}?employee={{ emp.pk }}">{% translate "Give advance" %}</a>
+    <a class="btn" href="{% url 'letters:new' 'appointment' %}?employee={{ emp.pk }}">{% translate "Issue appointment letter" %}</a>
+    <a class="btn" href="{% url 'employees:relieve' emp.pk %}">{% translate "Relieve employee" %}</a>
+  {% else %}
+    <a class="btn" href="{% url 'letters:new' 'relieving' %}?employee={{ emp.pk }}">{% translate "Relieving letter" %}</a>
+    <a class="btn" href="{% url 'letters:new' 'experience' %}?employee={{ emp.pk }}">{% translate "Experience letter" %}</a>
+    {% if can_undo %}<a class="btn" href="{% url 'employees:undo_relieve' emp.pk %}">{% translate "Undo relieve" %}</a>{% endif %}
+  {% endif %}
+</div>
+{% if emp.status == "ACTIVE" and not has_appointment %}<div class="msg msg-warning">{% translate "No appointment letter has been issued yet. The law requires one for every employee." %}</div>{% endif %}
+
+<h2>{% translate "Details" %}</h2>
+<div class="side-by-side">
+<table class="ledger details">
+  <tr><th>{% translate "Employee code" %}</th><td>{{ emp.emp_code }}</td></tr>
+  <tr><th>{% translate "Name" %}</th><td>{{ emp.title }} {{ emp.full_name }}</td></tr>
+  <tr><th>{{ emp.get_relation_type_display }}</th><td>{{ emp.relation_name }}</td></tr>
+  <tr><th>{% translate "Gender" %}</th><td>{{ emp.get_gender_display }}</td></tr>
+  <tr><th>{% translate "Date of birth" %}</th><td>{{ emp.date_of_birth|dmy }}</td></tr>
+  <tr><th>{% translate "Mobile" %}</th><td>{{ emp.mobile }}</td></tr>
+  <tr><th>{% translate "Email" %}</th><td>{{ emp.email }}</td></tr>
+  <tr><th>{% translate "Address" %}</th><td>{{ emp.address|linebreaksbr }}</td></tr>
+  <tr><th>{% translate "Date of joining" %}</th><td>{{ emp.date_of_joining|dmy }}</td></tr>
+  <tr><th>{% translate "Designation" %}</th><td>{{ emp.designation }}</td></tr>
+  <tr><th>{% translate "Department" %}</th><td>{{ emp.department|default:"" }}</td></tr>
+  <tr><th>{% translate "Reports to" %}</th><td>{% if emp.reports_to %}<a href="{% url 'employees:detail' emp.reports_to.pk %}">{{ emp.reports_to.full_name }}</a>{% else %}—{% endif %}</td></tr>
+  <tr><th>{% translate "Type / skill" %}</th><td>{{ emp.get_employment_type_display }} · {{ emp.get_skill_category_display }}</td></tr>
+</table>
+<table class="ledger details">
+  <tr><th>{% translate "PAN" %}</th><td>{{ emp.pan_masked|default:"—" }}</td></tr>
+  <tr><th>{% translate "Aadhaar" %}</th><td>{{ emp.aadhaar_masked|default:"—" }}</td></tr>
+  <tr><th>{% translate "UAN" %}</th><td>{{ emp.uan|default:"—" }}</td></tr>
+  <tr><th>{% translate "ESIC IP number" %}</th><td>{{ emp.esic_ip_no|default:"—" }}</td></tr>
+  <tr><th>{% translate "PF / pension" %}</th><td>{% if emp.pf_member %}{% translate "PF member" %}{% if emp.eps_member %}, {% translate "EPS member" %}{% endif %}{% else %}{% translate "Not a PF member" %}{% endif %}</td></tr>
+  <tr><th>{% translate "ESI" %}</th><td>{{ emp.get_esi_override_display }}{% if emp.is_pwd %} · {% translate "person with disability" %}{% endif %}</td></tr>
+  <tr><th>{% translate "Professional tax" %}</th><td>{% if emp.pt_exempt %}{% translate "Exempt" %}{% else %}{% translate "Applies" %}{% endif %}</td></tr>
+  <tr><th>{% translate "Income tax" %}</th><td>{{ emp.get_tax_regime_display }}{% if emp.tax_regime == "OLD" %} · {% translate "deductions" %} ₹{{ emp.old_regime_deductions_annual|inr }}/{% translate "year" %}{% endif %}</td></tr>
+  <tr><th>{% translate "Salary paid by" %}</th><td>{{ emp.get_payment_mode_display }}</td></tr>
+  <tr><th>{% translate "Bank" %}</th><td>{% if emp.bank_account_no %}{{ emp.bank_name }} · {{ emp.account_masked }} · {{ emp.ifsc }}{% else %}—{% endif %}</td></tr>
+</table>
+</div>
+
+<h2>{% translate "Salary history" %}</h2>
+<div class="table-wrap"><table class="ledger">
+  <thead><tr><th>{% translate "From" %}</th><th class="num">{% translate "Basic" %}</th><th class="num">{% translate "DA" %}</th><th class="num">{% translate "HRA" %}</th><th class="num">{% translate "Conveyance" %}</th><th class="num">{% translate "Other" %}</th><th class="num">{% translate "Gross" %}</th><th>{% translate "Reason" %}</th></tr></thead>
+  <tbody>{% for r in revisions %}
+    <tr><td>{{ r.effective_from|month_label }}</td><td class="num">{{ r.basic|inr }}</td><td class="num">{{ r.da|inr }}</td><td class="num">{{ r.hra|inr }}</td><td class="num">{{ r.conveyance|inr }}</td><td class="num">{{ r.other_allowance|inr }}</td><td class="num strong">{{ r.gross|inr }}</td><td>{{ r.reason }}</td></tr>
+  {% empty %}<tr><td colspan="8">{% translate "No salary structure yet. Use Revise salary." %}</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>{% translate "Advances" %}</h2>
+<div class="table-wrap"><table class="ledger">
+  <thead><tr><th>{% translate "Date" %}</th><th class="num">{% translate "Amount" %}</th><th class="num">{% translate "Instalment" %}</th><th class="num">{% translate "Outstanding" %}</th><th>{% translate "Status" %}</th></tr></thead>
+  <tbody>{% for a in advances %}
+    <tr><td><a href="{% url 'advances:detail' a.pk %}">{{ a.date_given|dmy }}</a></td><td class="num">{{ a.amount|inr }}</td><td class="num">{{ a.monthly_installment|inr }}</td><td class="num">{{ a.outstanding|inr }}</td><td>{{ a.get_status_display }}</td></tr>
+  {% empty %}<tr><td colspan="5">{% translate "No advances." %}</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>{% translate "Payslips" %}</h2>
+<div class="table-wrap"><table class="ledger">
+  <thead><tr><th>{% translate "Month" %}</th><th class="num">{% translate "Gross" %}</th><th class="num">{% translate "Net pay" %}</th><th></th></tr></thead>
+  <tbody>{% for l in payslips %}
+    <tr><td>{{ l.run.month|month_label }}</td><td class="num">{{ l.gross|inr }}</td><td class="num">{{ l.net_pay|inr }}</td><td><a href="{% url 'reports:payslip' l.run.month l.pk %}">{% translate "Print payslip" %}</a></td></tr>
+  {% empty %}<tr><td colspan="4">{% translate "No finalised months yet." %}</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>{% translate "Letters issued" %}</h2>
+<div class="table-wrap"><table class="ledger">
+  <thead><tr><th>{% translate "Date" %}</th><th>{% translate "Letter" %}</th><th>{% translate "Reference" %}</th><th></th></tr></thead>
+  <tbody>{% for l in letters %}
+    <tr><td>{{ l.issue_date|dmy }}</td><td>{{ l.get_letter_type_display }}</td><td>{{ l.ref_no }}</td><td><a href="{% url 'letters:detail' l.pk %}">{% translate "Reprint" %}</a></td></tr>
+  {% empty %}<tr><td colspan="4">{% translate "No letters issued yet." %}</td></tr>{% endfor %}</tbody>
+</table></div>
+<p><a href="{% url 'employees:list' %}">{% translate "All employees" %}</a></p>
+{% endblock %}

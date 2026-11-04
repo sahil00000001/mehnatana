@@ -1,0 +1,22 @@
+{% load i18n mtn %}
+<nav class="toggle no-print" aria-label="{% translate 'Show amounts as' %}">
+  {% for key, label in views.items %}<a href="{% querystring view=key %}"{% if key == view %} class="on" aria-current="true"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+{% if cost_rows %}
+<div class="table-wrap">
+<table class="ledger">
+  <caption>{% for key, label in views.items %}{% if key == view %}{{ label }}{% endif %}{% endfor %} — {% translate "last 12 finalised months" %}</caption>
+  <thead><tr><th>{% translate "Month" %}</th><th class="num">{% translate "Employees paid" %}</th><th class="num">{% translate "Amount ₹" %}</th><th class="bar-cell"><span class="hidden">{% translate "Bar" %}</span></th></tr></thead>
+  <tbody>
+  {% for row in cost_rows %}
+    <tr><td><a href="{% url 'payroll:month' row.run.month %}">{{ row.run.month|month_label }}</a></td>
+      <td class="num">{{ row.count }}</td>
+      <td class="num">{{ row.amount|inr }}</td>
+      <td class="bar-cell"><div class="bar" style="width: {{ row.amount|bar_percent:largest }}%"></div></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">{% translate "No month is finalised yet. The figures appear here after you finalise your first month." %}</p>
+{% endif %}

@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}<div class="box"><p>{% translate "Your new password is saved." %}</p><p><a class="btn btn-primary" href="{% url 'login' %}">{% translate "Login" %}</a></p></div>{% endblock %}

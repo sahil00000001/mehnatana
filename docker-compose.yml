@@ -1,0 +1,54 @@
+# docker compose up -d
+#
+# The database is Supabase (DATABASE_URL in .env), so only two services run by default:
+#   web   — Django under Gunicorn (migrate + collectstatic on start)
+#   caddy — HTTPS for $DOMAIN, uploads up to 10 MB, proxies to web
+#
+# To use a local PostgreSQL 16 instead of Supabase, set in .env
+#   POSTGRES_HOST=db POSTGRES_DB=mehnatana POSTGRES_USER=mehnatana POSTGRES_PASSWORD=... POSTGRES_SSLMODE=disable
+# (and leave DATABASE_URL empty), then run:  docker compose --profile localdb up -d
+
+services:
+  web:
+    build: .
+    env_file: .env
+    environment:
+      DEBUG: "False"
+      SQLITE_PATH: /app/data/db.sqlite3   # used only if no PostgreSQL settings are given
+    volumes:
+      - media:/app/media       # logos and uploaded sheets: private, NOT served by Caddy
+      - appdata:/app/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    profiles: ["localdb"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mehnatana}
+      POSTGRES_USER: ${POSTGRES_USER:-mehnatana}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  media:
+  appdata:
+  pgdata:
+  caddy_data:
+  caddy_config:

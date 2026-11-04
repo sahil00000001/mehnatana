@@ -1,0 +1,119 @@
+/* Printing: A4, black on white, register borders. Also used on screen by print_base.html
+   so the preview looks like the paper. */
+
+@page { size: A4; margin: 12mm; }
+@page landscape { size: A4 landscape; margin: 10mm; }
+
+:root { --ink: #000; --rule-print: #000; --serif: Georgia, "Times New Roman", serif;
+        --sans: system-ui, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", Arial, sans-serif; }
+
+/* ---------------------------------------------------------------- printing a normal page */
+@media print {
+  body { background: #fff !important; color: #000 !important; font-size: 12pt; }
+  .band, .menu, .footer, .actions, .no-print, .messages, form.filters, .toolbar { display: none !important; }
+  a { color: #000; text-decoration: none; }
+  .table-wrap { overflow: visible; border: 0; }
+  table.ledger { border-collapse: collapse; }
+  table.ledger th, table.ledger td { border: 1px solid #000 !important; background: #fff !important; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+  .sticky-table th, .sticky-table td { position: static !important; box-shadow: none !important; }
+}
+
+/* ---------------------------------------------------------------- print documents (print_base.html) */
+body.print-doc { margin: 0; background: #E9E5DA; color: #000; font-family: var(--sans); font-size: 11pt; line-height: 1.35; }
+.toolbar { background: #8B1E1E; color: #FFFDF5; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.toolbar a { color: #FFFDF5; font-weight: bold; }
+.toolbar .btn { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 16px; border: 2px solid #FFFDF5; background: #FFFDF5; color: #8B1E1E; font: bold 16px/1.2 var(--sans); text-decoration: none; cursor: pointer; border-radius: 2px; }
+.toolbar .hint { font-size: 14px; }
+.toolbar form { display: inline-flex; gap: 8px; align-items: center; margin: 0; }
+.toolbar select { min-height: 40px; font-size: 15px; }
+/* Shown only when JavaScript runs (site.js adds the 'js' class). Beats .btn's display. */
+html:not(.js) .js-only { display: none !important; }
+
+.sheet { background: #fff; width: 210mm; min-height: 297mm; margin: 16px auto; padding: 12mm; box-shadow: 0 1px 4px rgba(0,0,0,0.25); position: relative; overflow: hidden; }
+.sheet.landscape { width: 297mm; min-height: 210mm; padding: 10mm; }
+.sheet.half { min-height: 0; }
+.doc-title { font-family: var(--serif); font-size: 16pt; font-weight: bold; margin: 0 0 4mm; }
+
+table.print { width: 100%; border-collapse: collapse; margin: 0 0 3mm; }
+table.print th, table.print td { border: 1px solid #000; padding: 1.2mm 2mm; vertical-align: top; }
+table.print thead th { background: #EEE; text-align: left; }
+table.print .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.print tr.total td, table.print tfoot td { font-weight: bold; border-top: 3px double #000; }
+table.print.small th, table.print.small td { font-size: 8.5pt; padding: 0.8mm 1.2mm; }
+table.print.no-border th, table.print.no-border td { border: 0; padding: 0.6mm 1mm; }
+thead { display: table-header-group; }
+tfoot { display: table-footer-group; }
+
+.watermark { position: absolute; top: 40%; left: 0; right: 0; text-align: center; transform: rotate(-24deg); font: bold 46pt var(--serif); color: rgba(0,0,0,0.10); pointer-events: none; white-space: nowrap; }
+.revised { display: inline-block; border: 2px solid #000; padding: 0 3mm; font-weight: bold; margin-left: 3mm; }
+.copy-label { position: absolute; top: 6mm; right: 12mm; border: 2px solid #000; padding: 1mm 3mm; font-weight: bold; letter-spacing: 1px; }
+
+/* letterhead used by payslips and letters */
+.letterhead { display: flex; gap: 5mm; align-items: center; border-bottom: 3px double #000; padding-bottom: 3mm; margin-bottom: 4mm; }
+.letterhead img { max-height: 20mm; max-width: 35mm; }
+.letterhead .lh-name { font-family: var(--serif); font-size: 18pt; font-weight: bold; text-transform: uppercase; }
+.letterhead .lh-sub { font-size: 9.5pt; }
+.letterhead .lh-right { margin-left: auto; text-align: right; font-family: var(--serif); font-weight: bold; font-size: 13pt; }
+
+/* payslip */
+.payslip { border: 1.5px solid #000; padding: 4mm; }
+.payslip + .payslip { margin-top: 0; }
+.payslip .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.payslip .net { border: 1.5px solid #000; padding: 2mm 3mm; font-size: 12pt; font-weight: bold; margin: 3mm 0 2mm; }
+.payslip .foot { display: flex; justify-content: space-between; margin-top: 8mm; font-size: 9.5pt; }
+.cut-line { border-top: 1px dashed #000; margin: 6mm 0; position: relative; text-align: center; font-size: 8pt; }
+.cut-line span { background: #fff; padding: 0 3mm; position: relative; top: -2.4mm; }
+
+/* letter */
+.letter-body { font-family: var(--serif); font-size: 12pt; line-height: 1.5; }
+.letter-body p { margin: 0 0 3.5mm; white-space: pre-wrap; }
+.letter-body table.print td, .letter-body table.print th { font-family: var(--sans); font-size: 10pt; }
+.letter-footer { position: absolute; bottom: 8mm; left: 12mm; right: 12mm; text-align: center; font-size: 9pt; }
+.signature-line { margin-top: 14mm; border-top: 1px solid #000; width: 60mm; padding-top: 1mm; }
+
+.page-break { break-after: page; page-break-after: always; }
+
+@media print {
+  body.print-doc { background: #fff; }
+  .toolbar, .no-print { display: none !important; }
+  .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; overflow: visible; }
+  .sheet.landscape { page: landscape; width: auto; min-height: 0; padding: 0; }
+  .sheet + .sheet { break-before: page; page-break-before: always; }
+  .sheet.half + .sheet.half { break-before: auto; page-break-before: auto; }
+  .letter-footer { position: static; margin-top: 10mm; }
+  .copy-label { top: 0; right: 0; }
+}
+
+/* ---------------- letters */
+.letter-body table.particulars { margin: 1mm 0 4mm; }
+.letter-body table.particulars .sl { width: 9mm; text-align: center; }
+.letter-body table.particulars td:nth-child(2) { width: 42%; }
+.letter-body table.particulars th { font-weight: bold; }
+.letter-body .letter-gap { height: 7mm; }
+
+/* ---------------- reports */
+
+.payslip .slip-details td { padding: 0.5mm 1mm; }
+.payslip .slip-note { margin: 0.8mm 0; font-size: 9.5pt; }
+.payslip.compact { padding: 2.5mm 3.5mm; font-size: 8.6pt; line-height: 1.22; }
+.payslip.compact .letterhead { padding-bottom: 1.5mm; margin-bottom: 2mm; }
+.payslip.compact .letterhead .lh-name { font-size: 13pt; }
+.payslip.compact .letterhead img { max-height: 12mm; }
+.payslip.compact table.print th, .payslip.compact table.print td { padding: 0.6mm 1.5mm; }
+.payslip.compact .net { margin: 1.5mm 0 1mm; padding: 1mm 2mm; font-size: 10pt; }
+.payslip.compact .slip-note { font-size: 8pt; margin: 0.4mm 0; }
+.payslip.compact .foot { margin-top: 4mm; font-size: 8pt; }
+
+table.print.register th { font-size: 7.5pt; }
+table.print.register td.sign, table.print.register th.sign { width: 22mm; }
+table.print.cash-list td { height: 11mm; vertical-align: middle; }
+table.print .sign-wide { width: 55mm; }
+.register-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10mm; font-size: 9pt; }
+.register-foot .signature-line { margin-top: 0; text-align: center; }
+
+@page landscape {
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; }
+}

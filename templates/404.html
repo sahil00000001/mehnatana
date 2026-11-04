@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<p>{% translate "This page does not exist, or it belongs to another business." %}</p>
+<p><a href="{% url 'home' %}">{% translate "Go to the Home page" %}</a></p>
+{% endblock %}

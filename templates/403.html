@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<p>{% translate "You are not allowed to open this page." %}</p>
+<p><a href="{% url 'home' %}">{% translate "Go to the Home page" %}</a></p>
+{% endblock %}

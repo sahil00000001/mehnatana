@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+{% if blocked %}
+<div class="msg msg-error">{% blocktranslate with month=blocked.label %}This cannot be undone: {{ month }} is finalised and this person was not in it.{% endblocktranslate %}</div>
+<p><a class="btn" href="{% url 'employees:detail' emp.pk %}">{% translate "Go back" %}</a></p>
+{% else %}
+<form method="post" class="actions">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-primary">{% translate "Yes, make active again" %}</button>
+  <a class="btn" href="{% url 'employees:detail' emp.pk %}">{% translate "Go back" %}</a>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% include "reports/_draft_note.html" %}
+{% include "reports/_actions.html" with excel=True %}
+<p>{% translate "State" %}: <strong>{{ state }}</strong>{% if run.company.pt_registration_no %} · {% translate "PT registration" %}: {{ run.company.pt_registration_no }}{% endif %}</p>
+
+<h2>{% translate "Totals by slab" %}</h2>
+<table class="ledger details">
+  <thead><tr><th>{% translate "Tax per person ₹" %}</th><th class="num">{% translate "Employees" %}</th><th class="num">{% translate "Amount ₹" %}</th></tr></thead>
+  <tbody>
+  {% for s in slab_rows %}<tr><td>{% if s.amount %}{{ s.amount|inr }}{% else %}{% translate "Nil (below the slab or exempt)" %}{% endif %}</td><td class="num">{{ s.count }}</td><td class="num">{{ s.total|inr }}</td></tr>{% endfor %}
+  </tbody>
+  <tfoot><tr><td>{% translate "Total" %}</td><td class="num">{{ lines|length }}</td><td class="num">{{ total|inr }}</td></tr></tfoot>
+</table>
+
+<h2>{% translate "Each employee" %}</h2>
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th class="num">{% translate "Gross" %}</th><th class="num">{% translate "Professional tax" %}</th></tr></thead>
+  <tbody>{% for l in lines %}<tr><td>{{ l.code }}</td><td>{{ l.name }}</td><td class="num">{{ l.gross|inr }}</td><td class="num">{{ l.pt|inr }}</td></tr>{% endfor %}</tbody>
+  <tfoot><tr><td></td><td>{% translate "Total" %}</td><td></td><td class="num">{{ total|inr }}</td></tr></tfoot>
+</table>
+</div>
+{% endblock %}

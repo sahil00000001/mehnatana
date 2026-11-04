@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<dl class="qa">
+  <dt id="monthly">{% translate "How do I pay this month's salary?" %}</dt>
+  {% url 'payroll:months' as months_url %}
+  <dd>{% blocktranslate %}Open <a href="{{ months_url }}">Monthly Salary</a> and the month. Download the sheet, fill days and amounts in Excel, upload it, check the table and press Finalise. Then print payslips and download the bank, PF and ESI files.{% endblocktranslate %}</dd>
+
+  <dt id="sheet-columns">{% translate "What do the columns of the monthly sheet mean?" %}</dt>
+  <dd>
+    <ul>
+      <li><strong>{% translate "Days Present" %}</strong> — {% translate "days the person came to work (half days like 25.5 are fine)." %}</li>
+      <li><strong>{% translate "Paid Leave Days" %}</strong> — {% translate "leave with pay." %} <strong>{% translate "Weekly Off + Holidays" %}</strong> — {% translate "paid weekly offs and holidays." %}</li>
+      <li><strong>{% translate "Absent / LOP Days" %}</strong> — {% translate "days without pay. Leave it empty and it is worked out." %}</li>
+      <li><strong>{% translate "OT Hours / OT Amount" %}</strong> — {% translate "overtime. Hours are paid at twice the ordinary rate; a filled amount is used instead." %}</li>
+      <li><strong>{% translate "Incentive / Bonus" %}</strong> — {% translate "one-time extra pay." %} <strong>{% translate "Increment" %}</strong> — {% translate "a raise added to Basic from this month." %}</li>
+      <li><strong>{% translate "Advance Deduction" %}</strong> — {% translate "already filled with the instalment due." %} <strong>{% translate "Other Deduction" %}</strong> — {% translate "needs a reason." %}</li>
+      <li><strong>{% translate "TDS Override" %}</strong> — {% translate "only if your CA gave you the tax figure." %}</li>
+    </ul>
+  </dd>
+
+  <dt>{% translate "What is LOP?" %}</dt>
+  <dd>{% translate "Loss of pay: days not worked and not paid. Salary is cut by monthly salary ÷ days in the month for each LOP day." %}</dd>
+
+  <dt>{% translate "Why is PF only on ₹25,000?" %}</dt>
+  <dd>{% translate "From October 2026 the PF wage ceiling is ₹25,000 (it was ₹15,000). PF is worked out on wages up to the ceiling, unless you choose otherwise in Payroll rules." %}</dd>
+
+  <dt>{% translate "Why are PF and ESI on half of the salary for some people?" %}</dt>
+  <dd>{% translate "Under the Labour Codes, wages for PF and ESI cannot be less than half of the total pay. If HRA and other allowances are more than half, the extra counts as wages. Raising Basic avoids this." %}</dd>
+
+  <dt>{% translate "Why does ESI continue after a raise?" %}</dt>
+  <dd>{% translate "ESI coverage is fixed for six months at a time (April–September, October–March). A person covered at the start of the period stays covered until it ends, even after a raise above ₹21,000." %}</dd>
+
+  <dt>{% translate "Old or new tax regime?" %}</dt>
+  <dd>{% translate "The new regime is the default and has no tax up to ₹12 lakh taxable income. The old regime suits people with large deductions (80C, home loan, HRA). Ask the employee; your CA can help. Set it on the employee page." %}</dd>
+
+  <dt>{% translate "I made a mistake after finalising" %}</dt>
+  <dd>{% translate "Only the latest finalised month can be reopened. Open it, press Reopen this month and write the reason. Correct the sheet, upload again and finalise. Payslips then say 'Revised'." %}</dd>
+
+  <dt>{% translate "Can I cut money for damage or loss?" %}</dt>
+  <dd>{% translate "Only as the Code on Wages allows: for damage or loss caused by the employee's neglect, after giving them a chance to explain. Total deductions should not be more than half of the salary." %}</dd>
+
+  <dt>{% translate "What must an appointment letter contain?" %}</dt>
+  <dd>{% translate "The OSH Code makes an appointment letter compulsory for every employee, with particulars such as name, designation, skill category, wages, social security and the LIN of your establishment. Our appointment letter always prints this table." %}</dd>
+
+  <dt>{% translate "When must salary be paid?" %}</dt>
+  <dd>{% translate "Monthly salary before the 7th of the next month. When someone leaves, final dues within two working days." %}</dd>
+</dl>
+<p>{% blocktranslate with phone=SUPPORT_PHONE %}Still stuck? Call or WhatsApp {{ phone }}.{% endblocktranslate %}</p>
+{% endblock %}

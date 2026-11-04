@@ -1,0 +1,20 @@
+{% extends "print_base.html" %}{% load i18n %}
+{% block toolbar %}
+<form method="get" action="">
+  <label for="copies">{% translate "Copies" %}</label>
+  <select id="copies" name="copies" data-autosubmit>
+    <option value="1"{% if not two %} selected{% endif %}>{% translate "1 copy" %}</option>
+    <option value="2"{% if two %} selected{% endif %}>{% translate "2 copies (office copy + employee copy)" %}</option>
+  </select>
+  <button type="submit" class="btn">{% translate "Show" %}</button>
+</form>
+{% endblock %}
+{% block content %}
+{% for label in copies %}
+<div class="sheet">
+  {% if label %}<div class="copy-label">{{ label }}</div>{% endif %}
+  {{ letter.body_snapshot_html|safe }}
+  <div class="letter-footer">{% translate "Page 1 of 1" %}</div>
+</div>
+{% endfor %}
+{% endblock %}

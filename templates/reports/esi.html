@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% include "reports/_draft_note.html" %}
+<div class="actions no-print">
+  {% if run.is_final %}<a class="btn btn-primary" href="{% url 'reports:esi_file' run.month %}">{% translate "Download ESI upload file" %}</a>{% endif %}
+  <button type="button" class="btn js-only" data-print>{% translate "Print" %}</button>
+  <a class="btn" href="{% querystring format='xlsx' %}">{% translate "Download Excel" %}</a>
+</div>
+{% if missing %}
+<div class="msg msg-warning">
+  <p><strong>{% translate "ESI covered but no 10-digit IP number:" %}</strong>
+  {% for l in missing %}{{ l.code }} {{ l.name }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>
+  <p>{% translate "They are left out of the ESI file. Register them on the ESIC portal and save the IP number on their employee page." %}</p>
+</div>
+{% endif %}
+
+<table class="ledger details">
+  <tbody>
+    <tr><th>{% translate "Employee ESI" %}</th><td class="num">{{ totals.ee_esi|inr }}</td></tr>
+    <tr><th>{% translate "Employer ESI" %}</th><td class="num">{{ totals.er_esi|inr }}</td></tr>
+    <tr class="total"><td>{% translate "ESI challan total" %}</td><td class="num">{{ challan_total|inr }}</td></tr>
+  </tbody>
+</table>
+
+{% if lines %}
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "IP number" %}</th><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th class="num">{% translate "Paid days" %}</th>
+    <th class="num">{% translate "ESI wages" %}</th><th class="num">{% translate "Employee ESI" %}</th><th class="num">{% translate "Employer ESI" %}</th><th>{% translate "Notes" %}</th></tr></thead>
+  <tbody>
+  {% for l in lines %}
+    <tr><td>{{ l.emp_snapshot.esic_ip_no|default:"—" }}</td><td>{{ l.code }}</td><td>{{ l.name }}</td><td class="num">{{ l.paid_days|num }}</td>
+      <td class="num">{{ l.esi_wage|inr }}</td><td class="num">{{ l.ee_esi|inr }}</td><td class="num">{{ l.er_esi|inr }}</td>
+      <td class="notes">{% if "ESI_EMPLOYEE_SHARE_WAIVED" in l.warnings %}{{ "ESI_EMPLOYEE_SHARE_WAIVED"|warning_text }}{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td></td><td></td><td>{% translate "Total" %}</td><td></td><td class="num">{{ totals.esi_wage|inr }}</td><td class="num">{{ totals.ee_esi|inr }}</td><td class="num">{{ totals.er_esi|inr }}</td><td></td></tr></tfoot>
+</table>
+</div>
+{% else %}
+<p class="muted">{% translate "No one is covered by ESI in this month." %}</p>
+{% endif %}
+{% endblock %}

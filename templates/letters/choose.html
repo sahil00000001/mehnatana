@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+{% if not form.fields.employee.queryset.exists %}
+<div class="msg msg-warning">
+  {% if slug == "appointment" %}{% translate "There is nobody working now. Add an employee first." %}
+  {% else %}{% translate "Nobody has been relieved yet. Relieve the person from their page under Employees first." %}{% endif %}
+</div>
+{% endif %}
+<div class="box form">
+  <form method="get" novalidate>
+    {% include "includes/form_errors.html" %}
+    {% include "includes/form_fields.html" %}
+    <div class="actions">
+      <button type="submit" class="btn btn-primary">{% translate "Show the letter" %}</button>
+      <a href="{% url 'letters:index' %}">{% translate "Go back" %}</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

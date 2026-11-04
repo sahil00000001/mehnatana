@@ -1,0 +1,5 @@
+{% load i18n %}<form method="get" class="inline-fields no-print box">
+  <div class="field"><label for="id_from">{% translate "From" %}</label><input type="date" name="from" id="id_from" value="{{ start|date:'Y-m-d' }}"></div>
+  <div class="field"><label for="id_to">{% translate "To" %}</label><input type="date" name="to" id="id_to" value="{{ end|date:'Y-m-d' }}"></div>
+  <button type="submit" class="btn">{% translate "Show" %}</button>
+</form>

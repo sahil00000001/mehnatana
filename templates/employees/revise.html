@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  <div class="form">{% include "includes/field.html" with field=form.effective_month %}</div>
+  <div class="table-wrap" style="max-width:720px">
+  <table class="ledger">
+    <thead><tr><th>{% translate "Part of salary" %}</th><th class="num">{% translate "Now ₹ per month" %}</th><th>{% translate "New ₹ per month" %}</th></tr></thead>
+    <tbody>
+      <tr><td>{{ form.basic.label_tag }}</td><td class="num">{{ current.basic|inr }}</td><td>{{ form.basic }}{% for e in form.basic.errors %}<div class="field-error">{{ e }}</div>{% endfor %}</td></tr>
+      <tr><td>{{ form.da.label_tag }}</td><td class="num">{{ current.da|inr }}</td><td>{{ form.da }}</td></tr>
+      <tr><td>{{ form.hra.label_tag }}</td><td class="num">{{ current.hra|inr }}</td><td>{{ form.hra }}</td></tr>
+      <tr><td>{{ form.conveyance.label_tag }}</td><td class="num">{{ current.conveyance|inr }}</td><td>{{ form.conveyance }}</td></tr>
+      <tr><td>{{ form.other_allowance.label_tag }}</td><td class="num">{{ current.other_allowance|inr }}</td><td>{{ form.other_allowance }}</td></tr>
+    </tbody>
+    <tfoot><tr><td>{% translate "Monthly gross now" %}</td><td class="num">{{ current.gross|inr }}</td><td class="muted">{% translate "The change is shown after you save." %}</td></tr></tfoot>
+  </table>
+  </div>
+  <div class="form">{% include "includes/field.html" with field=form.reason %}</div>
+  <p class="muted">{% translate "Tip: Basic + DA + Other allowance should be at least half of the gross. Otherwise PF and ESI are worked out on half of the gross." %}</p>
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+    <a href="{% url 'employees:detail' emp.pk %}">{% translate "Go back" %}</a></div>
+</form>
+{% endblock %}

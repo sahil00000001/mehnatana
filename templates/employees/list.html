@@ -1,0 +1,57 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<div class="actions">
+  <a class="btn btn-primary" href="{% url 'employees:add' %}">{% translate "Add employee" %}</a>
+  <a class="btn" href="{% url 'employees:upload' %}">{% translate "Upload from Excel" %}</a>
+  <a href="{% url 'employees:upload_sample' %}">{% translate "Download sample file" %}</a>
+  <a href="{% url 'employees:export' %}">{% translate "Download list (Excel)" %}</a>
+  <a href="{% url 'employees:organisation' %}">{% translate "Organisation chart" %}</a>
+</div>
+
+<form method="get" class="filters inline-fields box">
+  <div class="field"><label for="q">{% translate "Search (name, code or mobile)" %}</label>
+    <input type="search" id="q" name="q" value="{{ q }}"></div>
+  <div class="field"><label for="status">{% translate "Show" %}</label>
+    <select id="status" name="status" data-autosubmit>
+      <option value="ACTIVE"{% if status == "ACTIVE" %} selected{% endif %}>{% translate "Active" %}</option>
+      <option value="RELIEVED"{% if status == "RELIEVED" %} selected{% endif %}>{% translate "Relieved" %}</option>
+      <option value="ALL"{% if status == "ALL" %} selected{% endif %}>{% translate "All" %}</option>
+    </select></div>
+  <div class="field"><label for="dept">{% translate "Department" %}</label>
+    <select id="dept" name="dept" data-autosubmit>
+      <option value="">{% translate "All departments" %}</option>
+      {% for d in departments %}<option value="{{ d.pk }}"{% if dept == d.pk|stringformat:"s" %} selected{% endif %}>{{ d.name }}</option>{% endfor %}
+    </select></div>
+  {% if fix %}<input type="hidden" name="fix" value="{{ fix }}">{% endif %}
+  <button type="submit" class="btn">{% translate "Show" %}</button>
+</form>
+
+{% if fix_label %}<div class="msg msg-warning">{% translate "Showing:" %} {{ fix_label }} — <a href="{% url 'employees:list' %}">{% translate "show everyone" %}</a></div>{% endif %}
+
+<div class="table-wrap">
+<table class="ledger">
+  <thead><tr>
+    <th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th>{% translate "Designation" %}</th><th>{% translate "Department" %}</th>
+    <th>{% translate "Date of joining" %}</th><th class="num">{% translate "Monthly gross ₹" %}</th><th>{% translate "PF" %}</th><th>{% translate "ESI" %}</th><th>{% translate "Status" %}</th>
+  </tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td>{{ row.emp.emp_code }}</td>
+      <td><a href="{% url 'employees:detail' row.emp.pk %}">{{ row.emp.full_name }}</a></td>
+      <td>{{ row.emp.designation }}</td>
+      <td>{{ row.emp.department|default:"" }}</td>
+      <td class="nowrap">{{ row.emp.date_of_joining|dmy }}</td>
+      <td class="num">{{ row.gross|inr }}</td>
+      <td>{% if row.pf %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td>
+      <td>{% if row.esi %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td>
+      <td>{% if row.emp.status == "ACTIVE" %}{% translate "Active" %}{% else %}{% blocktranslate with d=row.emp.date_of_leaving|dmy %}Relieved {{ d }}{% endblocktranslate %}{% endif %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="9">{% translate "No employees found." %} {% if not q and status == "ACTIVE" %}<a href="{% url 'employees:add' %}">{% translate "Add the first one" %}</a>.{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted">{% blocktranslate count n=rows|length %}{{ n }} person{% plural %}{{ n }} people{% endblocktranslate %}</p>
+{% endblock %}

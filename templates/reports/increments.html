@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% include "reports/_date_range.html" %}
+{% include "reports/_actions.html" with excel=True %}
+<p>{% blocktranslate with start=start|dmy end=end|dmy %}Salary changes that start from {{ start }} to {{ end }}{% endblocktranslate %}</p>
+{% if rows %}
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th>{% translate "From month" %}</th>
+    <th class="num">{% translate "Basic" %}</th><th class="num">{% translate "DA" %}</th><th class="num">{% translate "HRA" %}</th><th class="num">{% translate "Conv." %}</th><th class="num">{% translate "Other" %}</th>
+    <th class="num">{% translate "Gross" %}</th><th class="num">{% translate "Before" %}</th><th class="num">{% translate "Change" %}</th><th>{% translate "Reason" %}</th></tr></thead>
+  <tbody>
+  {% for x in rows %}
+    <tr><td>{{ x.rev.employee.emp_code }}</td><td><a href="{% url 'employees:detail' x.rev.employee_id %}">{{ x.rev.employee.full_name }}</a></td><td class="nowrap">{{ x.rev.effective_from|month_label }}</td>
+      <td class="num">{{ x.rev.basic|inr }}</td><td class="num">{{ x.rev.da|inr }}</td><td class="num">{{ x.rev.hra|inr }}</td><td class="num">{{ x.rev.conveyance|inr }}</td><td class="num">{{ x.rev.other_allowance|inr }}</td>
+      <td class="num">{{ x.rev.gross|inr }}</td><td class="num">{% if x.before is None %}—{% else %}{{ x.before|inr }}{% endif %}</td>
+      <td class="num">{% if x.change is None %}—{% else %}{% if x.change > 0 %}+{% endif %}{{ x.change|inr }}{% endif %}</td>
+      <td>{{ x.rev.reason|default:x.rev.get_source_display }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">{% translate "No salary changes in these dates." %}</p>
+{% endif %}
+{% endblock %}

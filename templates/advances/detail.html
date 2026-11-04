@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<table class="ledger details form">
+  <tr><th>{% translate "Employee" %}</th><td><a href="{% url 'employees:detail' adv.employee.pk %}">{{ adv.employee.full_name }}</a> ({{ adv.employee.emp_code }})</td></tr>
+  <tr><th>{% translate "Date given" %}</th><td>{{ adv.date_given|dmy }}</td></tr>
+  <tr><th>{% translate "Amount" %}</th><td class="num">₹{{ adv.amount|inr }}</td></tr>
+  <tr><th>{% translate "Recovered so far" %}</th><td class="num">₹{{ adv.recovered|inr }}</td></tr>
+  <tr><th>{% translate "Still to recover" %}</th><td class="num strong">₹{{ adv.outstanding|inr }}</td></tr>
+  <tr><th>{% translate "Monthly cut" %}</th><td class="num">₹{{ adv.monthly_installment|inr }}</td></tr>
+  <tr><th>{% translate "Status" %}</th><td>{{ adv.get_status_display }}</td></tr>
+  {% if adv.note %}<tr><th>{% translate "Note" %}</th><td>{{ adv.note }}</td></tr>{% endif %}
+</table>
+
+{% if adv.status == "OPEN" %}
+<h2>{% translate "Change the monthly cut" %}</h2>
+<form method="post" class="inline-fields" novalidate>
+  {% csrf_token %}
+  {% include "includes/field.html" with field=form.monthly_installment %}
+  <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+</form>
+{% endif %}
+
+<h2>{% translate "Recoveries" %}</h2>
+<p class="muted">{% translate "A recovery is saved when a month is finalised." %}</p>
+<div class="table-wrap" style="max-width:640px"><table class="ledger">
+  <thead><tr><th>{% translate "Salary month" %}</th><th class="num">{% translate "Amount ₹" %}</th></tr></thead>
+  <tbody>{% for r in recoveries %}<tr><td>{{ r.month|month_label }}</td><td class="num">{{ r.amount|inr }}</td></tr>
+  {% empty %}<tr><td colspan="2">{% translate "Nothing recovered yet." %}</td></tr>{% endfor %}</tbody>
+</table></div>
+<p><a href="{% url 'advances:list' %}">{% translate "All advances" %}</a></p>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<div class="box">
+  <ol>
+    <li>{% translate "Download the sample file. It has an EXAMPLE row and a 'How to fill' sheet." %}</li>
+    <li>{% translate "Write one row per person. Delete nothing from the headings." %}</li>
+    <li>{% translate "Upload it. People whose Emp Code already exists are updated (salary is not changed — use Revise salary)." %}</li>
+  </ol>
+</div>
+<form method="post" enctype="multipart/form-data" class="form" novalidate>
+  {% csrf_token %}
+  {% include "includes/field.html" with field=form.file %}
+  <div class="actions">
+    <button type="submit" class="btn btn-primary">{% translate "Upload and check" %}</button>
+    <a href="{% url 'employees:upload_sample' %}">{% translate "Download sample file" %}</a>
+  </div>
+</form>
+
+{% if file_errors or upload_errors %}
+<div class="msg msg-error" role="alert">
+  <p class="strong">{% translate "Nothing was saved. Please correct these mistakes and upload again." %}</p>
+  {% if file_errors %}<ul>{% for e in file_errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+  {% if errors_file %}<p><a href="{% url 'employees:upload_errors' %}">{% translate "Download my sheet with mistakes marked" %}</a></p>{% endif %}
+</div>
+{% if upload_errors %}
+<div class="table-wrap"><table class="ledger compact">
+  <thead><tr><th class="num">{% translate "Row" %}</th><th>{% translate "Employee" %}</th><th>{% translate "Column" %}</th><th>{% translate "Problem" %}</th></tr></thead>
+  <tbody>{% for e in upload_errors %}<tr><td class="num">{{ e.row }}</td><td>{{ e.code }} {{ e.name }}</td><td>{{ e.column }}</td><td>{{ e.message }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+{% endif %}
+<p><a href="{% url 'employees:list' %}">{% translate "All employees" %}</a></p>
+{% endblock %}

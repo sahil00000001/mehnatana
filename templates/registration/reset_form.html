@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<div class="box form"><form method="post" novalidate>{% csrf_token %}
+  <p>{% translate "Type the email address of your login. We will send a link to choose a new password." %}</p>
+  {% include "includes/form_errors.html" %}{% include "includes/form_fields.html" %}
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Send the link" %}</button></div>
+</form></div>
+{% endblock %}

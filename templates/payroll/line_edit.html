@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<div class="box">
+  <p><strong>{{ line.code }} {{ line.name }}</strong> — {{ line.emp_snapshot.designation }}. {% blocktranslate with d=line.days_in_month %}Days in this month: {{ d }}.{% endblocktranslate %}</p>
+  <p class="muted">{% translate "Now:" %} {% translate "gross" %} ₹{{ line.gross|inr }}, {% translate "net pay" %} ₹{{ line.net_pay|inr }}.</p>
+</div>
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  <fieldset><legend>{% translate "Days" %}</legend>
+    {% include "includes/field.html" with field=form.present %}{% include "includes/field.html" with field=form.paid_leave %}
+    {% include "includes/field.html" with field=form.week_off_holiday %}{% include "includes/field.html" with field=form.lop %}
+  </fieldset>
+  <fieldset><legend>{% translate "Extra pay" %}</legend>
+    {% include "includes/field.html" with field=form.ot_hours %}{% include "includes/field.html" with field=form.ot_amount %}
+    {% include "includes/field.html" with field=form.incentive %}{% include "includes/field.html" with field=form.increment %}
+  </fieldset>
+  <fieldset><legend>{% translate "Deductions" %}</legend>
+    {% include "includes/field.html" with field=form.advance %}{% include "includes/field.html" with field=form.other_deduction %}
+    {% include "includes/field.html" with field=form.other_reason %}{% include "includes/field.html" with field=form.tds_override %}
+    {% include "includes/field.html" with field=form.remarks %}
+  </fieldset>
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+    <a href="{% url 'payroll:month' run.month %}#review">{% translate "Go back" %}</a></div>
+</form>
+{% endblock %}

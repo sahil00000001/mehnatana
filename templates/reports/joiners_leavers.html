@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% include "reports/_date_range.html" %}
+{% include "reports/_actions.html" with excel=True %}
+<p>{% blocktranslate with start=start|dmy end=end|dmy %}From {{ start }} to {{ end }}{% endblocktranslate %}</p>
+
+<h2>{% blocktranslate count n=joiners|length %}Joined ({{ n }}){% plural %}Joined ({{ n }}){% endblocktranslate %}</h2>
+{% if joiners %}
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th>{% translate "Designation" %}</th><th>{% translate "Department" %}</th><th>{% translate "Date of joining" %}</th></tr></thead>
+  <tbody>{% for e in joiners %}<tr><td>{{ e.emp_code }}</td><td><a href="{% url 'employees:detail' e.pk %}">{{ e.full_name }}</a></td><td>{{ e.designation }}</td><td>{{ e.department|default:"" }}</td><td class="nowrap">{{ e.date_of_joining|dmy }}</td></tr>{% endfor %}</tbody>
+</table>
+{% else %}<p class="muted">{% translate "No one joined in these dates." %}</p>{% endif %}
+
+<h2>{% blocktranslate count n=leavers|length %}Left ({{ n }}){% plural %}Left ({{ n }}){% endblocktranslate %}</h2>
+{% if leavers %}
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th>{% translate "Designation" %}</th><th>{% translate "Date of joining" %}</th><th>{% translate "Last working day" %}</th><th>{% translate "Reason" %}</th></tr></thead>
+  <tbody>{% for e in leavers %}<tr><td>{{ e.emp_code }}</td><td><a href="{% url 'employees:detail' e.pk %}">{{ e.full_name }}</a></td><td>{{ e.designation }}</td><td class="nowrap">{{ e.date_of_joining|dmy }}</td><td class="nowrap">{{ e.date_of_leaving|dmy }}</td><td>{{ e.get_leaving_reason_display }}</td></tr>{% endfor %}</tbody>
+</table>
+{% else %}<p class="muted">{% translate "No one left in these dates." %}</p>{% endif %}
+{% endblock %}

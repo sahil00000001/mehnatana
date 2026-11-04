@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<div class="msg msg-info">{% translate "The person is still paid for the month in which they leave. Their record and payslips are kept." %}</div>
+<div class="msg msg-warning">{% translate "Under the Code on Wages, final dues must be paid within two working days of leaving." %}</div>
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  {% include "includes/form_fields.html" %}
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Relieve" %}</button>
+    <a href="{% url 'employees:detail' emp.pk %}">{% translate "Go back" %}</a></div>
+</form>
+{% endblock %}

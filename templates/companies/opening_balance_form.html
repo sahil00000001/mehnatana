@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  {% include "includes/form_fields.html" %}
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+    <a href="{% url 'companies:opening_balances' %}?year={{ year }}">{% translate "Go back" %}</a></div>
+</form>
+{% endblock %}

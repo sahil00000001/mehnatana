@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% load i18n static mtn %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/print.css' %}">{% endblock %}
+{% block content %}
+<p>{% blocktranslate with name=emp.full_name code=emp.emp_code date=issue_date|dmy %}Letter for <strong>{{ name }} ({{ code }})</strong>, dated {{ date }}.{% endblocktranslate %}
+  <a href="{% url 'letters:new' slug %}">{% translate "Choose another employee or date" %}</a></p>
+
+{% if warnings %}
+<div class="msg msg-warning" role="status">
+  <p>{% translate "These words in {{ }} are not known and will be printed as they are:" %} <strong>{{ warnings|join:", " }}</strong></p>
+  <p>{% translate "Check the spelling against the list on the Edit default text page." %}</p>
+</div>
+{% endif %}
+
+<p class="muted">{% blocktranslate with ref=next_ref %}Reference number: {{ ref }} (given when you press Save and print).{% endblocktranslate %}</p>
+
+<div class="letter-preview-wrap">
+  <div class="sheet">
+    {{ preview|safe }}
+    <div class="letter-footer">{% translate "Page 1 of 1" %}</div>
+  </div>
+</div>
+
+<form method="post" novalidate class="form-wide">
+  {% csrf_token %}
+  <input type="hidden" name="employee" value="{{ emp.pk }}">
+  <input type="hidden" name="date" value="{{ issue_date|date:'Y-m-d' }}">
+  <div class="field">
+    <label for="id_body">{% translate "Change the text for this letter only (optional)" %}</label>
+    <textarea id="id_body" name="body" class="letter-text" rows="30" spellcheck="true">{{ text }}</textarea>
+    <div class="help">{% translate "A blank line starts a new paragraph. The reference number and (for appointment letters) the table of particulars are filled in automatically. Press Show the changed text to see your changes above." %}</div>
+  </div>
+  <div class="actions">
+    <button type="submit" name="action" value="save" class="btn btn-primary">{% translate "Save and print" %}</button>
+    <button type="submit" name="action" value="preview" class="btn">{% translate "Show the changed text" %}</button>
+    <a href="{% url 'letters:index' %}">{% translate "Go back" %}</a>
+  </div>
+</form>
+{% endblock %}

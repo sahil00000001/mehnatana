@@ -1,0 +1,23 @@
+{% extends "print_base.html" %}{% load i18n mtn %}
+{% block content %}
+<div class="sheet">
+  {% if draft %}<div class="watermark">{% translate "DRAFT — not final" %}</div>{% endif %}
+  <h1 class="doc-title">{{ title }}</h1>
+  <p class="lh-sub">{{ company.trade_name }}, {{ company.address }}</p>
+  {% if lines %}
+  <table class="print cash-list">
+    <thead><tr><th>{% translate "Sl" %}</th><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th class="num">{% translate "Net Pay ₹" %}</th><th class="sign-wide">{% translate "Signature / Thumb impression" %}</th></tr></thead>
+    <tbody>
+    {% for l in lines %}<tr><td>{{ forloop.counter }}</td><td>{{ l.code }}</td><td>{{ l.name }}{% if l.emp_snapshot.payment_mode == "Cheque" %} ({% translate "Cheque" %}){% endif %}</td><td class="num">{{ l.net_pay|inr }}</td><td class="sign-wide"></td></tr>{% endfor %}
+    </tbody>
+    <tfoot><tr><td></td><td></td><td>{% translate "Total" %}</td><td class="num">{{ total|inr }}</td><td></td></tr></tfoot>
+  </table>
+  {% else %}
+  <p>{% translate "No one is paid in cash or by cheque this month." %}</p>
+  {% endif %}
+  <div class="register-foot">
+    <span>{% blocktranslate with date=today|dmy %}Prepared on {{ date }}{% endblocktranslate %}</span>
+    <span class="signature-line">{% translate "Paid by (signature)" %}</span>
+  </div>
+</div>
+{% endblock %}

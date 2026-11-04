@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% include "reports/_draft_note.html" %}
+<div class="actions no-print">
+  {% if run.is_final %}<a class="btn btn-primary" href="{% url 'reports:ecr' run.month %}">{% translate "Download PF ECR file" %}</a>{% endif %}
+  <button type="button" class="btn js-only" data-print>{% translate "Print" %}</button>
+  <a class="btn" href="{% querystring format='xlsx' %}">{% translate "Download Excel" %}</a>
+</div>
+{% if missing %}
+<div class="msg msg-warning">
+  <p><strong>{% translate "Generate UAN on the EPFO portal for:" %}</strong>
+  {% for l in missing %}{{ l.code }} {{ l.name }}{% if not forloop.last %}, {% endif %}{% endfor %}.</p>
+  <p>{% translate "They are left out of the ECR file until a 12-digit UAN is saved on their employee page." %}</p>
+</div>
+{% endif %}
+
+<h2>{% translate "Challan totals" %}</h2>
+<table class="ledger details">
+  <tbody>
+  {% for label, amount in challan %}<tr><th>{{ label }}</th><td class="num">{{ amount|inr }}</td></tr>{% endfor %}
+  <tr class="total"><td>{% translate "PF challan total" %}</td><td class="num">{{ challan_total|inr }}</td></tr>
+  </tbody>
+</table>
+
+<h2>{% translate "Members" %}</h2>
+{% if lines %}
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "UAN" %}</th><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th>
+    <th class="num">{% translate "Gross" %}</th><th class="num">{% translate "EPF wages" %}</th><th class="num">{% translate "EPS wages" %}</th><th class="num">{% translate "EDLI wages" %}</th>
+    <th class="num">{% translate "Employee PF" %}</th><th class="num">{% translate "Employer EPS" %}</th><th class="num">{% translate "Employer EPF" %}</th>
+    <th class="num">{% translate "EDLI" %}</th><th class="num">{% translate "Admin" %}</th><th class="num">{% translate "NCP days" %}</th></tr></thead>
+  <tbody>
+  {% for l in lines %}
+    <tr><td>{{ l.emp_snapshot.uan|default:"—" }}</td><td>{{ l.code }}</td><td>{{ l.name }}</td>
+      <td class="num">{{ l.gross|inr }}</td><td class="num">{{ l.epf_wage|inr }}</td><td class="num">{{ l.eps_wage|inr }}</td><td class="num">{{ l.edli_wage|inr }}</td>
+      <td class="num">{{ l.ee_pf|inr }}</td><td class="num">{{ l.er_eps|inr }}</td><td class="num">{{ l.er_epf|inr }}</td>
+      <td class="num">{{ l.edli|inr }}</td><td class="num">{{ l.pf_admin|inr }}</td><td class="num">{{ l.ncp_days }}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td></td><td></td><td>{% translate "Total" %}</td>
+    <td class="num">{{ totals.gross|inr }}</td><td class="num">{{ totals.epf_wage|inr }}</td><td class="num">{{ totals.eps_wage|inr }}</td><td class="num">{{ totals.edli_wage|inr }}</td>
+    <td class="num">{{ totals.ee_pf|inr }}</td><td class="num">{{ totals.er_eps|inr }}</td><td class="num">{{ totals.er_epf|inr }}</td>
+    <td class="num">{{ totals.edli|inr }}</td><td class="num">{{ totals.pf_admin|inr }}</td><td></td></tr></tfoot>
+</table>
+</div>
+{% if run.pf_admin_topup %}<p class="muted">{% blocktranslate with amount=run.pf_admin_topup|inr %}PF admin charges are at least ₹500 a month, so ₹{{ amount }} is added for the establishment.{% endblocktranslate %}</p>{% endif %}
+{% else %}
+<p class="muted">{% translate "No PF members in this month." %}</p>
+{% endif %}
+{% endblock %}

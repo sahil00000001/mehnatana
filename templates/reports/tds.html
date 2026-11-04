@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% include "reports/_actions.html" with excel=True %}
+<p class="no-print">{% translate "Other tax years" %}:
+  {% for y in tax_years %}{% if y == tax_year %}<strong>{{ y|tax_year_label }}</strong>{% else %}<a href="{% url 'reports:tds' y %}">{{ y|tax_year_label }}</a>{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+{% if rows %}
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th>{% translate "Regime" %}</th><th class="num">{% translate "Opening TDS" %}</th>
+    {% for m in months %}<th class="num">{{ m|date:"M" }}</th>{% endfor %}
+    <th class="num">{% translate "This year" %}</th><th class="num">{% translate "Incl. opening" %}</th></tr></thead>
+  <tbody>
+  {% for p in rows %}
+    <tr><td>{{ p.code }}</td><td>{{ p.name }}</td><td>{{ p.regime|title }}</td><td class="num">{{ p.opening_tds|inr }}</td>
+      {% for c in p.cells %}<td class="num">{% if c is None %}<span class="muted">·</span>{% else %}{{ c|inr }}{% endif %}</td>{% endfor %}
+      <td class="num">{{ p.tds|inr }}</td><td class="num">{{ p.ytd_tds|inr }}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td></td><td>{% translate "Total" %}</td><td></td><td></td>
+    {% for t in month_totals %}<td class="num">{{ t|dash_inr }}</td>{% endfor %}
+    <td class="num">{{ total_tds|inr }}</td><td class="num">{{ total_ytd|inr }}</td></tr></tfoot>
+</table>
+</div>
+<p class="muted small">{% translate "Only finalised months are shown. A dot means no salary in that month." %}</p>
+{% else %}
+<p class="muted">{% translate "No finalised month in this tax year yet." %}</p>
+{% endif %}
+{% endblock %}

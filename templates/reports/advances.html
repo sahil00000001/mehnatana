@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% include "reports/_actions.html" with excel=True %}
+
+<h2>{% translate "Outstanding by employee" %}</h2>
+{% if summary %}
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th class="num">{% translate "Given ₹" %}</th><th class="num">{% translate "Recovered ₹" %}</th><th class="num">{% translate "Outstanding ₹" %}</th></tr></thead>
+  <tbody>{% for e in summary %}<tr><td>{{ e.employee.emp_code }}</td><td>{{ e.employee.full_name }}</td><td class="num">{{ e.given|inr }}</td><td class="num">{{ e.recovered|inr }}</td><td class="num">{{ e.left|inr }}</td></tr>{% endfor %}</tbody>
+</table>
+{% else %}
+<p class="muted">{% translate "No advance is outstanding." %}</p>
+{% endif %}
+
+<h2>{% translate "All advances" %}</h2>
+{% if items %}
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th>{% translate "Date given" %}</th><th class="num">{% translate "Amount ₹" %}</th><th class="num">{% translate "Instalment ₹" %}</th>
+    <th class="num">{% translate "Recovered ₹" %}</th><th class="num">{% translate "Outstanding ₹" %}</th><th>{% translate "Status" %}</th><th>{% translate "Note" %}</th></tr></thead>
+  <tbody>
+  {% for a in items %}
+    <tr><td>{{ a.employee.emp_code }}</td><td>{{ a.employee.full_name }}</td><td class="nowrap"><a href="{% url 'advances:detail' a.pk %}">{{ a.date_given|dmy }}</a></td>
+      <td class="num">{{ a.amount|inr }}</td><td class="num">{{ a.monthly_installment|inr }}</td><td class="num">{{ a.recovered_sum|inr }}</td><td class="num">{{ a.left|inr }}</td>
+      <td>{{ a.get_status_display }}</td><td>{{ a.note }}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td></td><td>{% translate "Total" %}</td><td></td><td class="num">{{ totals.given|inr }}</td><td></td><td class="num">{{ totals.recovered|inr }}</td><td class="num">{{ totals.left|inr }}</td><td></td><td></td></tr></tfoot>
+</table>
+</div>
+{% else %}
+<p class="muted">{% translate "No advance has been given yet." %}</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,8 @@
+<div class="letterhead">
+  {% if company.logo %}<img src="{% url 'files_logo' %}" alt="">{% endif %}
+  <div>
+    <div class="lh-name">{{ company.trade_name }}</div>
+    <div class="lh-sub">{{ company.address }}</div>
+    {% if company.phone or company.email %}<div class="lh-sub">{% if company.phone %}Phone: {{ company.phone }}{% endif %}{% if company.phone and company.email %} · {% endif %}{% if company.email %}Email: {{ company.email }}{% endif %}</div>{% endif %}
+  </div>
+</div>

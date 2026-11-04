@@ -1,0 +1,7 @@
+<ul>
+{% for node in nodes %}
+  <li><a href="{% url 'employees:detail' node.emp.pk %}">{{ node.emp.full_name }}</a> — {{ node.emp.designation }} ({{ node.emp.emp_code }})
+    {% if node.children %}{% include "employees/_tree.html" with nodes=node.children %}{% endif %}
+  </li>
+{% endfor %}
+</ul>

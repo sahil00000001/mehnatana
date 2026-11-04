@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<div class="actions no-print">
+  <button type="button" class="btn js-only" data-print>{% translate "Print" %}</button>
+  {% if run %}<a class="btn" href="{% querystring format='xlsx' %}">{% translate "Download Excel (one month, per employee)" %}</a>{% endif %}
+</div>
+
+<h2>{% translate "Month by month" %}</h2>
+{% include "reports/_cost_table.html" %}
+
+{% if run %}
+<h2>{% blocktranslate with month=run.month|month_label %}Each employee — {{ month }}{% endblocktranslate %}</h2>
+{% if finals|length > 1 %}
+<form method="get" class="inline-fields no-print">
+  <input type="hidden" name="view" value="{{ view }}">
+  <div class="field">
+    <label for="id_month">{% translate "Month" %}</label>
+    <select name="month" id="id_month" data-autosubmit>
+      {% for r in finals %}<option value="{{ r.month|date:'Y-m' }}"{% if r.month == run.month %} selected{% endif %}>{{ r.month|month_label }}</option>{% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="btn">{% translate "Show" %}</button>
+</form>
+{% endif %}
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th class="num">{% translate "In-hand pay" %}</th><th class="num">{% translate "Gross" %}</th>
+    <th class="num">{% translate "Employer PF + EDLI + admin" %}</th><th class="num">{% translate "Employer ESI" %}</th><th class="num">{% translate "Total cost" %}</th></tr></thead>
+  <tbody>
+  {% for row in per_emp %}
+    <tr><td>{{ row.line.code }}</td><td>{{ row.line.name }}</td><td class="num">{{ row.line.net_pay|inr }}</td><td class="num">{{ row.line.gross|inr }}</td>
+      <td class="num">{{ row.employer_pf|inr }}</td><td class="num">{{ row.line.er_esi|inr }}</td><td class="num">{{ row.cost|inr }}</td></tr>
+  {% endfor %}
+  {% if run.pf_admin_topup %}<tr><td></td><td>{% translate "PF admin minimum top-up" %}</td><td></td><td></td><td class="num">{{ run.pf_admin_topup|inr }}</td><td></td><td class="num">{{ run.pf_admin_topup|inr }}</td></tr>{% endif %}
+  </tbody>
+  <tfoot><tr><td></td><td>{% translate "Total" %}</td><td class="num">{{ run_totals.net_pay|inr }}</td><td class="num">{{ run_totals.gross|inr }}</td>
+    <td class="num">{{ employer_pf_total|inr }}</td><td class="num">{{ run_totals.er_esi|inr }}</td><td class="num">{{ run_totals.company_cost|inr }}</td></tr></tfoot>
+</table>
+</div>
+{% endif %}
+{% endblock %}

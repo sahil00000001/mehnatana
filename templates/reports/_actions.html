@@ -1,0 +1,5 @@
+{% load i18n %}<div class="actions no-print">
+  <button type="button" class="btn js-only" data-print>{% translate "Print" %}</button>
+  <noscript><span class="muted">{% translate "To print, press Ctrl+P." %}</span></noscript>
+  {% if excel %}<a class="btn" href="{% querystring format='xlsx' %}">{% translate "Download Excel" %}</a>{% endif %}
+</div>

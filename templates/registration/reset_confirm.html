@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<div class="box form">
+{% if validlink %}
+<form method="post" novalidate>{% csrf_token %}{% include "includes/form_errors.html" %}{% include "includes/form_fields.html" %}
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button></div></form>
+{% else %}<p>{% translate "This link has expired or was already used. Please ask for a new one." %}</p>{% endif %}
+</div>
+{% endblock %}

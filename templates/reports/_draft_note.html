@@ -1,0 +1,1 @@
+{% load i18n %}{% if not run.is_final %}<p class="msg msg-warning">{% translate "DRAFT — not final. These figures can still change. Files are ready after the month is finalised." %}</p>{% elif run.revision_no %}<p class="msg msg-info">{% blocktranslate with n=run.revision_no %}This month was reopened and finalised again (revision {{ n }}).{% endblocktranslate %}</p>{% endif %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="form" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  <fieldset><legend>{% translate "Name and address" %}</legend>
+    {% include "includes/field.html" with field=form.legal_name %}{% include "includes/field.html" with field=form.trade_name %}
+    {% include "includes/field.html" with field=form.address_line1 %}{% include "includes/field.html" with field=form.address_line2 %}
+    {% include "includes/field.html" with field=form.city %}{% include "includes/field.html" with field=form.state %}
+    {% include "includes/field.html" with field=form.pincode %}{% include "includes/field.html" with field=form.phone %}
+    {% include "includes/field.html" with field=form.email %}
+  </fieldset>
+  <fieldset><legend>{% translate "Logo" %}</legend>
+    {% if request.company.logo %}<p><img src="{% url 'files_logo' %}" alt="{% translate 'Current logo' %}" style="max-height:80px"></p>{% endif %}
+    {% include "includes/field.html" with field=form.logo %}
+  </fieldset>
+  <fieldset><legend>{% translate "Registration numbers" %}</legend>
+    {% include "includes/field.html" with field=form.pan %}{% include "includes/field.html" with field=form.tan %}
+    {% include "includes/field.html" with field=form.gstin %}{% include "includes/field.html" with field=form.pf_establishment_code %}
+    {% include "includes/field.html" with field=form.esic_employer_code %}{% include "includes/field.html" with field=form.lin %}
+    {% include "includes/field.html" with field=form.pt_registration_no %}
+  </fieldset>
+  <fieldset><legend>{% translate "Who signs" %}</legend>
+    {% include "includes/field.html" with field=form.signatory_name %}{% include "includes/field.html" with field=form.signatory_designation %}
+  </fieldset>
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+    <a href="{% url 'companies:index' %}">{% translate "Go back" %}</a></div>
+</form>
+{% endblock %}

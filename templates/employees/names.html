@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<form method="post" class="inline-fields box" novalidate>
+  {% csrf_token %}
+  {% include "includes/field.html" with field=form.name %}
+  <input type="hidden" name="is_active" value="on">
+  <button type="submit" class="btn btn-primary">{% translate "Add" %}</button>
+</form>
+<div class="table-wrap" style="max-width:640px">
+<table class="ledger">
+  <thead><tr><th>{% translate "Name" %}</th><th>{% translate "In use" %}</th><th></th></tr></thead>
+  <tbody>{% for item in items %}
+    <tr><td>{{ item.name }}</td><td>{% if item.is_active %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td><td><a href="{% url edit_url item.pk %}">{% translate "Change" %}</a></td></tr>
+  {% empty %}<tr><td colspan="3">{% translate "Nothing added yet." %}</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+<p><a href="{% url 'companies:index' %}">{% translate "Back to Settings" %}</a></p>
+{% endblock %}

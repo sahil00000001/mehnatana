@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+{% if warnings %}
+<div class="msg msg-warning" role="status">
+  {% translate "These words in {{ }} are not on the list below and will be printed as they are:" %} <strong>{{ warnings|join:", " }}</strong>
+</div>
+{% endif %}
+{% if is_appointment %}
+<div class="msg msg-info">{% translate "The table of 15 particulars is required by law (OSH Code). It is always printed, even if you remove {{ letter.particulars_table }} from the text." %}</div>
+{% endif %}
+
+<form method="post" novalidate class="form-wide">
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  {% include "includes/form_fields.html" %}
+  <div class="actions">
+    <button type="submit" name="action" value="save" class="btn btn-primary">{% translate "Save" %}</button>
+    <a href="{% url 'letters:index' %}">{% translate "Go back" %}</a>
+  </div>
+</form>
+
+<form method="post" class="actions">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="reset">
+  <button type="submit" class="btn">{% translate "Reset to original text" %}</button>
+  <span class="muted">{% translate "Puts back the text that came with the app. Your changes are lost." %}</span>
+</form>
+
+<h2>{% translate "Words you can use" %}</h2>
+<p class="muted">{% translate "Type them exactly as shown, with the double curly brackets." %}</p>
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Type this" %}</th><th>{% translate "It prints" %}</th></tr></thead>
+  <tbody>
+  {% for name, description in placeholders %}
+  <tr><td class="nowrap"><code>{% templatetag openvariable %} {{ name }} {% templatetag closevariable %}</code></td><td>{{ description }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

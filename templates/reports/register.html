@@ -1,0 +1,35 @@
+{% extends "print_base.html" %}{% load i18n mtn %}
+{% block toolbar %}{% if run.is_final %}<a href="{% url 'reports:register_xlsx' run.month %}">{% translate "Download Excel" %}</a>{% endif %}{% endblock %}
+{% block content %}
+<div class="sheet landscape">
+  {% if draft %}<div class="watermark">{% translate "DRAFT — not final" %}</div>{% endif %}
+  <h1 class="doc-title">{{ title }}{% if revised %} <span class="revised">{% translate "Revised" %}</span>{% endif %}</h1>
+  <p class="lh-sub">{{ company.legal_name }}, {{ company.address }}{% if company.lin %} · LIN {{ company.lin }}{% endif %}</p>
+  <table class="print small register">
+    <thead>
+      <tr><th>{% translate "Sl" %}</th><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th>{% translate "Designation" %}</th>
+        <th class="num">{% translate "Paid days" %}</th><th class="num">{% translate "LOP" %}</th>
+        {% for h in headers %}<th class="num">{{ h }}</th>{% endfor %}
+        <th class="sign">{% translate "Signature / Thumb" %}</th></tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr><td>{{ forloop.counter }}</td><td>{{ row.line.code }}</td>
+        <td>{{ row.line.name }}{% if row.line.remarks %}<br><em>{{ row.line.remarks }}</em>{% endif %}</td>
+        <td>{{ row.line.emp_snapshot.designation }}</td>
+        <td class="num">{{ row.line.paid_days|num }}</td><td class="num">{{ row.line.lop|num }}</td>
+        {% for v in row.values %}<td class="num">{{ v|inr }}</td>{% endfor %}
+        <td class="sign"></td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td></td><td></td><td>{% translate "Total" %}</td><td></td><td></td><td></td>
+        {% for v in total_values %}<td class="num">{{ v|inr }}</td>{% endfor %}<td></td></tr>
+    </tfoot>
+  </table>
+  <div class="register-foot">
+    <span>{% blocktranslate with date=today|dmy %}Prepared on {{ date }}{% endblocktranslate %} · {{ APP_NAME }}</span>
+    <span class="signature-line">{% translate "Signature of employer" %}</span>
+  </div>
+</div>
+{% endblock %}

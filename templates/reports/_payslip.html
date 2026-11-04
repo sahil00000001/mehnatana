@@ -1,0 +1,45 @@
+{% load i18n mtn %}{% with line=slip.line s=slip.s %}
+<article class="payslip{% if two_per_page %} compact{% endif %}" aria-label="{% translate 'Wage slip' %} {{ s.name }}">
+  <header class="letterhead">
+    {% if company.logo %}<img src="{% url 'files_logo' %}" alt="">{% endif %}
+    <div>
+      <div class="lh-name">{{ company.trade_name }}</div>
+      <div class="lh-sub">{{ company.address }}</div>
+      <div class="lh-sub">{% translate "Date of issue" %}: {{ issue_date|dmy }} &nbsp; {% translate "Wage period" %}: {{ period_start|dmy }} {% translate "to" %} {{ period_end|dmy }}</div>
+    </div>
+    <div class="lh-right">{% translate "WAGE SLIP" %}<br><span class="lh-sub">(Form V)</span>{% if revised %}<br><span class="revised">{% translate "Revised" %}</span>{% endif %}</div>
+  </header>
+
+  <table class="print no-border slip-details">
+    <tr><td><strong>{% translate "Name" %}:</strong> {{ s.name }}</td><td><strong>{{ slip.relation_label }}:</strong> {{ s.relation_name }}</td></tr>
+    <tr><td><strong>{% translate "Emp code" %}:</strong> {{ s.code }} &nbsp; <strong>{% translate "Designation" %}:</strong> {{ s.designation }}</td><td><strong>{% translate "Date of joining" %}:</strong> {{ s.doj }}</td></tr>
+    <tr><td><strong>{% translate "UAN" %}:</strong> {{ s.uan|default:"—" }} &nbsp; <strong>{% translate "ESIC IP" %}:</strong> {{ s.esic_ip_no|default:"—" }}</td><td><strong>{% translate "PAN" %}:</strong> {{ s.pan|default:"—" }}</td></tr>
+    <tr><td colspan="2"><strong>{% translate "Paid by" %}:</strong> {{ s.payment_mode }}{% if s.bank_account_no %} — {% translate "Bank A/c" %}: {{ s.bank_account_no }}{% if s.bank_name %} ({{ s.bank_name }}){% endif %}{% endif %}</td></tr>
+    <tr><td colspan="2"><strong>{% translate "Attendance" %}:</strong> {% translate "Days in month" %} {{ line.days_in_month }} · {% translate "Paid days" %} {{ line.paid_days|num }} · {% translate "LOP" %} {{ line.lop|num }} · {% translate "OT hours" %} {{ line.ot_hours|num }}</td></tr>
+  </table>
+
+  <table class="print">
+    <tr><th>{% translate "RATE OF WAGES (per month)" %}</th></tr>
+    <tr><td>{% translate "Basic" %} {{ line.rate_basic|inr }} · {% translate "DA" %} {{ line.rate_da|inr }} · {% translate "Allowances" %} {{ line.rate_allowances|inr }} ({% translate "HRA" %} {{ line.rate_hra|inr }}, {% translate "Conv." %} {{ line.rate_conveyance|inr }}, {% translate "Other" %} {{ line.rate_other|inr }})</td></tr>
+  </table>
+
+  <table class="print">
+    <thead><tr><th>{% translate "EARNINGS" %}</th><th class="num">₹</th><th>{% translate "DEDUCTIONS" %}</th><th class="num">₹</th></tr></thead>
+    <tbody>
+    {% for earning, deduction in slip.rows %}
+      <tr>
+        <td>{% if earning %}{{ earning.0 }}{% endif %}</td><td class="num">{% if earning %}{{ earning.1|inr }}{% endif %}</td>
+        <td>{% if deduction %}{{ deduction.0 }}{% endif %}</td><td class="num">{% if deduction %}{{ deduction.1|inr }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td>{% translate "GROSS WAGES" %}</td><td class="num">{{ line.gross|inr }}</td><td>{% translate "TOTAL DEDUCTIONS" %}</td><td class="num">{{ line.total_deductions|inr }}</td></tr></tfoot>
+  </table>
+
+  <div class="net">{% translate "NET WAGES PAID" %}: ₹ {{ line.net_pay|inr }} &nbsp; ({{ line.net_pay|words }})</div>
+  <p class="slip-note">{% translate "Employer also paid" %}: {% translate "PF" %} {{ line.er_pf_total|inr }} · {% translate "EDLI" %} {{ line.edli|inr }} · {% translate "PF admin" %} {{ line.pf_admin|inr }} · {% translate "ESI" %} {{ line.er_esi|inr }}</p>
+  <p class="slip-note">{% translate "Advance balance after this month" %}: ₹ {{ slip.advance_balance|inr }}</p>
+  {% if line.remarks %}<p class="slip-note">{% translate "Remarks" %}: {{ line.remarks }}</p>{% endif %}
+  <div class="foot"><span>{% translate "This is a computer-generated wage slip." %}</span><span>{% translate "Employer / Pay-in-charge" %}</span></div>
+</article>
+{% endwith %}

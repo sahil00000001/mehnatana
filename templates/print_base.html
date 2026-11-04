@@ -1,0 +1,21 @@
+{% load i18n static %}<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if title %}{{ title }} — {% endif %}{{ APP_NAME }}</title>
+<link rel="stylesheet" href="{% static 'css/print.css' %}">
+{% block head %}{% endblock %}
+</head>
+<body class="print-doc">
+<div class="toolbar">
+  <button type="button" class="btn js-only" data-print>{% translate "Print" %}</button>
+  <noscript><span class="hint">{% translate "To print, press Ctrl+P (or use Print in your browser menu)." %}</span></noscript>
+  {% if back_url %}<a href="{{ back_url }}">{% translate "Go back" %}</a>{% endif %}
+  {% block toolbar %}{% endblock %}
+  <span class="hint">{% translate "Tip: choose 'Save as PDF' in the print window to keep a copy." %}</span>
+</div>
+{% block content %}{% endblock %}
+<script src="{% static 'js/site.js' %}" defer></script>
+</body>
+</html>

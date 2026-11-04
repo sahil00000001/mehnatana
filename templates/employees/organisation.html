@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<div class="actions no-print"><button type="button" class="btn js-only" data-print>{% translate "Print" %}</button>
+  <a href="{% url 'employees:list' %}">{% translate "All employees" %}</a></div>
+<div class="box">
+<ul class="tree">
+  <li class="root">{{ request.company.trade_name }}
+    {% if tree %}{% include "employees/_tree.html" with nodes=tree %}{% else %}<p>{% translate "No active employees." %}</p>{% endif %}
+  </li>
+</ul>
+</div>
+{% endblock %}

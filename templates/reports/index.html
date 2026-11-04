@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% if months %}
+<form method="get" class="box">
+  <div class="field">
+    <label for="id_month">{% translate "Month" %}</label>
+    <select name="month" id="id_month">
+      {% for m in months %}<option value="{{ m|date:'Y-m' }}"{% if m == default_month %} selected{% endif %}>{{ m|month_label }}</option>{% endfor %}
+    </select>
+    <div class="help">{% translate "Payslips, files and statements are for this month. Files are ready only for finalised months." %}</div>
+  </div>
+  <h2>{% translate "Monthly salary papers" %}</h2>
+  <div class="actions">
+    <button class="btn" name="go" value="payslips">{% translate "Payslips" %}</button>
+    <button class="btn" name="go" value="register">{% translate "Salary register" %}</button>
+    <button class="btn" name="go" value="bank_sheet">{% translate "Bank transfer sheet (Excel)" %}</button>
+    <button class="btn" name="go" value="cash_list">{% translate "Cash payment list" %}</button>
+  </div>
+  <h2>{% translate "PF, ESI and professional tax" %}</h2>
+  <div class="actions">
+    <button class="btn" name="go" value="pf">{% translate "PF statement and ECR file" %}</button>
+    <button class="btn" name="go" value="esi">{% translate "ESI statement and ESI file" %}</button>
+    <button class="btn" name="go" value="pt">{% translate "Professional tax" %}</button>
+  </div>
+  <h2>{% translate "Cost" %}</h2>
+  <div class="actions">
+    <button class="btn" name="go" value="cost">{% translate "Cost report (12 months and per employee)" %}</button>
+  </div>
+</form>
+{% else %}
+<p class="msg msg-info">{% translate "There are no salary months yet. Upload your first attendance sheet in Monthly Salary." %}</p>
+{% endif %}
+
+<form method="get" class="box">
+  <h2>{% translate "Income tax (TDS)" %}</h2>
+  <div class="inline-fields">
+    <div class="field">
+      <label for="id_tax_year">{% translate "Tax year" %}</label>
+      <select name="tax_year" id="id_tax_year">
+        {% for y in tax_years %}<option value="{{ y }}"{% if y == default_tax_year %} selected{% endif %}>{{ y|tax_year_label }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn" name="go" value="tds">{% translate "TDS for the tax year" %}</button>
+  </div>
+</form>
+
+<div class="box">
+  <h2>{% translate "Staff and advances" %}</h2>
+  <ul>
+    <li><a href="{% url 'reports:advances' %}">{% translate "Advances register" %}</a> — {% translate "outstanding by employee" %}</li>
+    <li><a href="{% url 'reports:joiners_leavers' %}">{% translate "Joiners and leavers" %}</a> — {% translate "between two dates" %}</li>
+    <li><a href="{% url 'reports:increments' %}">{% translate "Increment history" %}</a> — {% translate "all salary changes between two dates" %}</li>
+    <li><a href="{% url 'employees:export' %}">{% translate "Employee list (Excel)" %}</a></li>
+  </ul>
+</div>
+{% endblock %}

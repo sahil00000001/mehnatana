@@ -1,0 +1,75 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<section class="box box-highlight" aria-labelledby="this-month">
+  <h2 id="this-month">{% blocktranslate with month=open_month|month_label %}This month: {{ month }}{% endblocktranslate %}</h2>
+  <ol class="checklist">
+    {% for step in steps %}
+    <li>{% if step.done %}<span class="tick" aria-hidden="true">✔</span><span class="hidden">{% translate "Done:" %} </span>{% else %}<span class="todo">{{ forloop.counter }}.</span>{% endif %}{{ step.label }}</li>
+    {% endfor %}
+  </ol>
+  <p><a class="btn btn-primary" href="{{ next_step.url }}">{{ next_step.label }}</a></p>
+  {% if last %}
+  <p class="small">{% blocktranslate with month=last.month|month_label %}Last finalised month: {{ month }}.{% endblocktranslate %}
+    <a href="{% url 'reports:payslips' last.month %}">{% translate "Print payslips" %}</a> ·
+    <a href="{% url 'reports:register' last.month %}">{% translate "Salary register" %}</a> ·
+    <a href="{% url 'reports:bank_sheet' last.month %}">{% translate "Bank sheet" %}</a> ·
+    <a href="{% url 'reports:pf' last.month %}">{% translate "PF and ECR file" %}</a> ·
+    <a href="{% url 'reports:esi' last.month %}">{% translate "ESI file" %}</a></p>
+  {% endif %}
+</section>
+
+<div class="stats">
+  <div class="stat"><div class="label">{% translate "Active employees" %}</div><div class="value">{{ active_count }}</div></div>
+  <div class="stat"><div class="label">{% translate "Last finalised month" %}</div><div class="value">{% if last %}{{ last.month|month_short }}{% else %}—{% endif %}</div></div>
+  <div class="stat"><div class="label">{% translate "Net pay last month" %}</div><div class="value">{% if last_totals %}₹ {{ last_totals.net_pay|inr }}{% else %}—{% endif %}</div></div>
+  <div class="stat"><div class="label">{% translate "Total cost last month" %}</div><div class="value">{% if last_totals %}₹ {{ last_totals.company_cost|inr }}{% else %}—{% endif %}</div></div>
+</div>
+
+<h2>{% translate "Salary cost by month" %}</h2>
+{% include "reports/_cost_table.html" %}
+
+<h2>{% if last %}{% blocktranslate with month=last.month|month_label %}PF and ESI — {{ month }}{% endblocktranslate %}{% else %}{% translate "PF and ESI" %}{% endif %}</h2>
+{% if last_totals %}
+<div class="side-by-side">
+<table class="ledger details">
+  <tbody>
+    <tr><th>{% translate "Employee PF" %}</th><td class="num">{{ last_totals.ee_pf|inr }}</td></tr>
+    <tr><th>{% translate "Employer EPS (pension)" %}</th><td class="num">{{ last_totals.er_eps|inr }}</td></tr>
+    <tr><th>{% translate "Employer EPF" %}</th><td class="num">{{ last_totals.er_epf|inr }}</td></tr>
+    <tr><th>{% translate "EDLI" %}</th><td class="num">{{ last_totals.edli|inr }}</td></tr>
+    <tr><th>{% translate "PF admin charges" %}</th><td class="num">{{ last.pf_admin_establishment|inr }}</td></tr>
+    <tr class="total"><td>{% translate "PF challan total" %}</td><td class="num">{{ last_totals.pf_challan|inr }}</td></tr>
+  </tbody>
+</table>
+<table class="ledger details">
+  <tbody>
+    <tr><th>{% translate "Employee ESI" %}</th><td class="num">{{ last_totals.ee_esi|inr }}</td></tr>
+    <tr><th>{% translate "Employer ESI" %}</th><td class="num">{{ last_totals.er_esi|inr }}</td></tr>
+    <tr class="total"><td>{% translate "ESI challan total" %}</td><td class="num">{{ last_totals.esi_challan|inr }}</td></tr>
+    <tr><th>{% translate "Professional tax" %}</th><td class="num">{{ last_totals.pt|inr }}</td></tr>
+    <tr><th>{% translate "Income tax (TDS)" %}</th><td class="num">{{ last_totals.tds|inr }}</td></tr>
+  </tbody>
+</table>
+</div>
+<table class="ledger compact">
+  <thead><tr><th>{% blocktranslate with start=year_so_far.from|month_short end=year_so_far.to|month_short %}This tax year so far ({{ start }} to {{ end }}){% endblocktranslate %}</th><th class="num">{% translate "Employer PF ₹" %}</th><th class="num">{% translate "Employer ESI ₹" %}</th></tr></thead>
+  <tbody><tr><td>{% translate "Paid by the business" %}</td><td class="num">{{ year_so_far.pf|inr }}</td><td class="num">{{ year_so_far.esi|inr }}</td></tr></tbody>
+</table>
+{% else %}
+<p class="muted">{% translate "PF and ESI figures appear here after you finalise a month." %}</p>
+{% endif %}
+
+<h2>{% translate "Reminders" %}</h2>
+{% if reminders %}
+<ul class="checklist">
+  {% for r in reminders %}<li>{% if r.overdue %}<strong class="field-error">{% translate "Overdue:" %}</strong> {% endif %}{{ r.text }} {% translate "by" %} <strong>{{ r.due|dmy }}</strong></li>{% endfor %}
+</ul>
+{% else %}<p class="muted">{% translate "No reminders." %}</p>{% endif %}
+
+<h2>{% translate "Things to fix" %}</h2>
+{% if fixes %}
+<ul>
+  {% for fix in fixes %}<li><a href="{{ fix.url }}">{{ fix.label }}</a> ({{ fix.count }})</li>{% endfor %}
+</ul>
+{% else %}<p>{% translate "Nothing to fix. Everything looks in order." %}</p>{% endif %}
+{% endblock %}

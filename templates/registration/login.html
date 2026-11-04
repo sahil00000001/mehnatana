@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<div class="box form">
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "includes/form_errors.html" %}
+    {% include "includes/form_fields.html" %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Login" %}</button>
+      <a href="{% url 'password_forgot' %}">{% translate "Forgot password?" %}</a></div>
+  </form>
+</div>
+{% endblock %}

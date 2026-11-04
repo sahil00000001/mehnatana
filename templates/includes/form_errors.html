@@ -1,0 +1,6 @@
+{% load i18n %}{% if form.errors %}
+<div class="error-summary" role="alert">
+  <strong>{% translate "Please correct the mistakes marked in red below." %}</strong>
+  {% if form.non_field_errors %}<ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}

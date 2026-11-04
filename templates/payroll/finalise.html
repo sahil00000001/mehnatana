@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% if blockers %}
+  {% for b in blockers %}<div class="msg msg-error">{{ b }}</div>{% endfor %}
+  <p><a class="btn" href="{% url 'payroll:month' run.month %}">{% translate "Go back" %}</a></p>
+{% else %}
+<table class="ledger details form">
+  <tr><th>{% translate "Employees" %}</th><td class="num">{{ totals.count }}</td></tr>
+  <tr><th>{% translate "Gross salary" %}</th><td class="num">₹{{ totals.gross|inr }}</td></tr>
+  <tr><th>{% translate "Total deductions" %}</th><td class="num">₹{{ totals.total_deductions|inr }}</td></tr>
+  <tr><th>{% translate "Net pay (in hand)" %}</th><td class="num strong">₹{{ totals.net_pay|inr }}</td></tr>
+  <tr><th>{% translate "PF challan total" %}</th><td class="num">₹{{ totals.pf_challan|inr }}</td></tr>
+  <tr><th>{% translate "ESI challan total" %}</th><td class="num">₹{{ totals.esi_challan|inr }}</td></tr>
+  <tr><th>{% translate "Professional tax" %}</th><td class="num">₹{{ totals.pt|inr }}</td></tr>
+  <tr><th>{% translate "Income tax (TDS)" %}</th><td class="num">₹{{ totals.tds|inr }}</td></tr>
+  <tr><th>{% translate "Total cost to company" %}</th><td class="num strong">₹{{ totals.company_cost|inr }}</td></tr>
+</table>
+<div class="msg msg-warning"><p>{% translate "After finalising, the month is locked. Payslips and files will use these figures." %}</p></div>
+<form method="post" class="actions">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-primary">{% translate "Yes, finalise" %}</button>
+  <a class="btn" href="{% url 'payroll:month' run.month %}">{% translate "Go back" %}</a>
+</form>
+{% endif %}
+{% endblock %}

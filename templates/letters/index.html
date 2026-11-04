@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<h2>{% translate "Write a letter" %}</h2>
+<div class="table-wrap">
+<table class="ledger">
+  <thead><tr><th>{% translate "Letter" %}</th><th>{% translate "For" %}</th><th>{% translate "Write" %}</th><th>{% translate "Default text" %}</th></tr></thead>
+  <tbody>
+  {% for t in types %}
+  <tr>
+    <td><strong>{{ t.label }}</strong></td>
+    <td>{{ t.for_whom }}</td>
+    <td><a class="btn btn-primary btn-small" href="{% url 'letters:new' t.slug %}">{% blocktranslate with label=t.label %}Write {{ label }}{% endblocktranslate %}</a></td>
+    <td><a href="{% url 'letters:template_edit' t.slug %}">{% translate "Edit default text" %}</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2>{% translate "Letters issued" %}</h2>
+{% if letters %}
+<div class="table-wrap">
+<table class="ledger">
+  <thead><tr><th>{% translate "Ref no." %}</th><th>{% translate "Date" %}</th><th>{% translate "Employee" %}</th><th>{% translate "Letter" %}</th><th>{% translate "Reprint" %}</th></tr></thead>
+  <tbody>
+  {% for letter in letters %}
+  <tr>
+    <td class="nowrap">{{ letter.ref_no }}</td>
+    <td class="nowrap">{{ letter.issue_date|dmy }}</td>
+    <td>{{ letter.employee.full_name }} ({{ letter.employee.emp_code }})</td>
+    <td>{{ letter.get_letter_type_display }}</td>
+    <td><a href="{% url 'letters:detail' letter.pk %}">{% translate "Reprint" %}</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">{% translate "No letters issued yet." %}</p>
+{% endif %}
+{% endblock %}

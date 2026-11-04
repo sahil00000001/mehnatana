@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<div class="actions"><a class="btn btn-primary" href="{% url 'advances:add' %}">{% translate "Give advance" %}</a>
+  <a href="{% url 'reports:advances' %}">{% translate "Advances register (print)" %}</a></div>
+<form method="get" class="filters inline-fields">
+  <div class="field"><label for="status">{% translate "Show" %}</label>
+    <select id="status" name="status" data-autosubmit>
+      <option value="OPEN"{% if status == "OPEN" %} selected{% endif %}>{% translate "Open" %}</option>
+      <option value="CLOSED"{% if status == "CLOSED" %} selected{% endif %}>{% translate "Closed" %}</option>
+      <option value="ALL"{% if status == "ALL" %} selected{% endif %}>{% translate "All" %}</option>
+    </select></div>
+  {% if fix %}<input type="hidden" name="fix" value="{{ fix }}">{% endif %}
+  <button type="submit" class="btn">{% translate "Show" %}</button>
+</form>
+{% if fix_label %}<div class="msg msg-warning">{% translate "Showing:" %} {{ fix_label }} — <a href="{% url 'advances:list' %}">{% translate "show all" %}</a></div>{% endif %}
+<div class="table-wrap">
+<table class="ledger">
+  <thead><tr><th>{% translate "Employee" %}</th><th>{% translate "Date" %}</th><th class="num">{% translate "Amount ₹" %}</th><th class="num">{% translate "Instalment ₹" %}</th><th class="num">{% translate "Recovered ₹" %}</th><th class="num">{% translate "Outstanding ₹" %}</th><th>{% translate "Status" %}</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr><td><a href="{% url 'advances:detail' r.adv.pk %}">{{ r.adv.employee.full_name }}</a> ({{ r.adv.employee.emp_code }})</td>
+      <td class="nowrap">{{ r.adv.date_given|dmy }}</td><td class="num">{{ r.adv.amount|inr }}</td><td class="num">{{ r.adv.monthly_installment|inr }}</td>
+      <td class="num">{{ r.recovered|inr }}</td><td class="num strong">{{ r.outstanding|inr }}</td><td>{{ r.adv.get_status_display }}</td></tr>
+  {% empty %}<tr><td colspan="7">{% translate "No advances to show." %}</td></tr>{% endfor %}
+  </tbody>
+  {% if rows %}<tfoot><tr><td colspan="5">{% translate "Total outstanding" %}</td><td class="num">{{ total|inr }}</td><td></td></tr></tfoot>{% endif %}
+</table>
+</div>
+{% endblock %}

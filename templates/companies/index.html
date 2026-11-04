@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<table class="ledger form">
+  <tbody>
+    <tr><td><a href="{% url 'companies:company' %}">{% translate "Company details" %}</a></td><td>{% translate "Name, address, logo, PF/ESIC codes, LIN and who signs." %}</td></tr>
+    <tr><td><a href="{% url 'companies:payroll' %}">{% translate "Payroll rules" %}</a></td><td>{% translate "PF, ESI, professional tax, income tax and overtime settings." %}</td></tr>
+    <tr><td><a href="{% url 'companies:opening_balances' %}">{% translate "Opening balances" %}</a></td><td>{% translate "Pay and tax before you started using the app (for TDS)." %}</td></tr>
+    <tr><td><a href="{% url 'employees:departments' %}">{% translate "Departments" %}</a></td><td>{% translate "Store, Accounts, Delivery…" %}</td></tr>
+    <tr><td><a href="{% url 'employees:designations' %}">{% translate "Designations" %}</a></td><td>{% translate "Job titles like Helper or Cashier." %}</td></tr>
+    <tr><td><a href="{% url 'letters:index' %}">{% translate "Letter texts" %}</a></td><td>{% translate "Default words of appointment, relieving and experience letters." %}</td></tr>
+    <tr><td><a href="{% url 'password_change' %}">{% translate "Change password" %}</a></td><td>{% translate "Choose a new password for this login." %}</td></tr>
+  </tbody>
+</table>
+<p class="muted">{% blocktranslate with code=request.company.code start=request.company.payroll_start_month|month_label %}Company code: {{ code }}. First salary month in the app: {{ start }}.{% endblocktranslate %}</p>
+{% endblock %}

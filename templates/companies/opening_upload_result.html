@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+{% if file_errors %}<div class="msg msg-error"><ul>{% for e in file_errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+{% if errors_file %}<p><a href="{% url 'companies:opening_errors' %}">{% translate "Download my sheet with mistakes marked" %}</a></p>{% endif %}
+{% if upload_errors %}
+<div class="table-wrap"><table class="ledger compact">
+  <thead><tr><th class="num">{% translate "Row" %}</th><th>{% translate "Employee" %}</th><th>{% translate "Column" %}</th><th>{% translate "Problem" %}</th></tr></thead>
+  <tbody>{% for e in upload_errors %}<tr><td class="num">{{ e.row }}</td><td>{{ e.code }} {{ e.name }}</td><td>{{ e.column }}</td><td>{{ e.message }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+<p><a class="btn" href="{% url 'companies:opening_balances' %}?year={{ year }}">{% translate "Go back" %}</a></p>
+{% endblock %}

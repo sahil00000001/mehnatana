@@ -1,0 +1,17 @@
+{$DOMAIN} {
+	encode gzip
+
+	request_body {
+		max_size 10MB
+	}
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+
+	# Everything goes to Django. Static files are served by WhiteNoise; the media
+	# folder (logos, uploaded sheets) is never served here — only through views
+	# that check the company.
+	reverse_proxy web:8000
+}
