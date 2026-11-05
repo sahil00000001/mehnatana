@@ -23,7 +23,8 @@
   </fieldset>
   <fieldset><legend>{% translate "Letters and printing" %}</legend>
     {% include "includes/field.html" with field=form.notice_period_days %}{% include "includes/field.html" with field=form.probation_months %}
-    {% include "includes/field.html" with field=form.higher_wages_avenue %}{% include "includes/field.html" with field=form.payslip_two_per_page %}
+    {% include "includes/field.html" with field=form.higher_wages_avenue %}
+    <p><a href="{% url 'companies:payslip_design' %}">{% translate "Choose how payslips look" %}</a></p>
   </fieldset>
   <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
     <a href="{% url 'companies:index' %}">{% translate "Go back" %}</a></div>

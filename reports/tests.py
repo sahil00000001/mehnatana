@@ -149,7 +149,8 @@ class FinalisedMonthTest(DemoTestCase):
         ctx = service.RunContext(self.srks, DEC)
         rows = {e.pk: service.RowInput(present=D(27), week_off_holiday=D(4)) for e in ctx.employees}
         run = service.save_inputs(self.srks, DEC, rows, self.srks_user)
-        service.finalise(run, self.srks_user)
+        with self.today_is(date(2027, 1, 5)):
+            service.finalise(run, self.srks_user)
         page = self.client.get(reverse("reports:pf", args=[DEC]))
         self.assertContains(page, "Generate UAN on the EPFO portal for:")
         self.assertContains(page, "Ramesh Kumar")
@@ -240,3 +241,73 @@ class IsolationTest(DemoTestCase):
         self.assertContains(response, "Seema Patil")
         self.assertNotContains(response, "Sunita Devi")
         self.assertContains(self.client.get(reverse("reports:pt", args=[NOV])), "175")
+
+
+class PayslipDesignTest(DemoTestCase):
+    """Settings → Payslip design: three looks, same Form V particulars."""
+
+    FORM_V = ["Sunita Devi", "Ram Lal", "E002", "Cashier", "01-07-2021", "101234567802", "1234567802",
+              "15,052", "Rupees Fifteen Thousand Fifty-Two Only", "16,200", "1,148", "9,000"]
+
+    def slip(self):
+        line = PayrollLine.objects.get(run__company=self.srks, run__month=NOV, employee__emp_code="E002")
+        return self.client.get(reverse("reports:payslip", args=[NOV, line.pk]))
+
+    def set_style(self, **fields):
+        for name, value in fields.items():
+            setattr(self.srks, name, value)
+        self.srks.save()
+
+    def test_every_design_has_the_form_v_particulars(self):
+        self.finalise_november()
+        for style, marker in (("CLASSIC", "payslip classic"), ("MODERN", "payslip modern"),
+                              ("SIMPLE", "payslip simple")):
+            self.set_style(payslip_style=style)
+            response = self.slip()
+            with self.subTest(style=style):
+                self.assertContains(response, marker)
+                for text in self.FORM_V:
+                    self.assertContains(response, text)
+
+    def test_simple_design_has_receipt(self):
+        self.set_style(payslip_style="SIMPLE")
+        self.assertContains(self.slip(), "I have received ₹ 15,052 as my salary for November 2026.")
+
+    def test_employer_part_and_note(self):
+        self.set_style(payslip_style="MODERN", payslip_show_employer=False, payslip_note="Thank you for your hard work.")
+        response = self.slip()
+        self.assertNotContains(response, "Paid by the employer on top of your salary")
+        self.assertContains(response, "Thank you for your hard work.")
+
+    def test_two_per_page_in_each_design(self):
+        for style in ("CLASSIC", "MODERN", "SIMPLE"):
+            self.set_style(payslip_style=style, payslip_two_per_page=True)
+            response = self.client.get(reverse("reports:payslips", args=[NOV]))
+            with self.subTest(style=style):
+                self.assertEqual(response.content.decode().count('class="payslip'), 7)
+                self.assertContains(response, "compact")
+
+    def test_settings_page_shows_three_previews_and_saves(self):
+        response = self.client.get(reverse("companies:payslip_design"))
+        for label in ("Classic ledger", "Modern", "Simple, with receipt"):
+            self.assertContains(response, label)
+        self.assertEqual(response.content.decode().count('class="slip-paper"'), 3)
+        self.assertContains(response, "latest payslip")  # uses this shop's own figures
+        response = self.client.post(reverse("companies:payslip_design"), {
+            "payslip_style": "MODERN", "payslip_show_employer": "on", "payslip_note": "Shubh Deepawali"})
+        self.assertRedirects(response, reverse("companies:payslip_design"), fetch_redirect_response=False)
+        self.srks.refresh_from_db()
+        self.assertEqual((self.srks.payslip_style, self.srks.payslip_note), ("MODERN", "Shubh Deepawali"))
+        self.assertContains(self.slip(), "payslip modern")
+
+    def test_preview_before_any_month_uses_sample(self):
+        from accounts.models import User
+        from companies.models import Company
+
+        shop = Company.objects.create(code="NEWS", legal_name="New Shop", trade_name="New Shop",
+                                      address_line1="1 Road", city="Pune", state="MH", pincode="411001")
+        self.client.force_login(User.objects.create_user(username="9000000002", password="x-pass-123", company=shop))
+        response = self.client.get(reverse("companies:payslip_design"))
+        self.assertContains(response, "sample employee")
+        self.assertContains(response, "Sunita Devi")
+

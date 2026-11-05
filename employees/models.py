@@ -1,3 +1,4 @@
+import unicodedata
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -176,7 +177,8 @@ class Employee(CompanyOwned):
         prints "Mohd. Arif" as "MOHD ARIF". So the *default* drops dots (EPFO records
         usually have none); a dot typed into name_as_per_uan by the owner is kept.
         """
-        cleaned = "".join(ch if ch.isalpha() else " " for ch in full_name.upper())
+        cleaned = "".join(ch if ch.isalpha() or unicodedata.category(ch).startswith("M") else " "
+                          for ch in full_name.upper())
         return " ".join(cleaned.split())
 
     # ---------------------------------------------------------------- masks

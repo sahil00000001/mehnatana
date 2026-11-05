@@ -11,6 +11,13 @@ def not_found(request, exception=None):
     return render(request, "404.html", {"title": _("Page not found")}, status=404)
 
 
+def csrf_failure(request, reason=""):
+    return render(request, "403.html", {
+        "title": _("Please try again"),
+        "csrf": True,
+    }, status=403)
+
+
 def forbidden(request, exception=None):
     return render(request, "403.html", {"title": _("Not allowed")}, status=403)
 

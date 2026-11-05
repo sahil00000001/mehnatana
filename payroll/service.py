@@ -20,7 +20,7 @@ from advances.models import Advance, AdvanceRecovery
 from core.audit import audit
 from core.formatting import add_months, fmt_date, month_end, month_label, month_start, plain_number, tax_year_of
 from employees.models import Employee, OpeningBalance, SalaryRevision
-from statutory.rates import rates_for_month
+from statutory.rates import MissingRate, rates_for_month
 
 from . import engine
 from .models import PayrollLine, PayrollRun
@@ -29,6 +29,10 @@ ZERO = D("0")
 DAY_KEYS = ("present", "paid_leave", "week_off_holiday", "lop")
 NUMBER_KEYS = ("present", "paid_leave", "week_off_holiday", "lop", "ot_hours", "ot_amount", "incentive",
                "increment", "advance", "other_deduction", "tds_override")
+MONEY_KEYS = ("ot_amount", "incentive", "increment", "advance", "other_deduction", "tds_override")
+MAX_AMOUNT = D("9999999")  # same limit as the forms (core.forms.MAX_AMOUNT)
+MAX_OT_HOURS = 300
+OT_HOURS_NOTE = 100  # more than this gets a note to check
 
 
 class PayrollError(Exception):
@@ -211,11 +215,14 @@ def ytd_map(company, month, employee_ids):
     return out
 
 
-def open_advances(company, employee_ids):
-    """{employee_id: [(advance, outstanding), ...]} oldest first."""
+def open_advances(company, employee_ids, given_by=None):
+    """{employee_id: [(advance, outstanding), ...]} oldest first; only advances given by `given_by`."""
     out = {pk: [] for pk in employee_ids}
+    qs = Advance.objects.filter(company=company, employee_id__in=employee_ids, status=Advance.Status.OPEN)
+    if given_by is not None:
+        qs = qs.filter(date_given__lte=given_by)  # an advance cannot be recovered before it is given
     qs = (
-        Advance.objects.filter(company=company, employee_id__in=employee_ids, status=Advance.Status.OPEN)
+        qs
         .annotate(recovered_sum=Coalesce(Sum("recoveries__amount"), ZERO))
         .order_by("date_given", "id")
     )
@@ -243,7 +250,7 @@ class RunContext:
         self.employees = list(employees if employees is not None else employees_for_month(company, self.month))
         ids = [e.pk for e in self.employees]
         self.ytd = ytd_map(company, self.month, ids)
-        self.advances = open_advances(company, ids)
+        self.advances = open_advances(company, ids, given_by=month_end(self.month))
 
     def outstanding(self, emp):
         return sum((left for _a, left in self.advances.get(emp.pk, [])), ZERO)
@@ -276,6 +283,12 @@ def compute(ctx, emp, row):
         warnings.append("INCREMENT_LARGE")
     if result.paid_days == 0:
         warnings.append("ZERO_PAY")
+    if row.ot_hours > OT_HOURS_NOTE:
+        warnings.append("OT_HOURS_HIGH")
+    if row.tds_override is not None and row.tds_override > result.gross * D("0.3"):
+        warnings.append("TDS_OVERRIDE_HIGH")
+    if row.lop is None and not row.week_off_holiday and result.lop > 0 and (row.present or row.paid_leave):
+        warnings.append("WEEK_OFF_EMPTY")
     for code in ctx.month_rates.warnings:
         if code == "TAX_SLABS_NOT_UPDATED" and not ctx.settings.tds_enabled:
             continue
@@ -302,6 +315,14 @@ def check_row(ctx, emp, row, days_in_month_value=None):
         value = getattr(row, key)
         if value is not None and (value * 2) != (value * 2).to_integral_value():
             errors.append((key, _("Use whole or half days only, like 25 or 25.5.")))
+    for key in MONEY_KEYS:
+        value = getattr(row, key)
+        if value is not None and value > MAX_AMOUNT:
+            errors.append((key, _("This looks too big (more than ₹99,99,999). Please check.")))
+    if row.ot_hours > MAX_OT_HOURS:
+        errors.append(("ot_hours", _("More than %(max)s overtime hours in a month? Please check.") % {"max": MAX_OT_HOURS}))
+    if len(row.other_reason) > 200:
+        errors.append(("other_reason", _("Write the reason in at most 200 letters.")))
     if errors:
         return errors
 
@@ -333,7 +354,7 @@ def check_row(ctx, emp, row, days_in_month_value=None):
     outstanding = ctx.outstanding(emp)
     if row.advance > outstanding:
         errors.append(("advance", _("Advance deduction (₹%(a)s) is more than the advance still to be recovered (₹%(o)s).")
-                       % {"a": plain_number(row.advance), "o": plain_number(outstanding)}))
+                       % {"a": engine.indian_format(row.advance), "o": engine.indian_format(outstanding)}))
     if row.other_deduction > 0 and not row.other_reason.strip():
         errors.append(("other_reason", _("Write the reason for the other deduction.")))
     if errors:
@@ -342,11 +363,22 @@ def check_row(ctx, emp, row, days_in_month_value=None):
         compute(ctx, emp, row)
     except ValueError as exc:
         if "deductions are more than earnings" in str(exc):
-            errors.append(("advance", _("Deductions are more than the salary earned this month. Reduce the advance or other deduction.")))
+            if row.advance:
+                errors.append(("advance", _("Deductions are more than the salary earned this month. Reduce the advance.")))
+            elif row.other_deduction:
+                errors.append(("other_deduction", _("Deductions are more than the salary earned this month. "
+                                                    "Reduce the other deduction.")))
+            elif row.tds_override:
+                errors.append(("tds_override", _("The TDS override is more than the salary earned this month.")))
+            else:
+                errors.append(("present", _("The salary earned this month is less than PF, ESI and tax. "
+                                            "Check the days present.")))
         else:
             errors.append(("present", str(exc)))
     except PayrollError as exc:
         errors.append(("present", str(exc)))
+    except ArithmeticError:
+        errors.append(("present", _("These numbers could not be worked out. Please check this row.")))
     return errors
 
 
@@ -435,8 +467,9 @@ def save_inputs(company, month, rows_by_emp, user, uploaded_file=None, request=N
     return run
 
 
+@transaction.atomic
 def recompute_run(run, ctx=None):
-    """Calculate every line of a draft month again from its stored inputs."""
+    """Calculate every line of a draft month again from its stored inputs (all or nothing)."""
     if run.is_final:
         raise PayrollError(_("A finalised month cannot be recalculated."))
     ctx = ctx or RunContext(run.company, run.month)
@@ -523,6 +556,9 @@ def earlier_open_month(company, month):
 def upload_blocker(company, month):
     if month_start(month) < company.payroll_start_month:
         return _("This month is before you started using the app.")
+    if not employees_for_month(company, month).exists():
+        return _("No one is paid in %(month)s yet. Add your employees first (Employees → Add employee, "
+                 "or Upload from Excel).") % {"month": month_label(month)}
     earlier = earlier_open_month(company, month)
     if earlier:
         return _("Finalise %(month)s first. Months are done in order.") % {"month": month_label(earlier)}
@@ -532,14 +568,29 @@ def upload_blocker(company, month):
     return ""
 
 
-def finalise_blockers(run):
+def finalise_blockers(run, today=None):
     if run.is_final:
         return [_("This month is already finalised.")]
+    today = today or timezone.localdate()
+    if run.month > month_start(today):
+        return [_("%(month)s has not started yet. It can be finalised from %(start)s.")
+                % {"month": run.label, "start": fmt_date(run.month)}]
     earlier = earlier_open_month(run.company, run.month)
     if earlier:
         return [_("Finalise %(month)s first. Months are finalised in order.") % {"month": month_label(earlier)}]
     if not run.lines.exists():
         return [_("Upload the attendance sheet first.")]
+    expected = {e.pk: e for e in employees_for_month(run.company, run.month)}
+    have = set(run.lines.values_list("employee_id", flat=True))
+    missing = [e for pk, e in expected.items() if pk not in have]
+    if missing:
+        return [_("These people are not in this month's sheet yet: %(names)s. Download the sheet again "
+                  "(it now has them), fill their days and upload it.")
+                % {"names": ", ".join(f"{e.emp_code} {e.full_name}" for e in missing)}]
+    extra = run.lines.exclude(employee_id__in=list(expected)).count()
+    if extra:
+        return [_("Some people in this month's sheet are no longer paid in %(month)s (their dates changed). "
+                  "Download the sheet again and upload it.") % {"month": run.label}]
     return []
 
 
@@ -629,6 +680,23 @@ def reopen(run, user, reason, request=None):
         audit(request, "payroll.reopen", run, {"month": str(run.month), "reason": reason,
                                                "revision_no": run.revision_no}, company=run.company)
     return run
+
+
+def recalculate_drafts(company):
+    """Work out every draft month again after a change to staff, salary or rules.
+
+    Finalised months never change. Returns [(month label, problem)] for drafts that
+    could not be worked out (for example a person relieved before that month).
+    """
+    problems = []
+    for run in PayrollRun.objects.filter(company=company, status=PayrollRun.Status.DRAFT).order_by("month"):
+        if not run.lines.exists():
+            continue
+        try:
+            recompute_run(run)
+        except (PayrollError, MissingRate) as exc:
+            problems.append((run.label, str(exc)))
+    return problems
 
 
 # ---------------------------------------------------------------- helpers for other screens

@@ -3,6 +3,7 @@ import secrets
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 
+from core.admin import AuditedAdminMixin
 from core.audit import audit
 
 from .models import User
@@ -15,7 +16,7 @@ def temporary_password():
 
 
 @admin.register(User)
-class LoginAdmin(UserAdmin):
+class LoginAdmin(AuditedAdminMixin, UserAdmin):
     list_display = ["username", "company", "first_name", "is_active", "must_change_password", "locked_until",
                     "last_login"]
     list_filter = ["company", "is_active", "is_superuser"]

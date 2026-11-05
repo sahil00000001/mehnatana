@@ -14,6 +14,9 @@ MESSAGES = {
     "RATE_CHANGED_IN_MONTH": _("A statutory rate changed inside this month; check with your CA."),
     "TAX_SLABS_NOT_UPDATED": _("Tax slabs for this year are not set; last year's were used."),
     "ZERO_PAY": _("No paid days this month."),
+    "OT_HOURS_HIGH": _("More than 100 overtime hours this month — please check."),
+    "TDS_OVERRIDE_HIGH": _("The TDS override is more than 30% of the salary — please check."),
+    "WEEK_OFF_EMPTY": _("Weekly offs were left empty, so those days were counted as LOP — please check."),
 }
 
 

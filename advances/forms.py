@@ -1,4 +1,6 @@
 from django import forms
+from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import IndianDatesMixin, whole_rupees
@@ -20,9 +22,15 @@ class AdvanceForm(IndianDatesMixin, forms.ModelForm):
     def __init__(self, *args, company, **kwargs):
         super().__init__(*args, **kwargs)
         self.instance.company = company
-        self.fields["employee"].queryset = Employee.objects.filter(
-            company=company, status=Employee.Status.ACTIVE).order_by("emp_code")
+        working = Q(status=Employee.Status.ACTIVE) | Q(date_of_leaving__gte=timezone.localdate())
+        self.fields["employee"].queryset = Employee.objects.filter(working, company=company).order_by("emp_code")
         self.fields["employee"].label_from_instance = lambda e: f"{e.full_name} ({e.emp_code})"
+
+    def clean_date_given(self):
+        given = self.cleaned_data["date_given"]
+        if given and given > timezone.localdate():
+            raise forms.ValidationError(_("This date is in the future. Record the advance on the day it is given."))
+        return given
 
     def clean(self):
         data = super().clean()

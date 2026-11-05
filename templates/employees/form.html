@@ -11,6 +11,7 @@
   {% endfor %}
   <div class="actions">
     <button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+    {% if adding %}<button type="submit" name="then" value="another" class="btn">{% translate "Save and add another" %}</button>{% endif %}
     <a href="{% if emp %}{% url 'employees:detail' emp.pk %}{% else %}{% url 'employees:list' %}{% endif %}">{% translate "Go back" %}</a>
   </div>
 </form>

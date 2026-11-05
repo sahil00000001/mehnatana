@@ -5,7 +5,7 @@
   {% if draft %}<div class="watermark">{% translate "DRAFT — not final" %}</div>{% endif %}
   {% for slip in group %}
     {% if not forloop.first %}<div class="cut-line"><span>{% translate "cut here" %}</span></div>{% endif %}
-    {% include "reports/_payslip.html" %}
+    {% include slip_template %}
   {% endfor %}
 </div>
 {% endfor %}

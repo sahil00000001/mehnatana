@@ -1,15 +1,34 @@
+from django import forms
 from django.contrib import admin, messages
 
 from accounts.admin import temporary_password
 from accounts.models import User
 from core.admin import AuditedAdmin
 from core.audit import audit
+from core.forms import DATE_INPUT_FORMATS
+from core.validators import upper_no_spaces
 
 from .models import Company
 
 
+class CompanyAdminForm(forms.ModelForm):
+    class Meta:
+        model = Company
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if isinstance(field, forms.DateField):
+                field.input_formats = DATE_INPUT_FORMATS  # 01-11-2026 is 1 November
+
+    def clean_code(self):
+        return upper_no_spaces(self.cleaned_data["code"])  # "srks" becomes "SRKS"
+
+
 @admin.register(Company)
 class CompanyAdmin(AuditedAdmin):
+    form = CompanyAdminForm
     list_display = ["code", "trade_name", "city", "state", "payroll_start_month", "is_active", "owner_login"]
     list_filter = ["is_active", "state"]
     search_fields = ["code", "trade_name", "legal_name", "phone"]
@@ -22,8 +41,8 @@ class CompanyAdmin(AuditedAdmin):
         ("Payroll", {"fields": ("payroll_start_month", "is_active", "salary_divisor", "pf_enabled", "pf_employee_rate",
                                 "pf_restrict_to_ceiling", "esi_enabled", "pt_enabled", "pt_state", "tds_enabled",
                                 "default_tax_regime", "ot_multiplier", "ot_days_divisor", "ot_hours_per_day",
-                                "notice_period_days", "probation_months", "higher_wages_avenue",
-                                "payslip_two_per_page")}),
+                                "notice_period_days", "probation_months", "higher_wages_avenue")}),
+        ("Payslip", {"fields": ("payslip_style", "payslip_show_employer", "payslip_two_per_page", "payslip_note")}),
     )
 
     @admin.display(description="Owner login")
@@ -38,9 +57,13 @@ class CompanyAdmin(AuditedAdmin):
                 self.message_user(request, f"{company.code} already has a login. Use 'Reset password' on Logins.",
                                   messages.INFO)
                 continue
-            username = "".join(ch for ch in company.phone if ch.isdigit())[-10:] or company.code.lower()
-            if User.objects.filter(username=username).exists():
-                username = company.code.lower()
+            candidates = ["".join(ch for ch in company.phone if ch.isdigit())[-10:], company.code.lower()]
+            username = next((c for c in candidates if c and not User.objects.filter(username=c).exists()), None)
+            number = 2
+            while username is None:
+                if not User.objects.filter(username=f"{company.code.lower()}{number}").exists():
+                    username = f"{company.code.lower()}{number}"
+                number += 1
             password = temporary_password()
             user = User.objects.create_user(username=username, password=password, company=company,
                                             must_change_password=True, email=company.email)

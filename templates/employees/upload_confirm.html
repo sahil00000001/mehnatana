@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<div class="msg msg-success">
+  {% blocktranslate count n=added %}Your file has {{ n }} new person{% plural %}Your file has {{ n }} new people{% endblocktranslate %}
+  {% blocktranslate count n=updated %}and {{ n }} person already in the app.{% plural %}and {{ n }} people already in the app.{% endblocktranslate %}
+  {% translate "Nothing is saved until you press one of the buttons below." %}
+</div>
+
+<h2>{% blocktranslate count n=changes|length %}{{ n }} person has a different salary in your file{% plural %}{{ n }} people have a different salary in your file{% endblocktranslate %}</h2>
+<div class="table-wrap">
+<table class="ledger">
+  <thead>
+    <tr><th rowspan="2">{% translate "Code" %}</th><th rowspan="2">{% translate "Name" %}</th>
+        <th colspan="2" class="center">{% translate "Basic ₹" %}</th><th colspan="2" class="center">{% translate "Monthly gross ₹" %}</th></tr>
+    <tr><th class="num">{% translate "Now" %}</th><th class="num">{% translate "In your file" %}</th>
+        <th class="num">{% translate "Now" %}</th><th class="num">{% translate "In your file" %}</th></tr>
+  </thead>
+  <tbody>
+  {% for c in changes %}
+    <tr><td>{{ c.code }}</td><td>{{ c.name }}</td>
+      <td class="num">{{ c.old.basic|inr }}</td><td class="num strong">{{ c.new.basic|inr }}</td>
+      <td class="num">{{ c.old_gross|inr }}</td><td class="num strong">{{ c.new_gross|inr }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<form method="post" action="{% url 'employees:upload_confirm' %}" class="box form">
+  {% csrf_token %}
+  <div class="field">
+    <label for="month">{% translate "New salary from" %}</label>
+    <select id="month" name="month">
+      {% for m in months %}<option value="{{ m|date:'Y-m' }}">{{ m|month_label }}</option>{% endfor %}
+    </select>
+    <div class="help">{% translate "Months already finalised are not changed. The old salary stays in each person's salary history." %}</div>
+  </div>
+  <div class="actions">
+    <button type="submit" name="salaries" value="change" class="btn btn-primary">{% translate "Yes, save and change these salaries" %}</button>
+    <button type="submit" name="salaries" value="keep" class="btn">{% translate "Save, but keep the old salaries" %}</button>
+    <a href="{% url 'employees:upload' %}">{% translate "Cancel" %}</a>
+  </div>
+</form>
+{% endblock %}

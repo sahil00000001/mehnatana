@@ -14,7 +14,7 @@ from .models import Employee, SalaryRevision
 FORM = {
     "emp_code": "E008", "first_name": "Lakshmi", "surname": "N", "relation_type": "Father",
     "relation_name": "Narayan", "gender": "F", "date_of_birth": "1998-02-10", "mobile": "98450 11111", "email": "",
-    "address": "Jayanagar", "date_of_joining": "2026-11-20", "department": "", "designation": "",
+    "address": "Jayanagar", "date_of_joining": "2026-11-20", "department_name": "", "designation_name": "Packer",
     "reports_to": "", "employment_type": "Permanent", "skill_category": "Unskilled", "nature_of_duties": "Packing",
     "basic": "11000", "da": "", "hra": "3000", "conveyance": "", "other_allowance": "", "pf_member": "on",
     "eps_choice": "AUTO", "uan": "", "name_as_per_uan": "", "esic_ip_no": "", "esi_override": "AUTO",
@@ -25,7 +25,7 @@ FORM = {
 
 class EmployeeFormTest(DemoTestCase):
     def form_data(self, **changes):
-        data = dict(FORM, designation=str(self.employee("E001").designation_id))
+        data = dict(FORM)
         data.update(changes)
         return data
 
@@ -109,7 +109,8 @@ class RelieveReviseTest(DemoTestCase):
         dec = date(2026, 12, 1)
         ctx = service.RunContext(self.srks, dec)
         rows = {e.pk: service.RowInput(present=D(27), week_off_holiday=D(4)) for e in ctx.employees}
-        service.finalise(service.save_inputs(self.srks, dec, rows, self.srks_user), self.srks_user)
+        with self.today_is(date(2027, 1, 5)):
+            service.finalise(service.save_inputs(self.srks, dec, rows, self.srks_user), self.srks_user)
         response = self.client.post(reverse("employees:undo_relieve", args=[emp.pk]))
         self.assertContains(response, "This cannot be undone")
         emp.refresh_from_db()
@@ -124,7 +125,7 @@ class RelieveReviseTest(DemoTestCase):
             "other_allowance": "1000", "reason": "Yearly increment"})
         self.assertRedirects(response, reverse("employees:detail", args=[emp.pk]), fetch_redirect_response=False)
         page = self.client.get(reverse("employees:detail", args=[emp.pk]))
-        self.assertContains(page, "₹18000 → ₹19000 (+₹1000)")
+        self.assertContains(page, "₹18,000 → ₹19,000 (+₹1,000)")
         self.assertEqual(emp.structure_on(date(2026, 12, 1)).basic, D(10000))
         self.assertEqual(emp.structure_on(NOV).basic, D(9000))
 
@@ -154,6 +155,7 @@ class UploadTest(DemoTestCase):
         self.assertEqual(example[0], "EXAMPLE")
         new = list(example)
         new[0], new[1], new[13] = "E008", "Mahesh", "E003"
+        new[17], new[20], new[21] = "ABCPM1234Z", "101234567808", "1234567808"  # his own PAN / UAN / ESIC
         ws.append(new)
         update = list(example)
         update[0], update[1], update[2], update[8] = "E001", "Ramesh", "Kumar", "9900990099"
@@ -161,7 +163,7 @@ class UploadTest(DemoTestCase):
         response = self.post(wb)
         self.assertRedirects(response, reverse("employees:list"), fetch_redirect_response=False)
         page = self.client.get(reverse("employees:list"))
-        self.assertContains(page, "1 added, 1 updated.")
+        self.assertContains(page, "1 added, 1 updated")
         mahesh = Employee.objects.get(company=self.srks, emp_code="E008")
         self.assertEqual(mahesh.reports_to.emp_code, "E003")
         self.assertEqual(mahesh.revisions.get().basic, D(12000))
@@ -192,7 +194,7 @@ class UploadTest(DemoTestCase):
         self.assertNotIn("234567891234", [c.value for row in wb.worksheets[0].iter_rows() for c in row])
         response = self.post(wb)
         page = self.client.get(reverse("employees:list"))
-        self.assertContains(page, "0 added, 7 updated.")
+        self.assertContains(page, "0 added, 0 updated, 7 already up to date.")
         self.assertEqual(self.employee("E002").aadhaar, "234567891234")  # empty Aadhaar cell keeps the number
         self.assertEqual(self.employee("E006").reports_to.emp_code, "E003")
         self.assertEqual(SalaryRevision.objects.filter(company=self.srks).count(), 7)
@@ -223,3 +225,82 @@ class ListAndChartTest(DemoTestCase):
         content = page.content.decode()
         self.assertLess(content.index("Mohd. Arif"), content.index("Ramesh Kumar"))
         self.assertIn("Neha Joshi", content)
+
+
+class SimpleUseTest(DemoTestCase):
+    """Fewer steps for the owner: one question for salary changes, type-in designations, add another."""
+
+    def export_with(self, changes):
+        wb = load_workbook(BytesIO(self.client.get(reverse("employees:export")).content))
+        ws = wb.worksheets[0]
+        headers = {c.value: c.column for c in ws[1]}
+        rows = {ws.cell(row=r, column=1).value: r for r in range(2, ws.max_row + 1)}
+        for code, values in changes.items():
+            for header, value in values.items():
+                ws.cell(row=rows[code], column=headers[header]).value = value  # value=None would not clear it
+        out = BytesIO()
+        wb.save(out)
+        return SimpleUploadedFile("staff.xlsx", out.getvalue())
+
+    def test_salary_change_asks_once_and_updates(self):
+        response = self.client.post(reverse("employees:upload"), {"file": self.export_with({"E002": {"Basic": 10000}})})
+        self.assertContains(response, "1 person has a different salary in your file")
+        self.assertContains(response, "Yes, save and change these salaries")
+        self.assertEqual(self.employee("E002").revisions.count(), 1)  # nothing saved yet
+        response = self.client.post(reverse("employees:upload_confirm"), {"salaries": "change", "month": "2026-11"})
+        self.assertRedirects(response, reverse("employees:list"), fetch_redirect_response=False)
+        e002 = self.employee("E002")
+        self.assertEqual(e002.structure_on(NOV).basic, D(10000))
+        self.assertEqual(e002.revisions.count(), 2)  # the old salary stays in the history
+        line = self.run_for().lines.get(employee=e002)
+        self.assertEqual(line.rate_basic, D(10000))  # the draft month follows at once
+        page = self.client.get(reverse("employees:list"))
+        self.assertContains(page, "New salary from November 2026 for 1 people.")
+
+    def test_salary_change_can_be_skipped(self):
+        self.client.post(reverse("employees:upload"), {"file": self.export_with({"E002": {"Basic": 10000}})})
+        self.client.post(reverse("employees:upload_confirm"), {"salaries": "keep"})
+        self.assertEqual(self.employee("E002").structure_on(NOV).basic, D(9000))
+
+    def test_finalised_month_not_offered(self):
+        self.finalise_november()
+        response = self.client.post(reverse("employees:upload"), {"file": self.export_with({"E002": {"Basic": 10000}})})
+        months = [m.strftime("%Y-%m") for m in response.context["months"]]
+        self.assertNotIn("2026-11", months)
+        self.client.post(reverse("employees:upload_confirm"), {"salaries": "change", "month": "2026-11"})
+        self.assertEqual(self.employee("E002").structure_on(NOV).basic, D(9000))  # November is locked
+        self.assertEqual(self.employee("E002").structure_on(date(2026, 12, 1)).basic, D(10000))
+
+    def test_new_designation_typed_in(self):
+        data = dict(FORM, designation_name="Store Keeper", department_name="godown")
+        response = self.client.post(reverse("employees:add"), data)
+        emp = Employee.objects.get(company=self.srks, emp_code="E008")
+        self.assertRedirects(response, reverse("employees:detail", args=[emp.pk]))
+        self.assertEqual(emp.designation.name, "Store Keeper")
+        self.assertEqual(emp.department.name, "godown")
+        data = dict(FORM, emp_code="E009", pan="", designation_name="store keeper")  # same name, other case
+        self.client.post(reverse("employees:add"), data)
+        self.assertEqual(Employee.objects.get(company=self.srks, emp_code="E009").designation, emp.designation)
+
+    def test_save_and_add_another(self):
+        response = self.client.post(reverse("employees:add"), dict(FORM, then="another"))
+        self.assertRedirects(response, reverse("employees:add"))
+        self.assertContains(self.client.get(reverse("employees:add")), 'value="E009"')
+
+    def test_duplicate_uan_refused(self):
+        response = self.client.post(reverse("employees:add"), dict(FORM, uan="101234567802"))
+        self.assertContains(response, "This UAN already belongs to Sunita Devi (E002).")
+
+    def test_first_day_shows_start_here(self):
+        from accounts.models import User
+        from companies.models import Company
+
+        shop = Company.objects.create(code="NEWS", legal_name="New Shop", trade_name="New Shop",
+                                      address_line1="1 Road", city="Pune", state="MH", pincode="411001",
+                                      payroll_start_month=NOV)
+        self.client.force_login(User.objects.create_user(username="9000000001", password="x-pass-123", company=shop))
+        self.assertContains(self.client.get(reverse("home")), "Start here: add your employees")
+        page = self.client.get(reverse("payroll:month", args=[NOV]))
+        self.assertContains(page, "No one is paid in November 2026 yet. Add your employees first")
+        response = self.client.post(reverse("employees:add"), dict(FORM, emp_code="E001", designation_name="Helper"))
+        self.assertEqual(response.status_code, 302)  # first employee added without any setup page

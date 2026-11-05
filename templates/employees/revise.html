@@ -9,10 +9,10 @@
     <thead><tr><th>{% translate "Part of salary" %}</th><th class="num">{% translate "Now ₹ per month" %}</th><th>{% translate "New ₹ per month" %}</th></tr></thead>
     <tbody>
       <tr><td>{{ form.basic.label_tag }}</td><td class="num">{{ current.basic|inr }}</td><td>{{ form.basic }}{% for e in form.basic.errors %}<div class="field-error">{{ e }}</div>{% endfor %}</td></tr>
-      <tr><td>{{ form.da.label_tag }}</td><td class="num">{{ current.da|inr }}</td><td>{{ form.da }}</td></tr>
-      <tr><td>{{ form.hra.label_tag }}</td><td class="num">{{ current.hra|inr }}</td><td>{{ form.hra }}</td></tr>
-      <tr><td>{{ form.conveyance.label_tag }}</td><td class="num">{{ current.conveyance|inr }}</td><td>{{ form.conveyance }}</td></tr>
-      <tr><td>{{ form.other_allowance.label_tag }}</td><td class="num">{{ current.other_allowance|inr }}</td><td>{{ form.other_allowance }}</td></tr>
+      <tr><td>{{ form.da.label_tag }}</td><td class="num">{{ current.da|inr }}</td><td>{{ form.da }}{% for e in form.da.errors %}<div class="field-error">{{ e }}</div>{% endfor %}</td></tr>
+      <tr><td>{{ form.hra.label_tag }}</td><td class="num">{{ current.hra|inr }}</td><td>{{ form.hra }}{% for e in form.hra.errors %}<div class="field-error">{{ e }}</div>{% endfor %}</td></tr>
+      <tr><td>{{ form.conveyance.label_tag }}</td><td class="num">{{ current.conveyance|inr }}</td><td>{{ form.conveyance }}{% for e in form.conveyance.errors %}<div class="field-error">{{ e }}</div>{% endfor %}</td></tr>
+      <tr><td>{{ form.other_allowance.label_tag }}</td><td class="num">{{ current.other_allowance|inr }}</td><td>{{ form.other_allowance }}{% for e in form.other_allowance.errors %}<div class="field-error">{{ e }}</div>{% endfor %}</td></tr>
     </tbody>
     <tfoot><tr><td>{% translate "Monthly gross now" %}</td><td class="num">{{ current.gross|inr }}</td><td class="muted">{% translate "The change is shown after you save." %}</td></tr></tfoot>
   </table>

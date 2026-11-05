@@ -1,5 +1,16 @@
 {% extends "base.html" %}{% load i18n mtn %}
 {% block content %}
+{% if not active_count %}
+<section class="box box-highlight" aria-labelledby="start-here">
+  <h2 id="start-here">{% translate "Start here: add your employees" %}</h2>
+  <p>{% translate "Salary work starts once your staff are in the app. Add them one by one, or all together from an Excel file." %}</p>
+  <div class="actions">
+    <a class="btn btn-primary" href="{% url 'employees:add' %}">{% translate "Add employee" %}</a>
+    <a class="btn" href="{% url 'employees:upload' %}">{% translate "Upload from Excel" %}</a>
+    <a href="{% url 'companies:company' %}">{% translate "Check your company details" %}</a>
+  </div>
+</section>
+{% else %}
 <section class="box box-highlight" aria-labelledby="this-month">
   <h2 id="this-month">{% blocktranslate with month=open_month|month_label %}This month: {{ month }}{% endblocktranslate %}</h2>
   <ol class="checklist">
@@ -13,10 +24,11 @@
     <a href="{% url 'reports:payslips' last.month %}">{% translate "Print payslips" %}</a> ·
     <a href="{% url 'reports:register' last.month %}">{% translate "Salary register" %}</a> ·
     <a href="{% url 'reports:bank_sheet' last.month %}">{% translate "Bank sheet" %}</a> ·
-    <a href="{% url 'reports:pf' last.month %}">{% translate "PF and ECR file" %}</a> ·
-    <a href="{% url 'reports:esi' last.month %}">{% translate "ESI file" %}</a></p>
+    {% if request.company.pf_enabled %}<a href="{% url 'reports:pf' last.month %}">{% translate "PF and ECR file" %}</a>{% endif %}
+    {% if request.company.esi_enabled %} · <a href="{% url 'reports:esi' last.month %}">{% translate "ESI file" %}</a>{% endif %}</p>
   {% endif %}
 </section>
+{% endif %}
 
 <div class="stats">
   <div class="stat"><div class="label">{% translate "Active employees" %}</div><div class="value">{{ active_count }}</div></div>

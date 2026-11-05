@@ -1,6 +1,8 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import sensible_date
+
 from .models import LetterType
 from .render import eligible_employees
 
@@ -9,7 +11,7 @@ DATE_FORMATS = ["%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"]
 
 class ChooseForm(forms.Form):
     employee = forms.ModelChoiceField(queryset=None, label=_("Employee"), empty_label=_("— choose —"))
-    date = forms.DateField(label=_("Date of the letter"), input_formats=DATE_FORMATS,
+    date = forms.DateField(label=_("Date of the letter"), input_formats=DATE_FORMATS, validators=[sensible_date],
                            widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
 
     def __init__(self, company, letter_type, *args, **kwargs):

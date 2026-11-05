@@ -26,6 +26,7 @@ from .models import REF_CODES, IssuedLetter, LetterTemplate, LetterType
 
 PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-z_.]+)\s*\}\}")
 ANY_BRACES_RE = re.compile(r"\{\{(.*?)\}\}", re.S)
+HALF_CLOSED_RE = re.compile(r"\{\{[^{}]*\}(?!\})")
 TABLE_RE = re.compile(r"\{\{\s*letter\.particulars_table\s*\}\}")
 TABLE_KEY = "letter.particulars_table"
 REF_KEY = "letter.ref_no"
@@ -277,6 +278,9 @@ def unknown_placeholders(text):
             shown = "{{ " + " ".join(match.group(1).split()) + " }}"
             if shown not in found:
                 found.append(shown)
+    for match in HALF_CLOSED_RE.finditer(_normalise(text)):  # {{ emp.full_name }  (one closing brace)
+        if match.group(0) not in found:
+            found.append(match.group(0))
     return found
 
 

@@ -22,7 +22,9 @@ def client_ip(request):
 def _plain(value):
     if isinstance(value, Model):
         return str(value.pk)
-    if isinstance(value, (Decimal, date, datetime)):
+    if isinstance(value, Decimal):
+        return f"{value.normalize():f}"  # 200000.00 and 200000 are the same amount
+    if isinstance(value, (date, datetime)):
         return str(value)
     if isinstance(value, FieldFile):
         return value.name or ""

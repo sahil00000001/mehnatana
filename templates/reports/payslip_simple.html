@@ -1,0 +1,51 @@
+{% load i18n mtn %}{% with line=slip.line s=slip.s %}
+<article class="payslip simple{% if two_per_page %} compact{% endif %}" aria-label="{% translate 'Wage slip' %} {{ s.name }}">
+  <header class="ps-head">
+    {% if company.logo %}<img src="{% url 'files_logo' %}" alt="">{% endif %}
+    <div class="ps-name">{{ company.trade_name }}</div>
+    <div class="ps-sub">{{ company.address }}</div>
+    <div class="ps-title">{% blocktranslate with month=period_start|month_label %}Salary slip — {{ month }}{% endblocktranslate %} <span class="ps-sub">({% translate "Form V" %})</span>{% if revised %} <span class="revised">{% translate "Revised" %}</span>{% endif %}</div>
+  </header>
+
+  <table class="print ps-who">
+    <tr><td><strong>{% translate "Name" %}:</strong> {{ s.name }} ({{ s.code }})</td><td><strong>{{ slip.relation_label }}:</strong> {{ s.relation_name }}</td></tr>
+    <tr><td><strong>{% translate "Designation" %}:</strong> {{ s.designation }}</td><td><strong>{% translate "Date of joining" %}:</strong> {{ s.doj }}</td></tr>
+    <tr><td><strong>{% translate "Days" %}:</strong> {% blocktranslate with paid=line.paid_days|num dim=line.days_in_month lop=line.lop|num %}{{ paid }} paid of {{ dim }} (LOP {{ lop }}){% endblocktranslate %}{% if line.ot_hours %} · {% translate "OT" %} {{ line.ot_hours|num }} h{% endif %}</td>
+        <td><strong>{% translate "Wage period" %}:</strong> {{ period_start|dmy }} – {{ period_end|dmy }}</td></tr>
+    <tr><td><strong>{% translate "UAN" %}:</strong> {{ s.uan|default:"—" }} · <strong>{% translate "ESIC" %}:</strong> {{ s.esic_ip_no|default:"—" }}</td>
+        <td><strong>{% translate "Paid by" %}:</strong> {{ s.payment_mode }}{% if s.bank_account_no %} · {{ s.bank_account_no }}{% endif %}</td></tr>
+  </table>
+
+  <table class="print ps-money">
+    <tr class="ps-sec"><th>{% translate "Earnings" %}</th><th class="num">₹</th></tr>
+    {% for label, rate, earned in slip.earnings %}
+    <tr><td>{{ label }}{% if rate %} <span class="ps-rate">({% translate "rate" %} {{ rate|inr }})</span>{% endif %}</td><td class="num">{{ earned|inr }}</td></tr>
+    {% endfor %}
+    <tr class="ps-subtotal"><td>{% translate "Gross" %}</td><td class="num">{{ line.gross|inr }}</td></tr>
+    <tr class="ps-sec"><th>{% translate "Deductions" %}</th><th class="num">₹</th></tr>
+    {% for label, amount in slip.deductions %}
+    <tr><td>{{ label }}</td><td class="num">{{ amount|inr }}</td></tr>
+    {% empty %}
+    <tr><td>{% translate "No deductions" %}</td><td class="num">0</td></tr>
+    {% endfor %}
+    <tr class="ps-subtotal"><td>{% translate "Total deductions" %}</td><td class="num">{{ line.total_deductions|inr }}</td></tr>
+    <tr class="ps-net"><td>{% translate "NET PAY" %}</td><td class="num">₹ {{ line.net_pay|inr }}</td></tr>
+  </table>
+  <p class="ps-small">{% translate "In words" %}: {{ line.net_pay|words }}</p>
+  {% if company.payslip_show_employer %}<p class="ps-small">{% translate "Employer also paid" %}: {% translate "PF" %} {{ line.er_pf_total|inr }} · {% translate "EDLI" %} {{ line.edli|inr }} · {% translate "PF admin" %} {{ line.pf_admin|inr }} · {% translate "ESI" %} {{ line.er_esi|inr }}</p>{% endif %}
+  {% if slip.advance_balance %}<p class="ps-small">{% translate "Advance balance after this month" %}: ₹ {{ slip.advance_balance|inr }}</p>{% endif %}
+  {% if line.remarks %}<p class="ps-small">{% translate "Remarks" %}: {{ line.remarks }}</p>{% endif %}
+  {% if company.payslip_note %}<p class="ps-small ps-note">{{ company.payslip_note }}</p>{% endif %}
+
+  <div class="ps-receipt">
+    <div>
+      <div>{% blocktranslate with amount=line.net_pay|inr month=period_start|month_label %}I have received ₹ {{ amount }} as my salary for {{ month }}.{% endblocktranslate %}</div>
+      <div class="ps-line">{% translate "Signature / thumb impression of employee" %} &nbsp;·&nbsp; {% translate "Date" %}</div>
+    </div>
+    <div>
+      <div>{% blocktranslate with company=company.trade_name %}For {{ company }}{% endblocktranslate %} · {% translate "Date of issue" %}: {{ issue_date|dmy }}</div>
+      <div class="ps-line">{% if company.signatory_name %}{{ company.signatory_name }}{% else %}{% translate "Employer / Pay-in-charge" %}{% endif %}</div>
+    </div>
+  </div>
+</article>
+{% endwith %}

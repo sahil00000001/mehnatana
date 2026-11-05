@@ -47,6 +47,44 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 - **ID columns** (UAN, IP, account, mobile, PAN, IFSC) are Excel Text cells, so long numbers and leading zeros survive.
 - **Dates** are DD-MM-YYYY (or a real Excel date or ISO). The US month/day order and 2-digit years are never accepted. The same applies in forms, so `05/11/2026` means 5 November.
 
+## Making it easy for the owner (added after testing)
+
+- **Salary in the employee sheet.** When an uploaded employee list has a different salary (Basic, DA, HRA, Conveyance, Other) for someone already in the app, nothing is ignored silently. The app shows one page listing each change (now → in your file) with a "New salary from" month and two buttons: "Yes, save and change these salaries" or "Save, but keep the old salaries". The old salary stays in the history, and finalised months are never offered. An empty Basic cell means "no salary given" and is not a change.
+- **Draft months follow changes at once.** Revise salary, editing or relieving an employee, an employee upload, payroll rules and opening balances all recalculate the draft months straight away. Finalised months never change.
+- **Designation and Department are type-in boxes with suggestions.** A new name is created on save, so a brand-new shop can add its first employee without visiting Settings. Names are matched ignoring capitals.
+- **"Save and add another"** on the Add employee form.
+- **No duplicate numbers.** The same UAN, PAN, ESIC IP number or Aadhaar on two people is refused, in the form and in the upload.
+- **Monthly sheet with empty days.** A completely unfilled sheet is refused with one message ("No days are filled in this sheet"). A single row with all day columns empty is refused for that row. Before this change, both would have paid ₹0.
+- **Headings are matched forgivingly**, ignoring capitals, spaces, ₹, "*", "(optional)" and punctuation. A column we do not know, which has something written in it, is refused with a clear message, because silently ignoring it could lose data (for example a hand-renamed "Increment" column). An empty extra column is fine.
+- **A new shop's Home page** says "Start here: add your employees". Uploading a month with no one to pay explains what to do instead.
+
+## Payslip designs
+
+- **Three designs, chosen per company** under Settings → Payslip design: *Classic ledger* (the README §11.1 Form V layout), *Modern* (shaded header, details grid, monthly rate next to each earning, large net pay box) and *Simple, with receipt* (one table plus a signature/thumb-impression receipt strip for cash pay). The platform admin can also set the design when creating the company.
+- **Same particulars in every design.** All three print every Form V particular; only the layout differs. Modern and Simple leave out earnings and deductions that are zero; Classic shows every row, like a register.
+- **Previews.** The settings page shows each design with the company's latest payslip, or a sample employee before the first month.
+- **Options on the same page:** show or hide what the employer also paid (PF, EDLI, PF admin, ESI); two payslips per A4 sheet (moved here from Payroll rules); an optional note printed at the bottom.
+
+## Safety checks added after testing
+
+- **Amount limits.** Every amount box accepts its own displayed value (12000, 12000.00, 12,000 or ₹12000). Any single amount above ₹99,99,999, and more than 300 overtime hours in a month, is refused as a typing mistake; larger values would not fit the database columns.
+- **Notes for doubtful values** (shown, not blocking): more than 100 OT hours; a TDS override above 30% of the salary; weekly offs left empty so those days became LOP.
+- **What the owner confirms is what gets locked.** The Finalise page works the month out again before showing the totals. Finalising is refused while someone who should be paid that month is missing from the sheet, and for a month that has not started yet.
+- **Finalised months are not contradicted.** A date of joining cannot move after a month the person was already paid for. A last working day cannot fall before the days a finalised month paid for. New staff whose joining month is already finalised are told they will be paid from the next open month.
+- **Advances.** Only advances given by the end of a month are recovered in it, and an advance cannot be dated in the future.
+- **Leavers' TDS.** For someone who leaves in the month, TDS is worked out on actual pay and settled in that month, instead of projecting salary until March (NOTE in `payroll/engine.py`). The README's numbers are unchanged.
+- **People serving notice.** Someone with a future last working day still counts as working: they appear in the Active list as "Leaving on …" and can be given an advance.
+- **Careful sheet reading:**
+  - The monthly sheet must keep all of its columns, because a deleted column would silently become 0.
+  - In the employee list, a missing column keeps the saved values, and rows that changed nothing are reported as "already up to date".
+  - Emp codes are matched ignoring capitals and spaces.
+  - A row with data but no Emp Code is pointed out.
+  - Mobile numbers may be written with +91 or a leading 0.
+- **Excel downloads never contain live formulas.** Text that starts with "=" (in a name, a note and so on) is written as plain text.
+- **Logos are saved as .png or .jpg** according to the file's real content, not its name.
+- **Statutory table changes in the admin** are applied to every company's draft months at once. Admin edits to logins and bulk deletes are audit-logged. "Create owner login" finds a free username.
+- **Error pages.** A friendly page is shown for server errors and for an expired form (CSRF).
+
 ## Logins and admin
 
 - **Lockout everywhere.** The 5-wrong-passwords lockout sits in the authentication backend, so it also protects `/admin/`.
@@ -90,6 +128,13 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 - Static files use WhiteNoise without a manifest, so the app (and the tests) run with `DEBUG=False` before `collectstatic`.
 - Docker Compose runs `web` and `caddy` against Supabase. A local `postgres:16` `db` service is available with `--profile localdb`.
 - Backups dump only the `mehnatana` schema (`pg_dump --schema`) plus the media folder (`scripts/backup.sh`).
+
+## Known limitations
+
+- **Formula cells.** A sheet whose formula cells were never calculated (made by a program, not saved by Excel) is read as if those cells were empty. Files saved by Excel always work.
+- **Merged cells** in an uploaded sheet are read only in their first row.
+- **Very large uploads.** Uploads of thousands of rows are slow (10,000 employees take about a minute). Gunicorn's timeout is 120 seconds.
+- **Full PAN and bank account on the payslip.** The payslip shows these in full, as in the README §11.1 example; lists and other screens mask them.
 
 ## Not verified yet
 

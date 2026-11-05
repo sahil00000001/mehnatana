@@ -18,9 +18,9 @@ from excel_io.parsers import SheetError, parse_opening, read_upload
 from payroll import service
 from payroll.forms import UploadForm
 from payroll.models import PayrollRun
-from statutory.rates import MissingRate, has_pt_slabs
+from statutory.rates import has_pt_slabs
 
-from .forms import CompanyDetailsForm, OpeningBalanceForm, PayrollRulesForm
+from .forms import CompanyDetailsForm, OpeningBalanceForm, PayrollRulesForm, PayslipDesignForm
 
 OPENING_KIND = "opening"
 OPENING_FIELDS = ["ytd_gross", "ytd_tds", "ytd_pt", "prev_employer_income", "prev_employer_tds"]
@@ -47,14 +47,9 @@ def company_details(request):
 
 def _recalculate_drafts(request, company):
     """Draft months are worked out again with the new rules. Problems are reported, not hidden."""
-    for run in PayrollRun.objects.filter(company=company, status=PayrollRun.Status.DRAFT):
-        if not run.lines.exists():
-            continue
-        try:
-            service.recompute_run(run)
-        except (service.PayrollError, MissingRate) as exc:
-            messages.warning(request, _("%(month)s could not be worked out again: %(problem)s Upload its sheet again.")
-                             % {"month": run.label, "problem": exc})
+    for label, problem in service.recalculate_drafts(company):
+        messages.warning(request, _("%(month)s could not be worked out again: %(problem)s Upload its sheet again.")
+                         % {"month": label, "problem": problem})
 
 
 @owner_required
@@ -65,7 +60,8 @@ def payroll_rules(request):
     pt_warning = ""
     state = (request.POST.get("pt_state") if request.method == "POST" else None) or company.pt_state or company.state
     if not has_pt_slabs(state, timezone.localdate()):
-        pt_warning = _("No PT slabs set for your state — PT will be 0. Ask your administrator to add them.")
+        pt_warning = _("No professional tax slabs are set for your state, so PT will be 0. Many states (like Delhi) "
+                       "have no professional tax. If yours has, ask your administrator to add the slabs.")
     form = PayrollRulesForm(request.POST or None, instance=company, start_locked=started, pt_warning=pt_warning)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
@@ -78,13 +74,42 @@ def payroll_rules(request):
                 _("Each rule has a short explanation. Change what is needed and press Save."), form=form)
 
 
+@owner_required
+def payslip_design(request):
+    from reports import payslip as designs
+
+    company = request.company
+    before = snapshot(company)
+    form = PayslipDesignForm(request.POST or None, instance=company)
+    if request.method == "POST" and form.is_valid():
+        company = form.save()
+        audit(request, "settings.payslip", company, {"changes": diff(before, snapshot(company))})
+        messages.success(request, _("Saved. Payslips will now print in the %(style)s design.")
+                         % {"style": company.get_payslip_style_display()})
+        return redirect("companies:payslip_design")
+    preview = designs.preview_context(company)
+    choices = [{"value": value, "label": label, "note": designs.STYLE_NOTES[value],
+                "template": designs.STYLE_TEMPLATES[value], "checked": form["payslip_style"].value() == value}
+               for value, label in company.PayslipStyle.choices]
+    return page(request, "companies/payslip_design.html", _("Payslip design"),
+                _("Choose how your payslips look, then press Save. Every design has all the details the law asks for."),
+                form=form, choices=choices, **preview)
+
+
 # ---------------------------------------------------------------- opening balances
 def _tax_year(request):
     default = tax_year_of(request.company.payroll_start_month)
     try:
-        return int(request.GET.get("year", default))
+        year = int(request.GET.get("year", default))
     except ValueError:
         return default
+    return year if 2000 <= year <= 2100 else default
+
+
+def _opening_upload_form(*args):
+    form = UploadForm(*args)
+    form.fields["file"].label = _("Opening balances sheet (.xlsx)")
+    return form
 
 
 @owner_required
@@ -101,7 +126,7 @@ def opening_balances(request):
                 _("Only needed if you started using the app after April, or a new person had another job earlier "
                   "this tax year. Used only for income tax (TDS)."),
                 rows=rows, year=year, year_label=tax_year_label(year), years=[(y, tax_year_label(y)) for y in years],
-                upload_form=UploadForm(), start_label=month_label(company.payroll_start_month))
+                upload_form=_opening_upload_form(), start_label=month_label(company.payroll_start_month))
 
 
 @owner_required
@@ -141,7 +166,7 @@ def opening_upload(request):
     company = request.company
     if request.method != "POST":
         return redirect("companies:opening_balances")
-    form = UploadForm(request.POST, request.FILES)
+    form = _opening_upload_form(request.POST, request.FILES)
     data, rows, errors, file_errors = None, [], [], []
     if form.is_valid():
         try:
@@ -166,7 +191,6 @@ def opening_upload(request):
     forget_failed_upload(request, OPENING_KIND)
     if data is not None and errors:
         remember_failed_upload(request, OPENING_KIND, data, errors, file_errors)
-    messages.error(request, _("Nothing was saved. Please correct the mistakes listed below and upload again."))
     year = _tax_year(request)
     return page(request, "companies/opening_upload_result.html", _("Opening balances — mistakes"),
                 _("Correct these mistakes in your file and upload it again."), upload_errors=errors,

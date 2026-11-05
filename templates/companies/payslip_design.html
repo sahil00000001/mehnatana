@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% load i18n static %}
+{% block head %}<link rel="stylesheet" href="{% static 'css/print.css' %}">{% endblock %}
+{% block content %}
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  <p class="muted">{% if is_sample %}{% translate "The pictures use a sample employee. After your first month they show your own figures." %}{% else %}{% blocktranslate with name=slip.s.name %}The pictures use {{ name }}'s latest payslip.{% endblocktranslate %}{% endif %}</p>
+
+  <div class="design-choices" role="radiogroup" aria-label="{% translate 'Payslip design' %}">
+    {% for choice in choices %}
+    <label class="design-card{% if choice.checked %} chosen{% endif %}">
+      <span class="design-pick">
+        <input type="radio" name="payslip_style" value="{{ choice.value }}"{% if choice.checked %} checked{% endif %}>
+        <strong>{{ choice.label }}</strong>
+      </span>
+      <span class="design-note">{{ choice.note }}</span>
+      <span class="slip-preview" aria-hidden="true"><span class="slip-paper">{% include choice.template %}</span></span>
+    </label>
+    {% endfor %}
+  </div>
+
+  <div class="form">
+    <fieldset><legend>{% translate "What every payslip shows" %}</legend>
+      {% include "includes/field.html" with field=form.payslip_show_employer %}
+      {% include "includes/field.html" with field=form.payslip_two_per_page %}
+      {% include "includes/field.html" with field=form.payslip_note %}
+    </fieldset>
+    <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+      <a href="{% url 'companies:index' %}">{% translate "Go back" %}</a></div>
+  </div>
+</form>
+{% endblock %}

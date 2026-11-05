@@ -5,7 +5,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
-from core.formatting import month_label, plain_number
+from core.formatting import indian_format, month_label
 from core.tenancy import company_get, owner_required, page
 from excel_io import builders
 from excel_io.common import as_number, table_workbook, xlsx_response
@@ -61,6 +61,7 @@ def _month_context(request, month, run, **extra):
         "totals": totals, "has_lines": has_lines, "only_notes": only_notes,
         "is_final": bool(run and run.is_final), "upload_form": UploadForm(),
         "finalise_blockers": service.finalise_blockers(run) if run and has_lines and not run.is_final else [],
+        "can_reopen": bool(run and run.is_final and not service.reopen_blockers(run)),
     }
     context.update(extra)
     return context
@@ -122,7 +123,6 @@ def upload(request, month):
             remember_failed_upload(request, _kind(month), data, errors, file_errors)
         context = _month_context(request, month, run, upload_errors=errors, file_errors=file_errors,
                                  errors_file=bool(data is not None and errors))
-        messages.error(request, _("Nothing was saved. Please correct the mistakes listed below and upload again."))
         return page(request, "payroll/month.html", title, instruction, **context)
     try:
         run = service.save_inputs(company, month, rows, request.user,
@@ -156,7 +156,11 @@ def line_edit(request, month, line_id):
     form = LineForm(request.POST or None, initial=LineForm.initial_from(line))
     if request.method == "POST" and form.is_valid():
         row = form.row_input()
-        ctx = service.RunContext(request.company, month)
+        try:
+            ctx = service.RunContext(request.company, month)
+        except MissingRate as exc:
+            messages.error(request, str(exc))
+            return redirect("payroll:month", month=month)
         emp = next((e for e in ctx.employees if e.pk == line.employee_id), None)
         problems = service.check_row(ctx, emp, row) if emp else [("present", _("This employee is not paid this month."))]
         for key, message in problems:
@@ -168,7 +172,7 @@ def line_edit(request, month, line_id):
                 form.add_error(None, str(exc))
             else:
                 messages.success(request, _("Saved. %(name)s: net pay is now ₹%(net)s.")
-                                 % {"name": line.name, "net": plain_number(line.net_pay)})
+                                 % {"name": line.name, "net": indian_format(line.net_pay)})
                 return redirect(reverse("payroll:month", args=[month]) + "#review")
     return page(request, "payroll/line_edit.html", _("Change %(name)s — %(month)s") % {"name": line.name, "month": run.label},
                 _("Change the numbers and press Save. The salary is worked out again."), form=form, line=line, run=run)
@@ -181,6 +185,12 @@ def finalise(request, month):
         messages.error(request, _("Upload the attendance sheet first."))
         return redirect("payroll:month", month=month)
     blockers = service.finalise_blockers(run)
+    if not blockers:
+        # Work the month out again now, so the totals the owner confirms are exactly what gets locked.
+        try:
+            service.recompute_run(run)
+        except (service.PayrollError, MissingRate) as exc:
+            blockers = [str(exc)]
     if request.method == "POST" and not blockers:
         try:
             service.finalise(run, request.user, request=request)

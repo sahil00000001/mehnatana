@@ -49,6 +49,42 @@ def _model_errors(exc, row, code, name):
     return errors
 
 
+def salary_changes(company, rows):
+    """Existing employees whose salary in the sheet differs from their latest salary in the app.
+
+    A row with an empty Basic means "no salary given" and is skipped; other empty
+    salary cells count as 0 (as the sample says).
+    """
+    codes = [r["emp_code"] for r in rows if not r["_new"] and r.get("basic") is not None]
+    employees = Employee.objects.filter(company=company, emp_code__in=codes).prefetch_related("revisions")
+    by_code = {e.emp_code: e for e in employees}
+    changes = []
+    for row in rows:
+        emp = by_code.get(row["emp_code"])
+        if emp is None:
+            continue
+        latest = max(emp.revisions.all(), key=lambda r: (r.effective_from, r.pk), default=None)
+        old = {n: (getattr(latest, n) if latest else Decimal("0")) for n in SALARY}
+        new = {n: row.get(n) or Decimal("0") for n in SALARY}
+        if any(old[n] != new[n] for n in SALARY):
+            changes.append({"employee": emp, "code": emp.emp_code, "name": emp.full_name, "old": old, "new": new,
+                            "old_gross": sum(old.values()), "new_gross": sum(new.values())})
+    return changes
+
+
+def apply_salary_changes(company, changes, month, user, request=None):
+    """New salary structure from `month` for each change (old salaries stay in the history)."""
+    for change in changes:
+        rev = SalaryRevision.objects.create(
+            company=company, employee=change["employee"], effective_from=month,
+            source=SalaryRevision.Source.MANUAL, reason="Changed by employee upload", created_by=user,
+            **change["new"])
+        audit(request, "salary.revise", rev, {"employee": change["code"], "from": str(month), "source": "upload",
+                                              "old_gross": change["old_gross"], "new_gross": change["new_gross"]},
+              company=company)
+    return len(changes)
+
+
 def save_employees(company, rows, user, request=None):
     """Create new employees (with their first salary structure) and update existing ones. Returns (added, updated)."""
     added = updated = 0
@@ -105,9 +141,10 @@ def save_employees(company, rows, user, request=None):
                 added += 1
                 audit(request, "employee.create", emp, {"source": "upload"}, company=company)
             else:
-                updated += 1
-                audit(request, "employee.update", emp, {"source": "upload", "changes": diff(before, snapshot(emp))},
-                      company=company)
+                changes = diff(before, snapshot(emp))
+                if changes:
+                    updated += 1
+                    audit(request, "employee.update", emp, {"source": "upload", "changes": changes}, company=company)
             saved[code] = (emp, row)
         if errors:
             raise UploadRejected(errors)

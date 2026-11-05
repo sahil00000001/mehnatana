@@ -54,7 +54,17 @@ def table_workbook(sheet_title, headers, rows, money_columns=(), totals=None, wi
     return wb
 
 
+def neutralise_formulas(wb):
+    """Text typed by people (names, notes) that starts with '=' must stay text in Excel, never a formula."""
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.data_type == "f":
+                    cell.data_type = "s"
+
+
 def workbook_bytes(wb):
+    neutralise_formulas(wb)
     buffer = BytesIO()
     wb.save(buffer)
     return buffer.getvalue()

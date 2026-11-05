@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from core.audit import audit
-from core.formatting import plain_number
+from core.formatting import indian_format
 from core.tenancy import company_get, owner_required, page
 from employees.models import Employee
 
@@ -57,7 +57,7 @@ def advance_add(request):
         audit(request, "advance.create", adv, {"employee": adv.employee.emp_code, "amount": adv.amount,
                                                "instalment": adv.monthly_installment})
         messages.success(request, _("Advance of ₹%(amount)s given to %(name)s. ₹%(cut)s will be cut every month.") % {
-            "amount": plain_number(adv.amount), "name": adv.employee.full_name, "cut": plain_number(adv.monthly_installment)})
+            "amount": indian_format(adv.amount), "name": adv.employee.full_name, "cut": indian_format(adv.monthly_installment)})
         return redirect("advances:detail", pk=adv.pk)
     return page(request, "advances/form.html", _("Give advance"),
                 _("Fill this form and press Save."), form=form)
@@ -76,7 +76,7 @@ def advance_detail(request, pk):
             adv.monthly_installment = new
             adv.save(update_fields=["monthly_installment", "updated_at"])
             audit(request, "advance.instalment", adv, {"before": old, "after": new})
-            messages.success(request, _("Monthly cut changed to ₹%(cut)s.") % {"cut": plain_number(new)})
+            messages.success(request, _("Monthly cut changed to ₹%(cut)s.") % {"cut": indian_format(new)})
             return redirect("advances:detail", pk=adv.pk)
     recoveries = adv.recoveries.select_related("payroll_line__run").order_by("month")
     return page(request, "advances/detail.html",

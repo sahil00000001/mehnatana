@@ -45,7 +45,7 @@
       <td class="num">{{ row.gross|inr }}</td>
       <td>{% if row.pf %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td>
       <td>{% if row.esi %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</td>
-      <td>{% if row.emp.status == "ACTIVE" %}{% translate "Active" %}{% else %}{% blocktranslate with d=row.emp.date_of_leaving|dmy %}Relieved {{ d }}{% endblocktranslate %}{% endif %}</td>
+      <td>{% if row.leaving_on %}{% blocktranslate with d=row.leaving_on|dmy %}Leaving on {{ d }}{% endblocktranslate %}{% elif row.emp.status == "ACTIVE" %}{% translate "Active" %}{% else %}{% blocktranslate with d=row.emp.date_of_leaving|dmy %}Relieved {{ d }}{% endblocktranslate %}{% endif %}</td>
     </tr>
   {% empty %}
     <tr><td colspan="9">{% translate "No employees found." %} {% if not q and status == "ACTIVE" %}<a href="{% url 'employees:add' %}">{% translate "Add the first one" %}</a>.{% endif %}</td></tr>

@@ -66,7 +66,8 @@ class IsolationTest(DemoTestCase):
     def test_form_choices_only_own_company(self):
         form = self.client.get(reverse("employees:add")).context["form"]
         self.assertFalse(form.fields["reports_to"].queryset.filter(company=self.anps).exists())
-        self.assertFalse(form.fields["designation"].queryset.filter(company=self.anps).exists())
+        self.assertNotIn("Sweet Maker", form.fields["designation_name"].widget.options)
+        self.assertIn("Cashier", form.fields["designation_name"].widget.options)
         response = self.client.get(reverse("advances:add"))
         self.assertFalse(response.context["form"].fields["employee"].queryset.filter(company=self.anps).exists())
 

@@ -120,10 +120,10 @@
       <a class="btn" href="{% url 'reports:register' month %}">{% translate "Print salary register" %}</a>
       <a class="btn" href="{% url 'reports:bank_sheet' month %}">{% translate "Bank transfer sheet (Excel)" %}</a>
       <a class="btn" href="{% url 'reports:cash_list' month %}">{% translate "Cash payment list (print)" %}</a>
-      <a class="btn" href="{% url 'reports:pf' month %}">{% translate "PF ECR file" %}</a>
-      <a class="btn" href="{% url 'reports:esi' month %}">{% translate "ESI upload file" %}</a>
+      {% if request.company.pf_enabled %}<a class="btn" href="{% url 'reports:pf' month %}">{% translate "PF ECR file" %}</a>{% endif %}
+      {% if request.company.esi_enabled %}<a class="btn" href="{% url 'reports:esi' month %}">{% translate "ESI upload file" %}</a>{% endif %}
     </div>
-    <p><a href="{% url 'payroll:reopen' month %}">{% translate "Reopen this month" %}</a> — {% translate "only if you made a mistake." %}</p>
+    {% if can_reopen %}<p><a href="{% url 'payroll:reopen' month %}">{% translate "Reopen this month" %}</a> — {% translate "only if you made a mistake." %}</p>{% endif %}
     {% elif has_lines %}
       <p class="muted">{% translate "Available after finalising." %} <a href="{% url 'reports:payslips' month %}">{% translate "Preview payslips (draft)" %}</a> · <a href="{% url 'reports:register' month %}">{% translate "Preview register (draft)" %}</a></p>
     {% else %}

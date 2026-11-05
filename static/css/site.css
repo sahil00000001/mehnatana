@@ -212,6 +212,11 @@ tr.has-notes td.notes { color: var(--warn-ink); }
 .side-by-side { display: flex; flex-wrap: wrap; gap: 18px; }
 .side-by-side > * { flex: 1 1 320px; }
 
+@media (max-width: 700px) {
+  /* a wide table scrolls inside itself instead of pushing the page sideways */
+  main table.ledger { display: block; overflow-x: auto; max-width: 100%; }
+}
+
 @media (max-width: 600px) {
   body { font-size: 16px; }
   h1 { font-size: 25px; }
@@ -227,3 +232,15 @@ tr.has-notes td.notes { color: var(--warn-ink); }
 code { font-family: Consolas, "Courier New", monospace; font-size: 15px; background: var(--head-bg); padding: 1px 4px; }
 
 /* ---------------- reports */
+
+/* ---------------- payslip design page */
+.design-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin: 8px 0 22px; }
+.design-card { display: flex; flex-direction: column; gap: 6px; border: 2px solid var(--rule-dark); background: var(--white); padding: 12px; cursor: pointer; }
+.design-card:hover { border-color: var(--maroon); }
+.design-card.chosen, .design-card:has(input:checked) { border-color: var(--maroon); box-shadow: 0 0 0 2px var(--maroon); }
+.design-pick { display: flex; gap: 10px; align-items: center; font-size: 19px; font-family: var(--serif); }
+.design-pick input { width: 22px; height: 22px; }
+.design-note { color: var(--muted); font-size: 15px; min-height: 3em; }
+.slip-preview { display: block; overflow: hidden; border: 1px solid var(--rule); background: #E9E5DA; padding: 6px; height: 360px; }
+.slip-paper { display: block; width: 190mm; background: #fff; padding: 6mm; zoom: 0.42; pointer-events: none; color: #000; font-family: var(--sans); font-size: 11pt; line-height: 1.35; }
+@media (max-width: 600px) { .slip-paper { zoom: 0.38; } .slip-preview { height: 320px; } }

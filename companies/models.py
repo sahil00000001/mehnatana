@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -36,6 +37,11 @@ class Company(TimeStamped):
     class Regime(models.TextChoices):
         NEW = "NEW", _("New regime")
         OLD = "OLD", _("Old regime")
+
+    class PayslipStyle(models.TextChoices):
+        CLASSIC = "CLASSIC", _("Classic ledger")
+        MODERN = "MODERN", _("Modern")
+        SIMPLE = "SIMPLE", _("Simple, with receipt")
 
     PF_RATE_CHOICES = [(Decimal("12.00"), _("12% (normal)")), (Decimal("10.00"), _("10% (only if notified for 10%)"))]
 
@@ -82,15 +88,25 @@ class Company(TimeStamped):
     default_tax_regime = models.CharField(_("default tax regime for new staff"), max_length=3,
                                           choices=Regime.choices, default=Regime.NEW)
     ot_multiplier = models.DecimalField(_("overtime rate (times ordinary)"), max_digits=4, decimal_places=2,
+                                        validators=[MinValueValidator(1), MaxValueValidator(5)],
                                         default=Decimal("2"))
-    ot_days_divisor = models.PositiveSmallIntegerField(_("overtime: working days in a month"), default=26)
+    ot_days_divisor = models.PositiveSmallIntegerField(_("overtime: working days in a month"), default=26,
+                                                       validators=[MinValueValidator(1), MaxValueValidator(31)])
     ot_hours_per_day = models.DecimalField(_("overtime: hours in a working day"), max_digits=4, decimal_places=2,
+                                           validators=[MinValueValidator(1), MaxValueValidator(24)],
                                            default=Decimal("8"))
-    notice_period_days = models.PositiveSmallIntegerField(_("notice period (days)"), default=30)
-    probation_months = models.PositiveSmallIntegerField(_("probation (months)"), default=0)
+    notice_period_days = models.PositiveSmallIntegerField(_("notice period (days)"), default=30,
+                                                          validators=[MaxValueValidator(365)])
+    probation_months = models.PositiveSmallIntegerField(_("probation (months)"), default=0,
+                                                        validators=[MaxValueValidator(36)])
     higher_wages_avenue = models.TextField(_("avenue for higher wages or position"),
                                            default=DEFAULT_HIGHER_WAGES_AVENUE)
     payslip_two_per_page = models.BooleanField(_("print two payslips on one A4 sheet"), default=False)
+    payslip_style = models.CharField(_("payslip design"), max_length=10, choices=PayslipStyle.choices,
+                                     default=PayslipStyle.CLASSIC)
+    payslip_show_employer = models.BooleanField(_("show what the employer also paid (PF, ESI)"), default=True)
+    payslip_note = models.CharField(_("note at the bottom of every payslip"), max_length=200, blank=True,
+                                    help_text=_("Optional, for example 'Thank you for your hard work.'"))
 
     class Meta:
         db_table = "mtn_company"
@@ -104,6 +120,11 @@ class Company(TimeStamped):
     def clean(self):
         if self.payroll_start_month and self.payroll_start_month.day != 1:
             self.payroll_start_month = self.payroll_start_month.replace(day=1)
+        if self.payroll_start_month:
+            latest = date(date.today().year + 1, 12, 1)
+            if not (date(2017, 1, 1) <= self.payroll_start_month <= latest):
+                raise ValidationError({"payroll_start_month": _(
+                    "Choose a month between January 2017 and %(latest)s.") % {"latest": latest.strftime("%B %Y")}})
         if self.code:
             self.code = self.code.upper()
         for name in ("pan", "tan", "gstin"):

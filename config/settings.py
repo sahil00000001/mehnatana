@@ -224,6 +224,7 @@ else:
 
 # ------------------------------------------------------------ security
 X_FRAME_OPTIONS = "DENY"
+CSRF_FAILURE_VIEW = "core.views.csrf_failure"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 if not DEBUG:

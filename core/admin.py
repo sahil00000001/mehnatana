@@ -4,8 +4,8 @@ from .audit import audit, diff, snapshot
 from .models import AuditLog
 
 
-class AuditedAdmin(admin.ModelAdmin):
-    """Admin edits to platform tables are written to the audit log."""
+class AuditedAdminMixin:
+    """Admin edits (including bulk delete) are written to the audit log."""
 
     def save_model(self, request, obj, form, change):
         before = snapshot(type(obj).objects.get(pk=obj.pk)) if change and obj.pk else {}
@@ -16,6 +16,15 @@ class AuditedAdmin(admin.ModelAdmin):
     def delete_model(self, request, obj):
         audit(request, "admin.delete", obj, {"before": snapshot(obj)}, company=getattr(obj, "company", None))
         super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            audit(request, "admin.delete", obj, {"before": snapshot(obj)}, company=getattr(obj, "company", None))
+        super().delete_queryset(request, queryset)
+
+
+class AuditedAdmin(AuditedAdminMixin, admin.ModelAdmin):
+    pass
 
 
 @admin.register(AuditLog)

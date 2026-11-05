@@ -21,7 +21,6 @@ PAYROLL_HELP = {
     "notice_period_days": _("Printed on the appointment letter."),
     "probation_months": _("0 = no probation line in the appointment letter."),
     "higher_wages_avenue": _("Printed in the appointment letter's particulars (how a person can earn more)."),
-    "payslip_two_per_page": _("Saves paper: two payslips on one A4 sheet, with a cut line."),
     "payroll_start_month": _("The first month you pay salary with this app. It can be changed only before the first upload."),
 }
 
@@ -39,6 +38,9 @@ class CompanyDetailsForm(forms.ModelForm):
         logo = self.cleaned_data.get("logo")
         if logo and hasattr(logo, "content_type"):  # a new upload
             validate_logo(logo)
+            head = logo.read(4)
+            logo.seek(0)
+            logo.name = "logo.png" if head.startswith(b"\x89PNG") else "logo.jpg"
         return logo
 
     def clean_pan(self):
@@ -58,7 +60,6 @@ class PayrollRulesForm(IndianDatesMixin, forms.ModelForm):
             "payroll_start_month", "salary_divisor", "pf_enabled", "pf_employee_rate", "pf_restrict_to_ceiling",
             "esi_enabled", "pt_enabled", "pt_state", "tds_enabled", "default_tax_regime", "ot_multiplier",
             "ot_days_divisor", "ot_hours_per_day", "notice_period_days", "probation_months", "higher_wages_avenue",
-            "payslip_two_per_page",
         ]
         widgets = {"higher_wages_avenue": forms.Textarea(attrs={"rows": 2})}
 
@@ -75,6 +76,17 @@ class PayrollRulesForm(IndianDatesMixin, forms.ModelForm):
     def clean_payroll_start_month(self):
         value = self.cleaned_data["payroll_start_month"]
         return value.replace(day=1) if value else value
+
+
+class PayslipDesignForm(forms.ModelForm):
+    class Meta:
+        model = Company
+        fields = ["payslip_style", "payslip_show_employer", "payslip_two_per_page", "payslip_note"]
+        widgets = {"payslip_style": forms.RadioSelect}
+        help_texts = {
+            "payslip_show_employer": _("Prints the employer's PF, EDLI, PF admin and ESI under the net pay."),
+            "payslip_two_per_page": _("Saves paper: two payslips on one A4 sheet, with a cut line."),
+        }
 
 
 class OpeningBalanceForm(forms.Form):

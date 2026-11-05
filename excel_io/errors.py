@@ -37,6 +37,35 @@ def forget_failed_upload(request, kind):
         request.session[SESSION_KEY] = store
 
 
+PENDING_KEY = "mtn_pending_uploads"
+
+
+def keep_pending_upload(request, kind, data):
+    """A checked file waiting for the owner's answer (e.g. 'change these salaries?')."""
+    path = default_storage.save(f"private/uploads/{request.company.code}/pending/{uuid.uuid4().hex}.xlsx",
+                                ContentFile(data))
+    store = request.session.get(PENDING_KEY, {})
+    store[kind] = {"path": path, "company": request.company.pk}
+    request.session[PENDING_KEY] = store
+
+
+def pending_upload_data(request, kind):
+    entry = request.session.get(PENDING_KEY, {}).get(kind)
+    if not entry or entry.get("company") != request.company.pk:
+        return None
+    try:
+        with default_storage.open(entry["path"], "rb") as handle:
+            return handle.read()
+    except (FileNotFoundError, OSError):
+        return None
+
+
+def forget_pending_upload(request, kind):
+    store = request.session.get(PENDING_KEY, {})
+    if store.pop(kind, None) is not None:
+        request.session[PENDING_KEY] = store
+
+
 def failed_upload(request, kind):
     entry = request.session.get(SESSION_KEY, {}).get(kind)
     if not entry or entry.get("company") != request.company.pk:
@@ -45,7 +74,9 @@ def failed_upload(request, kind):
 
 
 def _norm(text):
-    return " ".join(str(text or "").replace("*", "").split()).lower()
+    from .parsers import _norm as heading_key  # same heading matching as the upload itself
+
+    return heading_key(text)
 
 
 def marked_workbook_bytes(data, errors):

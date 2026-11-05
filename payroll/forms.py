@@ -3,6 +3,8 @@ from decimal import Decimal
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import WholeRupeesField
+
 
 class UploadForm(forms.Form):
     file = forms.FileField(label=_("Filled attendance sheet (.xlsx)"),
@@ -15,8 +17,7 @@ def _days(label, help_text="", required=False):
 
 
 def _money(label, help_text=""):
-    return forms.DecimalField(label=label, help_text=help_text, required=False, min_value=0, max_digits=12,
-                              decimal_places=0, widget=forms.NumberInput(attrs={"step": "1", "inputmode": "numeric"}))
+    return WholeRupeesField(label=label, help_text=help_text, required=False)
 
 
 class LineForm(forms.Form):
@@ -26,7 +27,9 @@ class LineForm(forms.Form):
     paid_leave = _days(_("Paid leave days"))
     week_off_holiday = _days(_("Weekly off + holidays"), _("Paid weekly offs and paid holidays."))
     lop = _days(_("Absent / LOP days"), _("Leave empty to work it out from the other days."))
-    ot_hours = forms.DecimalField(label=_("OT hours"), required=False, min_value=0, max_digits=6, decimal_places=2)
+    ot_hours = forms.DecimalField(label=_("OT hours"), required=False, min_value=0, max_value=300, max_digits=8,
+                                  decimal_places=2, help_text=_("Overtime hours this month."),
+                                  error_messages={"max_value": _("More than 300 overtime hours in a month? Please check.")})
     ot_amount = _money(_("OT amount ₹ (optional)"), _("If filled, used instead of OT hours."))
     incentive = _money(_("Incentive / bonus ₹"), _("One-time extra pay this month."))
     increment = _money(_("Increment ₹ per month"), _("Raise added to Basic from this month."))

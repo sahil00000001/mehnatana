@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import redirect, render
@@ -80,6 +82,12 @@ def new(request, letter_type):
         text = text_for_editing(template.body, values)
 
     if request.method == "POST" and request.POST.get("action") == "save":
+        just_issued = IssuedLetter.objects.filter(
+            company=company, employee=emp, letter_type=ltype, issue_date=issue_date,
+            created_at__gte=timezone.now() - timedelta(minutes=10)).first()
+        if just_issued:  # pressed twice
+            messages.info(request, _("This letter was already saved as %(ref)s.") % {"ref": just_issued.ref_no})
+            return redirect("letters:detail", pk=just_issued.pk)
         letter = issue_letter(request, company, emp, ltype, issue_date, text)
         messages.success(request, _("Letter %(ref)s is saved. Print it now.") % {"ref": letter.ref_no})
         return redirect("letters:detail", pk=letter.pk)

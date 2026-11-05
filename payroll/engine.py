@@ -376,6 +376,11 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
         L.tds = rupee(inp.tds_override)
     elif settings.tds_enabled:
         left = months_left_in_tax_year(month)
+        if emp.dol and emp.dol <= month_end:
+            # NOTE: Appendix A always projects salary until March. Someone who leaves this month
+            # earns nothing after it, so the year's tax is worked out on actual pay and settled now
+            # (otherwise a leaver is over-taxed in the final pay). README cases are unchanged.
+            left = 1
         later = future_months(year, month, left - 1)
         projected = ytd.gross + L.gross + s.gross() * (left - 1)
         if emp.tax_regime == "NEW":

@@ -47,7 +47,7 @@ class MonthTestCase(DemoTestCase):
         rows = {ws.cell(row=r, column=1).value: r for r in range(2, ws.max_row + 1)}
         for code, values in inputs.items():
             for header, value in values.items():
-                ws.cell(row=rows[code], column=headers[header], value=value)
+                ws.cell(row=rows[code], column=headers[header]).value = value  # value=None would not clear it
         return wb
 
     @staticmethod
@@ -137,7 +137,7 @@ class UploadErrorsTest(MonthTestCase):
     def test_missing_employee(self):
         wb = self.download_sheet()
         wb.worksheets[0].delete_rows(8)  # E007
-        self.assert_rejected(wb, "These employees are missing: E007 Neha Joshi")
+        self.assert_rejected(wb, "These employees are missing from the sheet: E007 Neha Joshi")
 
     def test_wrong_month(self):
         wb = self.download_sheet()
@@ -223,7 +223,8 @@ class FinaliseReopenTest(MonthTestCase):
         dec = date(2026, 12, 1)
         ctx = service.RunContext(self.srks, dec)
         rows = {e.pk: service.RowInput(present=D(27), week_off_holiday=D(4)) for e in ctx.employees}
-        service.finalise(service.save_inputs(self.srks, dec, rows, self.srks_user), self.srks_user)
+        with self.today_is(date(2027, 1, 5)):
+            service.finalise(service.save_inputs(self.srks, dec, rows, self.srks_user), self.srks_user)
         with self.assertRaisesMessage(service.PayrollError, "Only the latest finalised month"):
             service.reopen(self.run_for(), self.srks_user, "test")
         # December uses the increment saved by November: E001 Basic 12,500
@@ -273,3 +274,45 @@ class LineEditTest(MonthTestCase):
         line = self.run_for().lines.get(employee__emp_code="E003")
         response = self.client.post(reverse("payroll:line_edit", args=[NOV, line.pk]), {"present": "26"})
         self.assertRedirects(response, reverse("payroll:month", args=[NOV]))
+
+
+class FriendlySheetTest(MonthTestCase):
+    """The sheet is read the way a busy owner fills it, and mistakes are explained."""
+
+    def test_untouched_sheet_is_refused_with_one_message(self):
+        self.clear_november()
+        response = self.client.post(reverse("payroll:upload", args=[NOV]), {"file": self.as_upload(self.download_sheet())})
+        self.assertContains(response, "No days are filled in this sheet.")
+        self.assertNotContains(response, "The days are empty.")
+        self.assertFalse(PayrollRun.objects.filter(company=self.srks, month=NOV).exists())
+
+    def test_one_empty_row_is_pointed_out(self):
+        wb = self.fill(self.download_sheet(), {"E003": {"Days Present": None, "Weekly Off + Holidays": None}})
+        response = self.upload(wb)
+        self.assertContains(response, "The days are empty.")
+
+    def test_heading_written_differently_still_read(self):
+        wb = self.download_sheet()
+        ws = wb.worksheets[0]
+        for cell in ws[1]:
+            if cell.value == "Incentive / Bonus ₹":
+                cell.value = "incentive/bonus"
+        self.fill(wb, {"E003": {"incentive/bonus": 2000}})
+        self.upload(wb)
+        self.assertEqual(self.run_for().lines.get(employee__emp_code="E003").incentive_pay, D(2000))
+
+    def test_unknown_column_with_numbers_is_refused(self):
+        wb = self.download_sheet()
+        ws = wb.worksheets[0]
+        col = ws.max_column + 1
+        ws.cell(row=1, column=col, value="Bonus")
+        ws.cell(row=2, column=col, value=500)
+        response = self.upload(wb)
+        self.assertContains(response, "We do not know the column &#x27;Bonus&#x27;")
+
+    def test_empty_extra_column_is_fine(self):
+        wb = self.download_sheet()
+        ws = wb.worksheets[0]
+        ws.cell(row=1, column=ws.max_column + 1, value="My notes")
+        response = self.upload(wb)
+        self.assertEqual(response.status_code, 302)

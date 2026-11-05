@@ -5,7 +5,6 @@ nothing here recalculates salary.
 """
 from datetime import date, datetime
 from decimal import ROUND_FLOOR, Decimal as D
-from itertools import zip_longest
 
 from django.contrib import messages
 from django.db.models import Sum
@@ -24,6 +23,7 @@ from excel_io.common import as_number, table_workbook, xlsx_response
 from payroll import engine, service
 from payroll.models import PayrollLine, PayrollRun
 
+from . import payslip as payslip_design
 from . import queries
 from .fixes import fix_querysets
 
@@ -135,36 +135,9 @@ def dashboard(request):
 
 
 # ---------------------------------------------------------------- payslips (Form V)
-RELATION_LABELS = {"Father": "Father's name", "Mother": "Mother's name", "Spouse": "Spouse's name"}
-
-
-def _slip(run, line, advance_balance):
-    s = line.emp_snapshot
-    other_label = _("Other")
-    if line.other_deduction_reason:
-        other_label = _("Other (%(reason)s)") % {"reason": line.other_deduction_reason}
-    earnings = [
-        (_("Basic"), line.earned_basic), (_("DA"), line.earned_da), (_("HRA"), line.earned_hra),
-        (_("Conveyance"), line.earned_conveyance), (_("Other allowance"), line.earned_other),
-        (_("Overtime"), line.ot_pay), (_("Incentive / Bonus"), line.incentive_pay),
-    ]
-    deductions = [
-        (_("Provident Fund"), line.ee_pf), (_("ESI"), line.ee_esi), (_("Professional Tax"), line.pt),
-        (_("Income Tax (TDS)"), line.tds), (_("Advance recovery"), line.advance),
-        (other_label, line.other_deduction_amt),
-    ]
-    return {
-        "line": line,
-        "s": s,
-        "relation_label": _(RELATION_LABELS.get(s.get("relation_type"), "Father's/Mother's/Spouse's name")),
-        "rows": list(zip_longest(earnings, deductions)),
-        "advance_balance": advance_balance,
-    }
-
-
 def _payslip_page(request, run, lines, single=False):
     balances = queries.advance_balances(run, lines)
-    slips = [_slip(run, line, balances.get(line.employee_id, ZERO)) for line in lines]
+    slips = [payslip_design.slip_context(line, balances.get(line.employee_id, ZERO)) for line in lines]
     two = run.company.payslip_two_per_page and not single
     groups = [slips[i:i + 2] for i in range(0, len(slips), 2)] if two else [[s] for s in slips]
     issue_date = timezone.localtime(run.finalised_at).date() if run.finalised_at else timezone.localdate()
@@ -172,6 +145,7 @@ def _payslip_page(request, run, lines, single=False):
         else (_("Payslips — %(month)s") % {"month": run.label})
     return render(request, "reports/payslips.html", {
         "title": title, "run": run, "company": run.company, "groups": groups, "two_per_page": two,
+        "slip_template": payslip_design.template_for(run.company),
         "issue_date": issue_date, "period_start": run.month, "period_end": run.month_end,
         "back_url": reverse("payroll:month", args=[run.month]), **_print_flags(run),
     })
@@ -343,6 +317,8 @@ def index(request):
         try:
             year = int(request.GET.get("tax_year", ""))
         except ValueError:
+            raise Http404
+        if not 2000 <= year <= 2098:
             raise Http404
         return redirect("reports:tds", tax_year=year)
     if go == "cost":

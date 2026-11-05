@@ -6,6 +6,7 @@ all-or-nothing: the caller saves only when there is no error at all.
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+import re
 from io import BytesIO
 
 from django.conf import settings
@@ -19,6 +20,8 @@ from core.formatting import month_label
 from core.validators import (
     aadhaar_validator, esic_validator, ifsc_validator, mobile_validator, pan_validator, uan_validator,
 )
+
+from core.forms import MAX_AMOUNT
 
 from .builders import EMPLOYEES, MONTHLY, OPENING
 from .columns import CHOICES, EMPLOYEE_COLUMNS, MONTHLY_COLUMNS, OPENING_COLUMNS, header_of
@@ -98,14 +101,19 @@ def check_meta(meta, template_type, company, month=None):
 
 
 def _norm(text):
-    return " ".join(str(text or "").replace("*", "").split()).lower()
+    """Heading match ignores case, spaces, ₹, '*', '(optional)' and punctuation: 'OT Amount (optional)' = 'ot amount ₹'."""
+    text = str(text or "").lower().replace("₹", " ").replace("(optional)", " ")
+    return " ".join(re.sub(r"[^0-9a-z\u0900-\u097f]+", " ", text).split())
+
+
+IGNORED_HEADINGS = {"errors"}  # the column we add to "mistakes marked" files
 
 
 def header_index(ws, columns, must):
     header = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), ())
     positions = {}
     for i, value in enumerate(header):
-        if value is not None and _norm(value) not in positions:
+        if value is not None and _norm(value) and _norm(value) not in positions:
             positions[_norm(value)] = i
     index, missing = {}, []
     for key, title, *_rest in columns:
@@ -118,6 +126,23 @@ def header_index(ws, columns, must):
     if missing:
         raise SheetError(_("These columns are missing: %(cols)s. Please use the sample file without changing the headings.")
                          % {"cols": ", ".join(missing)})
+    # A column we do not know, with something written in it, would be silently ignored. Say so instead.
+    used = set(index.values())
+    unknown = {i: str(v).strip() for i, v in enumerate(header)
+               if i not in used and v is not None and str(v).strip() and _norm(v) not in IGNORED_HEADINGS}
+    if unknown:
+        filled = set()
+        for values in ws.iter_rows(min_row=2, values_only=True):
+            for i in unknown:
+                if i < len(values) and values[i] not in (None, ""):
+                    filled.add(i)
+            if len(filled) == len(unknown):
+                break
+        if filled:
+            names = ", ".join(f"'{unknown[i]}'" for i in sorted(filled))
+            raise SheetError(_("We do not know the column %(cols)s, so what is written in it would be ignored. "
+                               "Change the heading back to the one in our sheet (see the 'How to fill' sheet), "
+                               "or delete that column, and upload again.") % {"cols": names})
     return index
 
 
@@ -177,7 +202,12 @@ def to_date(value):
     if isinstance(value, date):
         return value
     if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return from_excel(value).date()
+        if not 1 <= value <= 80000:  # Excel day numbers 1900-2119
+            raise ValueError
+        try:
+            return from_excel(value).date()
+        except (OverflowError, ValueError, TypeError):
+            raise ValueError
     text = str(value).strip()
     for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%d.%m.%Y", "%Y-%m-%d"):
         try:
@@ -229,15 +259,23 @@ def _value_error_message(kind, raw):
     return _("'%(v)s' is not one of the allowed choices.") % {"v": raw}
 
 
-def _rows(ws):
-    """(row number, values) of data rows: skips empty first cells and EXAMPLE rows."""
+def _rows(ws, index):
+    """(row number, values) of data rows. Skips EXAMPLE rows and empty rows; a row with something
+    written in our columns but no Emp Code is still returned, so it can be pointed out."""
     for number, values in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not values:
             continue
-        first = to_text(values[0])
-        if not first or first.upper() == "EXAMPLE":
+        first = to_text(_cell(values, index, "emp_code"))
+        if first.upper() == "EXAMPLE":
+            continue
+        if not first and not any(to_text(_cell(values, index, key)) for key in index if key != "emp_code"):
             continue
         yield number, values
+
+
+def _no_code(errors, number, name, columns):
+    errors.append(CellError(number, "", name, header_of(columns, "emp_code"),
+                            _("This row has no Emp Code. Write the code (like E001), or delete the row.")))
 
 
 # ---------------------------------------------------------------- monthly attendance sheet
@@ -257,14 +295,18 @@ def parse_monthly(data, ctx):
         if file_errors:
             return {}, [], file_errors
         ws = wb.worksheets[0]
-        index = header_index(ws, MONTHLY_COLUMNS, must=("emp_code", "present"))
-        expected = {e.emp_code: e for e in ctx.employees}
-        known = set(Employee.objects.filter(company=ctx.company).values_list("emp_code", flat=True))
-        rows, errors, seen = {}, [], {}
-        for number, values in _rows(ws):
-            code = to_text(_cell(values, index, "emp_code"))
+        # Every column of our sheet must be there: a deleted column would silently become 0.
+        index = header_index(ws, MONTHLY_COLUMNS, must=[c[0] for c in MONTHLY_COLUMNS if c[0] not in ("name", "designation")])
+        expected = {e.emp_code.upper(): e for e in ctx.employees}
+        known = {c.upper() for c in Employee.objects.filter(company=ctx.company).values_list("emp_code", flat=True)}
+        rows, errors, seen, blank_days = {}, [], {}, []
+        for number, values in _rows(ws, index):
+            code = "".join(to_text(_cell(values, index, "emp_code")).split()).upper()
             emp = expected.get(code)
             name = emp.full_name if emp else to_text(_cell(values, index, "name"))
+            if not code:
+                _no_code(errors, number, name, MONTHLY_COLUMNS)
+                continue
 
             def err(key, message, number=number, code=code, name=name):
                 errors.append(CellError(number, code, name, header_of(MONTHLY_COLUMNS, key), str(message)))
@@ -292,6 +334,11 @@ def parse_monthly(data, ctx):
                     bad = True
             if bad:
                 continue
+            if all(parsed[k] is None for k in ("present", "paid_leave", "week_off_holiday", "lop")):
+                blank_days.append(number)
+                err("present", _("The days are empty. Write the days present, paid leave and weekly offs "
+                                 "(write 0 in Days Present if the person did not work at all)."))
+                continue
             zero = Decimal("0")
             row = RowInput(
                 present=parsed["present"] or zero, paid_leave=parsed["paid_leave"] or zero,
@@ -308,8 +355,13 @@ def parse_monthly(data, ctx):
         missing = [e for code, e in expected.items() if code not in seen]
         if missing:
             file_errors.append(
-                _("These employees are missing: %(names)s; add them with 0 days or mark them relieved.")
+                _("These employees are missing from the sheet: %(names)s. Download the sheet again (it has everyone), "
+                  "or add a row for them (0 days if they did not work), or relieve them if they have left.")
                 % {"names": ", ".join(f"{e.emp_code} {e.full_name}" for e in missing)})
+        if seen and len(blank_days) == len(seen):  # nothing filled at all: one clear message instead of one per row
+            errors = [e for e in errors if e.row not in blank_days]
+            file_errors.append(_("No days are filled in this sheet. Open it in Excel, write the days for every person "
+                                 "(Days Present, Paid Leave Days, Weekly Off + Holidays), save it and upload again."))
         return rows, errors, file_errors
     finally:
         wb.close()
@@ -317,6 +369,7 @@ def parse_monthly(data, ctx):
 
 # ---------------------------------------------------------------- employee list
 EMPLOYEE_KINDS = {c[0]: c[3] for c in EMPLOYEE_COLUMNS}
+UNIQUE_IDS = ("uan", "pan", "esic_ip_no", "aadhaar")
 ID_RULES = {
     "pan": (pan_validator, "upper"),
     "ifsc": (ifsc_validator, "upper"),
@@ -350,11 +403,19 @@ def parse_employees(data, company):
         must = [c[0] for c in EMPLOYEE_COLUMNS if c[2]]
         index = header_index(ws, EMPLOYEE_COLUMNS, must=must)
         existing = {e.emp_code: e for e in Employee.objects.filter(company=company).select_related("reports_to")}
+        id_owner = {}  # (field, value) -> emp code that has it
+        for e in existing.values():
+            for field in UNIQUE_IDS:
+                if getattr(e, field):
+                    id_owner[(field, getattr(e, field))] = e.emp_code
         rows, errors, seen = [], [], {}
-        for number, values in _rows(ws):
-            code = to_text(_cell(values, index, "emp_code"))
+        for number, values in _rows(ws, index):
+            code = "".join(to_text(_cell(values, index, "emp_code")).split()).upper()
             name = " ".join(p for p in (to_text(_cell(values, index, "first_name")),
                                         to_text(_cell(values, index, "surname"))) if p)
+            if not code:
+                _no_code(errors, number, name, EMPLOYEE_COLUMNS)
+                continue
             row_errors = []
 
             def err(key, message, number=number, code=code, name=name, row_errors=row_errors):
@@ -371,6 +432,8 @@ def parse_employees(data, company):
             is_new = code not in existing
             row = {"_row": number, "emp_code": code, "_new": is_new}
             for key, _title, required, kind, *_help in EMPLOYEE_COLUMNS[1:]:
+                if key not in index:
+                    continue  # column not in this sheet: the saved value is kept
                 raw = _cell(values, index, key)
                 try:
                     if kind == "text":
@@ -386,6 +449,14 @@ def parse_employees(data, company):
                 except ValueError:
                     err(key, _value_error_message(kind, raw))
                     continue
+                if kind == "money" and value is not None and value > MAX_AMOUNT:
+                    err(key, _("This looks too big (more than ₹99,99,999). Please check."))
+                    continue
+                if key in ("department", "designation") and len(value or "") > 100:
+                    err(key, _("Write at most 100 letters."))
+                    continue
+                if key == "reports_to" and value:
+                    value = "".join(value.split()).upper()
                 row[key] = value
                 if required and value in (None, "") and (key != "basic" or is_new):
                     err(key, _("This column must be filled."))
@@ -396,6 +467,15 @@ def parse_employees(data, company):
                         validator(row[key])
                     except ValidationError as exc:
                         err(key, exc.messages[0])
+            for field in UNIQUE_IDS:
+                value = row.get(field)
+                if value and not any(e.column == header_of(EMPLOYEE_COLUMNS, field) for e in row_errors):
+                    owner = id_owner.get((field, value))
+                    if owner and owner != code:
+                        err(field, _("This number already belongs to %(code)s. Each person has their own.")
+                            % {"code": owner})
+                    else:
+                        id_owner[(field, value)] = code
             if row.get("email"):
                 try:
                     validate_email(row["email"])
@@ -465,8 +545,11 @@ def parse_tax_year(value):
         start = int(start)
         if (start + 1) % 100 != int(end) % 100:
             raise ValueError
-        return start
-    return int(Decimal(text))
+    else:
+        start = int(Decimal(text))
+    if not 2000 <= start <= 2100:
+        raise ValueError
+    return start
 
 
 def parse_opening(data, company):
@@ -479,12 +562,15 @@ def parse_opening(data, company):
             return [], [], file_errors
         ws = wb.worksheets[0]
         index = header_index(ws, OPENING_COLUMNS, must=("emp_code", "tax_year"))
-        employees = {e.emp_code: e for e in Employee.objects.filter(company=company)}
+        employees = {e.emp_code.upper(): e for e in Employee.objects.filter(company=company)}
         rows, errors, seen = [], [], {}
-        for number, values in _rows(ws):
-            code = to_text(_cell(values, index, "emp_code"))
+        for number, values in _rows(ws, index):
+            code = "".join(to_text(_cell(values, index, "emp_code")).split()).upper()
             emp = employees.get(code)
             name = emp.full_name if emp else to_text(_cell(values, index, "name"))
+            if not code:
+                _no_code(errors, number, name, OPENING_COLUMNS)
+                continue
 
             def err(key, message, number=number, code=code, name=name):
                 errors.append(CellError(number, code, name, header_of(OPENING_COLUMNS, key), str(message)))
@@ -494,7 +580,7 @@ def parse_opening(data, company):
                 continue
             try:
                 tax_year = parse_tax_year(_cell(values, index, "tax_year"))
-            except (ValueError, InvalidOperation):
+            except (ValueError, ArithmeticError, TypeError):
                 err("tax_year", _("Write the tax year like 2026-27."))
                 continue
             key = (code, tax_year)
@@ -512,6 +598,8 @@ def parse_opening(data, company):
                     continue
                 if value < 0:
                     err(money_key, _("Cannot be a negative number."))
+                elif value > MAX_AMOUNT * 12:
+                    err(money_key, _("This looks too big. Please check."))
                 row[money_key] = value
             rows.append(row)
         return rows, errors, file_errors

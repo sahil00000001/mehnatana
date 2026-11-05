@@ -3,6 +3,7 @@ from datetime import date
 
 from django import forms
 from django.core.validators import MaxLengthValidator
+from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import IndianDatesMixin, whole_rupees
@@ -36,6 +37,23 @@ HELP = {
 }
 
 SALARY_FIELDS = ["basic", "da", "hra", "conveyance", "other_allowance"]
+UNIQUE_IDS = {"uan": _("UAN"), "pan": _("PAN"), "esic_ip_no": _("ESIC IP number"), "aadhaar": _("Aadhaar number")}
+
+
+class SuggestInput(forms.TextInput):
+    """A text box with a list of suggestions (HTML datalist: works without JavaScript)."""
+
+    def __init__(self, options=(), attrs=None):
+        super().__init__(attrs={"autocomplete": "off", **(attrs or {})})
+        self.options = list(options)
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = dict(attrs or {})
+        list_id = f"{attrs.get('id', name)}_list"
+        attrs["list"] = list_id
+        html = super().render(name, value, attrs, renderer)
+        options = format_html_join("", '<option value="{}">', ((o,) for o in self.options))
+        return format_html('{}<datalist id="{}">{}</datalist>', html, list_id, options)
 TIDIED_FIELDS = ["emp_code", "mobile", "pan", "aadhaar", "uan", "esic_ip_no", "ifsc"]
 
 
@@ -43,7 +61,7 @@ class EmployeeForm(IndianDatesMixin, forms.ModelForm):
     GROUPS = [
         (_("Personal"), ["emp_code", "first_name", "surname", "relation_type", "relation_name", "gender",
                          "date_of_birth", "mobile", "email", "address"]),
-        (_("Job"), ["date_of_joining", "department", "designation", "reports_to", "employment_type",
+        (_("Job"), ["date_of_joining", "designation_name", "department_name", "reports_to", "employment_type",
                     "skill_category", "nature_of_duties"]),
         (_("Salary per month"), SALARY_FIELDS),
         (_("PF / ESI / Tax"), ["pf_member", "eps_choice", "eps_member", "uan", "name_as_per_uan", "esic_ip_no",
@@ -62,12 +80,18 @@ class EmployeeForm(IndianDatesMixin, forms.ModelForm):
         choices=[("AUTO", _("Decide by the rule")), ("YES", _("Yes")), ("NO", _("No"))], initial="AUTO",
         help_text=_("Rule: Yes if PF wages at joining are within the PF ceiling and age is under 58, else No."))
     old_regime_deductions_annual = whole_rupees(_("Old regime deductions per year ₹"))
+    designation_name = forms.CharField(
+        label=_("Designation"), max_length=100,
+        help_text=_("Job title, like Helper or Cashier. Pick from the list or type a new one."))
+    department_name = forms.CharField(
+        label=_("Department"), max_length=100, required=False,
+        help_text=_("Optional, like Store or Accounts. Pick from the list or type a new one."))
 
     class Meta:
         model = Employee
         fields = [
             "emp_code", "first_name", "surname", "relation_type", "relation_name", "gender", "date_of_birth",
-            "mobile", "email", "address", "date_of_joining", "department", "designation", "reports_to",
+            "mobile", "email", "address", "date_of_joining", "reports_to",
             "employment_type", "skill_category", "nature_of_duties", "pan", "aadhaar", "aadhaar_consent", "uan",
             "name_as_per_uan", "esic_ip_no", "payment_mode", "bank_name", "bank_account_no", "ifsc", "pf_member",
             "eps_member", "esi_override", "is_pwd", "pt_exempt", "tax_regime", "old_regime_deductions_annual",
@@ -94,14 +118,13 @@ class EmployeeForm(IndianDatesMixin, forms.ModelForm):
             active = active.exclude(pk=self.instance.pk)
         self.fields["reports_to"].queryset = active.order_by("emp_code")
         self.fields["reports_to"].label_from_instance = lambda e: f"{e.full_name} ({e.emp_code})"
-        self.fields["department"].queryset = Department.objects.filter(company=company, is_active=True)
-        self.fields["designation"].queryset = Designation.objects.filter(company=company, is_active=True)
-        if self.instance.pk:  # keep a value that was made inactive later
-            if self.instance.department_id:
-                self.fields["department"].queryset |= Department.objects.filter(pk=self.instance.department_id)
-            if self.instance.designation_id:
-                self.fields["designation"].queryset |= Designation.objects.filter(pk=self.instance.designation_id)
-        self.fields["designation"].help_text = _("Add new ones on the Designations page (Settings).")
+        self.fields["designation_name"].widget = SuggestInput(
+            Designation.objects.filter(company=company, is_active=True).values_list("name", flat=True))
+        self.fields["department_name"].widget = SuggestInput(
+            Department.objects.filter(company=company, is_active=True).values_list("name", flat=True))
+        if self.instance.pk:
+            self.initial.setdefault("designation_name", self.instance.designation.name if self.instance.designation_id else "")
+            self.initial.setdefault("department_name", self.instance.department.name if self.instance.department_id else "")
         if adding:
             del self.fields["eps_member"]
         else:
@@ -159,13 +182,59 @@ class EmployeeForm(IndianDatesMixin, forms.ModelForm):
         return self._digits("esic_ip_no")
 
     def clean_mobile(self):
-        return self._digits("mobile")
+        value = self.cleaned_data["mobile"] or ""
+        digits = digits_only(value)
+        if re.fullmatch(r"[\d\s()+-]*", value):
+            if len(digits) == 12 and digits.startswith("91"):
+                return digits[2:]  # +91 98450 12345
+            if len(digits) == 11 and digits.startswith("0"):
+                return digits[1:]  # 098450 12345
+            return digits
+        return value
 
     def clean_aadhaar(self):
         value = self._digits("aadhaar")
         if not value and self.instance.pk and self.instance.aadhaar:
             return self.instance.aadhaar  # empty box on edit = keep the saved number
         return value
+
+    @staticmethod
+    def _named(model, company, name):
+        """Existing department/designation with this name (any case), or a new unsaved one."""
+        name = " ".join((name or "").split())
+        if not name:
+            return None
+        return model.objects.filter(company=company, name__iexact=name).first() or model(company=company, name=name)
+
+    def clean(self):
+        data = super().clean()
+        doj = data.get("date_of_joining")
+        if doj and self.instance.pk:
+            paid_before = (self.instance.payroll_lines.filter(run__status="FINALISED", run__month__lt=month_start(doj))
+                           .select_related("run").order_by("run__month").first())
+            if paid_before:
+                self.add_error("date_of_joining", _(
+                    "%(name)s was already paid for %(month)s (finalised), so the date of joining cannot be after "
+                    "that month.") % {"name": self.instance.first_name, "month": paid_before.run.label})
+        self._designation = self._named(Designation, self.company, data.get("designation_name"))
+        self._department = self._named(Department, self.company, data.get("department_name"))
+        for field, label in UNIQUE_IDS.items():
+            value = data.get(field)
+            if not value or field in self.errors:
+                continue
+            owner = Employee.objects.filter(company=self.company, **{field: value}).exclude(pk=self.instance.pk).first()
+            if owner:
+                self.add_error(field, _("This %(what)s already belongs to %(name)s (%(code)s). Each person has their own.")
+                               % {"what": label, "name": owner.full_name, "code": owner.emp_code})
+        return data
+
+    def save(self, commit=True):
+        for attr, field in (("_designation", "designation"), ("_department", "department")):
+            obj = getattr(self, attr, None)
+            if obj is not None and obj.pk is None:
+                obj.save()  # a new name typed by the owner
+            setattr(self.instance, field, obj)
+        return super().save(commit)
 
     def clean_old_regime_deductions_annual(self):
         return self.cleaned_data.get("old_regime_deductions_annual") or 0

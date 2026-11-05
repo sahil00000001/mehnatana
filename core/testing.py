@@ -1,5 +1,7 @@
 """Shared test base: the README §16 demo businesses, logged in as the SRKS owner."""
+from contextlib import contextmanager
 from datetime import date
+from unittest import mock
 
 from django.test import TestCase
 
@@ -30,6 +32,13 @@ class DemoTestCase(TestCase):
         company = company or self.srks
         user = self.srks_user if company == self.srks else self.anps_user
         return service.finalise(self.run_for(company), user)
+
+    @staticmethod
+    @contextmanager
+    def today_is(day):
+        """Pretend today is `day` (a month can be finalised only after it has started)."""
+        with mock.patch("django.utils.timezone.localdate", return_value=day):
+            yield
 
     def employee(self, code, company=None):
         return Employee.objects.get(company=company or self.srks, emp_code=code)

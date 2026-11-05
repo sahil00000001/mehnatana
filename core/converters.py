@@ -4,7 +4,7 @@ from datetime import date
 class MonthConverter:
     """/salary/2026-11/ <-> date(2026, 11, 1)"""
 
-    regex = r"[0-9]{4}-(?:0[1-9]|1[0-2])"
+    regex = r"(?:19|20)[0-9]{2}-(?:0[1-9]|1[0-2])"
 
     def to_python(self, value):
         year, month = value.split("-")
@@ -19,7 +19,7 @@ class MonthConverter:
 class TaxYearConverter:
     """/reports/tds/2026-27/ <-> 2026 (tax year April 2026 - March 2027)"""
 
-    regex = r"[0-9]{4}-[0-9]{2}"
+    regex = r"(?:19|20)[0-9]{2}-[0-9]{2}"
 
     def to_python(self, value):
         start, end = value.split("-")
