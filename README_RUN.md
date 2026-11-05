@@ -74,7 +74,28 @@ To reset a forgotten password or unlock a login, open **Logins**, tick it, and u
 
 Statutory rates, PT slabs, tax slabs and due dates are under **Statutory tables**. When the law changes, add a new row with its "effective from" date; do not edit the old row. Every admin change is written to the **Audit log**.
 
-## 4. Server (one small VPS)
+## 4. Vercel (live now)
+
+The app runs at **https://mehnatana.vercel.app** (Vercel project `mehnatana`, region Mumbai `bom1`,
+next to the Supabase database in `ap-south-1`).
+
+- **Deploys:** every push to `main` on GitHub deploys to production automatically (`vercel.json`).
+- **Database:** every push to `main` also runs the GitHub Actions job *Tests and database*
+  (`.github/workflows/database.yml`): all tests on SQLite, then `migrate` on Supabase and, once, the
+  platform admin login (`ensure_admin`). It can also be started by hand: GitHub → Actions → Run workflow.
+- **GitHub secrets:** `DATABASE_URL`, `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_PASSWORD`.
+- **Vercel environment variables (Production):** `DEBUG=False`, `SECRET_KEY`, `ALLOWED_HOSTS=.vercel.app`,
+  `DATABASE_URL` (Supabase Session pooler), `POSTGRES_SCHEMA=mehnatana`, `CONN_MAX_AGE=0`,
+  `FILE_STORAGE=database`, `WHITENOISE_USE_FINDERS=True`, `MAX_UPLOAD_MB=4`, `SUPPORT_PHONE`, `TIME_ZONE`.
+  Change them in Vercel → Project → Settings → Environment Variables, then redeploy.
+- **Files on Vercel** (logos, uploaded sheets) are kept in the database table `mtn_stored_file`, because Vercel
+  has no lasting disk. They are private, like the media folder, and included in database backups.
+- **If you change the database password** in Supabase: update `DATABASE_URL` in both Vercel and GitHub secrets.
+- **Custom domain:** add it in Vercel → Project → Settings → Domains, then add it to `ALLOWED_HOSTS` and
+  `CSRF_TRUSTED_ORIGINS` (for example `https://payroll.example.com`).
+- Uploads are limited to 4 MB on Vercel (Vercel accepts up to 4.5 MB per request).
+
+## 5. Server (one small VPS) — the alternative to Vercel
 
 1 vCPU / 2 GB RAM is enough to start. Install Docker first.
 
@@ -107,7 +128,7 @@ To use a local PostgreSQL 16 instead of Supabase:
 
 To update the app: copy the new code, then run `docker compose up -d --build`.
 
-## 5. Backups
+## 6. Backups
 
 `scripts/backup.sh` saves:
 
@@ -149,7 +170,7 @@ docker compose run --rm --no-deps -v /var/backups/mehnatana:/backup --entrypoint
 
 Then start the app again with `docker compose start web`.
 
-## 6. Before going live
+## 7. Before going live
 
 - Have a Chartered Accountant check README §8 and §9 against your customers' states (see README §21).
 - Compare the ESI upload file's columns with the current template on the ESIC portal.

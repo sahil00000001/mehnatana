@@ -122,6 +122,15 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 - **Particulars row 13 (ESI: Yes/No)** uses the rates for the month of the letter date.
 - **Mistyped placeholders** like `{{ Emp.Name }}` also produce a warning.
 
+## Vercel deployment
+
+- **Region.** The app runs on Vercel in the Mumbai region (`bom1`), next to Supabase in `ap-south-1`.
+- **Database connections** go through the Supabase **Session pooler**, which works over IPv4. The direct `db.…` host is IPv6-only. Each request opens and closes its own connection (`CONN_MAX_AGE=0`), so serverless instances never hold pooler slots.
+- **Files.** Vercel has no lasting disk, so uploaded files are kept in the database (`FILE_STORAGE=database`, table `mtn_stored_file`). Static files are served by WhiteNoise straight from the app folders (`WHITENOISE_USE_FINDERS`), with no collectstatic step.
+- **Upload limit.** Vercel accepts requests up to 4.5 MB, so the upload limit there is 4 MB (`MAX_UPLOAD_MB`).
+- **Migrations** run in GitHub Actions after the tests pass, never on Vercel itself. Database credentials live only in GitHub secrets and Vercel environment variables, never in the repository.
+- **The platform admin login** is created once from secrets (`ensure_admin`) and is never changed by later deployments.
+
 ## Security and deployment
 
 - Two `check --deploy` warnings are silenced on purpose. Caddy already redirects HTTP to HTTPS (W008), and HSTS preload is the domain owner's choice (W021).
