@@ -28,13 +28,14 @@ Then open:
 
 If `DATABASE_URL` and `POSTGRES_HOST` are empty, the data is kept in a local `db.sqlite3` file.
 
-Run the tests (219 tests, including all README §17 numbers):
+Run the tests (225 tests, including all README §17 numbers):
 
 ```
 python manage.py test
 ```
 
-`python manage.py seed_demo --reset` deletes the two demo businesses and creates them again.
+`python manage.py seed_demo --reset` deletes the two demo businesses and creates them again, and
+`python manage.py seed_demo --delete` removes them.
 
 ## 2. Connecting to Supabase
 
@@ -62,7 +63,12 @@ The app connects straight to Supabase's PostgreSQL database, so it needs the **d
 - In the Supabase Table Editor, pick the `mehnatana` schema to see the tables.
 - **Do not** add `mehnatana` to *API → Exposed schemas*. Keeping it unexposed means the payroll data cannot be read through Supabase's REST API.
 
-Do not run `seed_demo` on the live database. It is for testing only.
+**Demo businesses on the live site.** GitHub → Actions → *Demo businesses* → Run workflow, then choose
+`create`, `reset` or `delete`. It adds Shri Ram Kirana Stores (login `9876500001`) and Annapurna Sweets
+(login `9876500002`) with a draft November 2026. The repository is public, so the job never prints a password:
+give the two logins a password from `/admin/` → Logins → tick them → *Reset password*. Only businesses
+whose LIN starts with `DEMO-LIN-` are ever reset or deleted, so a real business is never touched.
+Delete the demo businesses before real use.
 
 ## 3. Starting a new business (platform admin)
 

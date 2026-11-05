@@ -12,7 +12,7 @@ from django.db import transaction
 from accounts.models import User
 from advances.models import Advance, AdvanceRecovery
 from companies.models import Company
-from core.models import AuditLog
+from core.models import AuditLog, StoredFile
 from employees.models import Department, Designation, Employee, OpeningBalance, SalaryRevision
 from letters.models import IssuedLetter, LetterTemplate
 from payroll import service
@@ -114,9 +114,20 @@ def _inputs(rows, people):
     return out
 
 
+DEMO_CODES = ("SRKS", "ANPS")
+
+
+def demo_companies():
+    """The demo businesses: their code and the DEMO- labour number together, so a real business is never touched."""
+    return Company.objects.filter(code__in=DEMO_CODES, lin__startswith="DEMO-LIN-")
+
+
 @transaction.atomic
-def create_demo():
-    """Create both demo companies. Returns {code: (company, owner user, password)}."""
+def create_demo(password=None):
+    """Create both demo companies. Returns {code: (company, owner user, password)}.
+
+    With `password`, both owners get it; otherwise each gets a random one.
+    """
     result = {}
     srks = Company.objects.create(
         code="SRKS", legal_name="Shri Ram Kirana Stores", trade_name="Shri Ram Kirana Stores",
@@ -146,10 +157,10 @@ def create_demo():
     anps_people = _staff(anps, ANPS_STAFF, "", "22345678", {"A001", "A002"}, pf_on=False)
 
     for company, mobile in ((srks, "9876500001"), (anps, "9876500002")):
-        password = _password()
-        user = User.objects.create_user(username=mobile, password=password, company=company,
+        owner_password = password or _password()
+        user = User.objects.create_user(username=mobile, password=owner_password, company=company,
                                         first_name="Owner", last_name=company.code)
-        result[company.code] = (company, user, password)
+        result[company.code] = (company, user, owner_password)
 
     service.save_inputs(srks, NOV_2026, _inputs(SRKS_STAFF, srks_people), result["SRKS"][1])
     service.save_inputs(anps, NOV_2026, _inputs(ANPS_STAFF, anps_people), result["ANPS"][1])
@@ -173,4 +184,7 @@ def delete_company(company):
     Designation.objects.filter(company=company).delete()
     AuditLog.objects.filter(company=company).delete()
     User.objects.filter(company=company).delete()
+    StoredFile.objects.filter(name__startswith=f"private/uploads/{company.code}/").delete()
+    if company.logo:
+        company.logo.delete(save=False)
     company.delete()
