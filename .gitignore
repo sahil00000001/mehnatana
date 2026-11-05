@@ -6,3 +6,8 @@ db.sqlite3
 media/
 staticfiles/
 backups/
+
+.vercel
+.env.local
+.env.*.local
+.claude/settings.local.json

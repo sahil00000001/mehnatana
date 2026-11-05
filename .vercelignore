@@ -1,5 +1,7 @@
 # Never upload secrets or local data to Vercel
 .env
+.env.local
+.vercel/
 db.sqlite3
 media/
 staticfiles/
