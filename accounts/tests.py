@@ -76,3 +76,13 @@ class LoginTest(TestCase):
 
         self.assertEqual(settings.SESSION_COOKIE_AGE, 28800)
         self.assertTrue(settings.SESSION_SAVE_EVERY_REQUEST)
+
+
+class AdminHomeTest(TestCase):
+    def test_admin_home_says_what_to_use(self):
+        admin_user = User.objects.create_superuser("platformadmin", password="a-long-test-password")
+        self.client.force_login(admin_user)
+        page = self.client.get("/admin/")
+        self.assertContains(page, "What to use here")
+        self.assertContains(page, "Create owner login")
+        self.assertNotContains(page, "/admin/auth/group/")

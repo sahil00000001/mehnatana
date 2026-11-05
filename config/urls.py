@@ -12,6 +12,12 @@ admin.site.site_header = f"{settings.APP_NAME} — platform admin"
 admin.site.site_title = f"{settings.APP_NAME} admin"
 admin.site.index_title = "Companies, logins and statutory tables"
 
+# Groups are not used: a login belongs to one company, and platform admins are superusers.
+from django.contrib.auth.models import Group  # noqa: E402
+
+if admin.site.is_registered(Group):
+    admin.site.unregister(Group)
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("accounts.urls")),
