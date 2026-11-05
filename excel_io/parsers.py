@@ -56,7 +56,8 @@ def read_upload(upload):
     if not name.endswith(".xlsx"):
         raise SheetError(_("Please save the file as Excel Workbook (.xlsx) and upload again."))
     if upload.size > settings.MAX_UPLOAD_BYTES:
-        raise SheetError(_("The file is bigger than 5 MB. Please remove extra sheets or pictures and upload again."))
+        raise SheetError(_("The file is bigger than %(mb)s MB. Please remove extra sheets or pictures and upload again.")
+                         % {"mb": settings.MAX_UPLOAD_BYTES // (1024 * 1024)})
     return upload.read()
 
 

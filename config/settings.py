@@ -144,7 +144,8 @@ if _pg:
             "HOST": _pg["HOST"],
             "PORT": _pg["PORT"],
             "OPTIONS": {"sslmode": _pg["SSLMODE"]},
-            "CONN_MAX_AGE": 60,
+            # Seconds a connection is kept open. 0 on Vercel: each request opens and closes its own.
+            "CONN_MAX_AGE": int(env("CONN_MAX_AGE", "60")),
             "CONN_HEALTH_CHECKS": True,
             # Safe with connection poolers such as Supabase's.
             "DISABLE_SERVER_SIDE_CURSORS": True,
@@ -192,10 +193,16 @@ LOCALE_PATHS = [BASE_DIR / "locale"]
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# FILE_STORAGE=database keeps uploaded files (logos, sheets) in the database instead of the
+# media folder — needed on Vercel, whose disk is not kept between requests.
+FILE_STORAGE = env("FILE_STORAGE", "filesystem")
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": {"BACKEND": "core.storage.DatabaseStorage" if FILE_STORAGE == "database"
+                else "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
+# On Vercel there is no collectstatic step: WhiteNoise serves the files straight from the app folders.
+WHITENOISE_USE_FINDERS = env_bool("WHITENOISE_USE_FINDERS", False)
 
 # Uploaded sheets and logos. This folder is private: there is no public URL for it;
 # files are returned only through views that check the company (core/views.py).
@@ -204,7 +211,8 @@ MEDIA_ROOT = Path(env("MEDIA_ROOT", str(BASE_DIR / "media")))
 # Before the first collectstatic there is no staticfiles folder; WhiteNoise only needs to say so once.
 warnings.filterwarnings("ignore", message=r"No directory at: .*staticfiles")
 
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+# README: uploads up to 5 MB. Vercel accepts requests up to 4.5 MB, so it is set to 4 there.
+MAX_UPLOAD_BYTES = int(env("MAX_UPLOAD_MB", "5")) * 1024 * 1024
 MAX_LOGO_BYTES = 500 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_BYTES
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024

@@ -13,7 +13,6 @@ from core.testing import NOV, DemoTestCase
 from employees.models import Employee, OpeningBalance
 from letters.models import IssuedLetter
 from payroll import engine, service
-from payroll.models import PayrollRun
 
 DEC = date(2026, 12, 1)
 

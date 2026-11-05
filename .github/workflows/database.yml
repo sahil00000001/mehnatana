@@ -1,0 +1,55 @@
+# On every push to main: run all tests, then bring the Supabase database up to date
+# (python manage.py migrate) and make sure the platform admin login exists.
+# Secrets (GitHub → Settings → Secrets and variables → Actions):
+#   DATABASE_URL                Supabase Session pooler connection string
+#   DJANGO_SUPERUSER_USERNAME   platform admin login (created once, never changed)
+#   DJANGO_SUPERUSER_PASSWORD
+name: Tests and database
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: database
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run all tests (local SQLite, never the live database)
+        env:
+          DEBUG: "True"
+          SECRET_KEY: ci-test-only
+        run: python manage.py test
+
+  migrate:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Update the Supabase database (only the mehnatana schema)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          POSTGRES_SCHEMA: mehnatana
+          DEBUG: "False"
+          SECRET_KEY: migrate-only-not-used-for-requests
+          DJANGO_SUPERUSER_USERNAME: ${{ secrets.DJANGO_SUPERUSER_USERNAME }}
+          DJANGO_SUPERUSER_PASSWORD: ${{ secrets.DJANGO_SUPERUSER_PASSWORD }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret is not set — skipping."; exit 0; fi
+          python manage.py migrate --noinput
+          python manage.py ensure_admin

@@ -37,6 +37,21 @@ class CompanyOwned(TimeStamped):
         abstract = True
 
 
+class StoredFile(models.Model):
+    """A private uploaded file kept in the database (see core/storage.py)."""
+
+    name = models.CharField(max_length=255, unique=True)
+    content = models.BinaryField()
+    size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "mtn_stored_file"
+
+    def __str__(self):
+        return self.name
+
+
 class AuditLog(models.Model):
     company = models.ForeignKey("companies.Company", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")

@@ -1,0 +1,16 @@
+# Never upload secrets or local data to Vercel
+.env
+db.sqlite3
+media/
+staticfiles/
+backups/
+.venv/
+**/__pycache__/
+*.pyc
+.git/
+.github/
+# Server-only files (Docker/Caddy are for a VPS, not Vercel)
+Dockerfile
+docker-compose.yml
+Caddyfile
+scripts/
