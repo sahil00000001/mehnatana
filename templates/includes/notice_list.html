@@ -1,0 +1,12 @@
+{% load i18n mtn %}{% if notices %}
+<table class="ledger notice-board compact">
+  <tbody>
+  {% for n in notices %}
+    <tr class="notice-{{ n.level }}">
+      <td class="nowrap">{% if n.when %}{{ n.when|dmy }}{% endif %}</td>
+      <td><a href="{{ n.url }}">{{ n.text }}</a>{% if n.detail %} — <span class="notice-detail">{{ n.detail }}</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">{% translate "No reminders." %}</p>{% endif %}

@@ -67,22 +67,33 @@ def salary_changes(company, rows):
         old = {n: (getattr(latest, n) if latest else Decimal("0")) for n in SALARY}
         new = {n: row.get(n) or Decimal("0") for n in SALARY}
         if any(old[n] != new[n] for n in SALARY):
+            # A new salary cannot start before the person joins, nor before a salary already set for later
+            # (it would be hidden behind it and the change would be lost).
+            earliest = max([first_revision_month(company, emp.date_of_joining)]
+                           + ([latest.effective_from] if latest else []))
             changes.append({"employee": emp, "code": emp.emp_code, "name": emp.full_name, "old": old, "new": new,
-                            "old_gross": sum(old.values()), "new_gross": sum(new.values())})
+                            "old_gross": sum(old.values()), "new_gross": sum(new.values()), "earliest": earliest})
     return changes
 
 
 def apply_salary_changes(company, changes, month, user, request=None):
-    """New salary structure from `month` for each change (old salaries stay in the history)."""
+    """New salary structure from `month` (or later, see `earliest`) for each change. Returns the months used.
+
+    Old salaries stay in the history.
+    """
+    used = []
     for change in changes:
+        month_for_this = max(month, change["earliest"])
+        used.append(month_for_this)
         rev = SalaryRevision.objects.create(
-            company=company, employee=change["employee"], effective_from=month,
+            company=company, employee=change["employee"], effective_from=month_for_this,
             source=SalaryRevision.Source.MANUAL, reason="Changed by employee upload", created_by=user,
             **change["new"])
-        audit(request, "salary.revise", rev, {"employee": change["code"], "from": str(month), "source": "upload",
-                                              "old_gross": change["old_gross"], "new_gross": change["new_gross"]},
+        audit(request, "salary.revise", rev, {"employee": change["code"], "from": str(month_for_this),
+                                              "source": "upload", "old_gross": change["old_gross"],
+                                              "new_gross": change["new_gross"]},
               company=company)
-    return len(changes)
+    return used
 
 
 def save_employees(company, rows, user, request=None):

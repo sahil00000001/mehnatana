@@ -6,6 +6,7 @@
   <a href="{% url 'employees:upload_sample' %}">{% translate "Download sample file" %}</a>
   <a href="{% url 'employees:export' %}">{% translate "Download list (Excel)" %}</a>
   <a href="{% url 'employees:organisation' %}">{% translate "Organisation chart" %}</a>
+  <button type="button" class="btn js-only" data-print>{% translate "Print this list" %}</button><noscript><span class="muted">{% translate "To print, press Ctrl+P." %}</span></noscript>
 </div>
 
 <form method="get" class="filters inline-fields box">
@@ -31,12 +32,13 @@
 <div class="table-wrap">
 <table class="ledger">
   <thead><tr>
-    <th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th>{% translate "Designation" %}</th><th>{% translate "Department" %}</th>
+    <th class="num">{% translate "Sl." %}</th><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th>{% translate "Designation" %}</th><th>{% translate "Department" %}</th>
     <th>{% translate "Date of joining" %}</th><th class="num">{% translate "Monthly gross ₹" %}</th><th>{% translate "PF" %}</th><th>{% translate "ESI" %}</th><th>{% translate "Status" %}</th>
   </tr></thead>
   <tbody>
   {% for row in rows %}
     <tr>
+      <td class="num">{{ forloop.counter }}</td>
       <td>{{ row.emp.emp_code }}</td>
       <td><a href="{% url 'employees:detail' row.emp.pk %}">{{ row.emp.full_name }}</a></td>
       <td>{{ row.emp.designation }}</td>
@@ -48,7 +50,7 @@
       <td>{% if row.leaving_on %}{% blocktranslate with d=row.leaving_on|dmy %}Leaving on {{ d }}{% endblocktranslate %}{% elif row.emp.status == "ACTIVE" %}{% translate "Active" %}{% else %}{% blocktranslate with d=row.emp.date_of_leaving|dmy %}Relieved {{ d }}{% endblocktranslate %}{% endif %}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="9">{% translate "No employees found." %} {% if not q and status == "ACTIVE" %}<a href="{% url 'employees:add' %}">{% translate "Add the first one" %}</a>.{% endif %}</td></tr>
+    <tr><td colspan="10">{% translate "No employees found." %} {% if not q and status == "ACTIVE" %}<a href="{% url 'employees:add' %}">{% translate "Add the first one" %}</a>.{% endif %}</td></tr>
   {% endfor %}
   </tbody>
 </table>

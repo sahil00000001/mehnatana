@@ -4,6 +4,13 @@
 <p>{% blocktranslate with name=emp.full_name code=emp.emp_code date=issue_date|dmy %}Letter for <strong>{{ name }} ({{ code }})</strong>, dated {{ date }}.{% endblocktranslate %}
   <a href="{% url 'letters:new' slug %}">{% translate "Choose another employee or date" %}</a></p>
 
+{% if before_last_day %}
+<div class="msg msg-warning" role="status">
+  {% blocktranslate with last=before_last_day|dmy %}This letter is dated before the last working day ({{ last }}). A relieving or experience letter is normally dated on or after that day. Change the date if this is a mistake.{% endblocktranslate %}
+  <a href="{% url 'letters:new' slug %}?employee={{ emp.pk }}&amp;date={{ before_last_day|date:'Y-m-d' }}">{% translate "Use the last working day" %}</a>
+</div>
+{% endif %}
+
 {% if warnings %}
 <div class="msg msg-warning" role="status">
   <p>{% translate "These words in {{ }} are not known and will be printed as they are:" %} <strong>{{ warnings|join:", " }}</strong></p>

@@ -1,6 +1,7 @@
 {% extends "base.html" %}{% load i18n mtn %}
 {% block content %}
 <div class="actions"><a class="btn btn-primary" href="{% url 'advances:add' %}">{% translate "Give advance" %}</a>
+  <button type="button" class="btn js-only" data-print>{% translate "Print this list" %}</button><noscript><span class="muted">{% translate "To print, press Ctrl+P." %}</span></noscript>
   <a href="{% url 'reports:advances' %}">{% translate "Advances register (print)" %}</a></div>
 <form method="get" class="filters inline-fields">
   <div class="field"><label for="status">{% translate "Show" %}</label>

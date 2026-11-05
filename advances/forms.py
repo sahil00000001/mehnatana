@@ -25,6 +25,7 @@ class AdvanceForm(IndianDatesMixin, forms.ModelForm):
         working = Q(status=Employee.Status.ACTIVE) | Q(date_of_leaving__gte=timezone.localdate())
         self.fields["employee"].queryset = Employee.objects.filter(working, company=company).order_by("emp_code")
         self.fields["employee"].label_from_instance = lambda e: f"{e.full_name} ({e.emp_code})"
+        self.fields["employee"].empty_label = _("— choose —")
 
     def clean_date_given(self):
         given = self.cleaned_data["date_given"]

@@ -28,7 +28,7 @@ Then open:
 
 If `DATABASE_URL` and `POSTGRES_HOST` are empty, the data is kept in a local `db.sqlite3` file.
 
-Run the tests (186 tests, including all README §17 numbers):
+Run the tests (219 tests, including all README §17 numbers):
 
 ```
 python manage.py test

@@ -14,6 +14,7 @@
     <div><a class="app-name" href="{% url 'home' %}">{{ APP_NAME }}</a><span class="tagline">{{ APP_TAGLINE }}</span></div>
     {% if request.company %}
     <div class="band-right">
+      <span class="today">{{ today|date:"l, j F Y" }}</span>
       <span class="company-name">{{ request.company.trade_name }}</span>
       <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}<button type="submit" class="link-button">{% translate "Logout" %}</button></form>
     </div>
@@ -22,11 +23,21 @@
 </header>
 {% if MENU %}
 <nav class="page menu" aria-label="{% translate 'Main menu' %}">
-  {% for key, label, url in MENU %}<a href="{{ url }}"{% if key == menu_current %} class="current" aria-current="page"{% endif %}>{{ label }}</a>{% if not forloop.last %}<span class="sep" aria-hidden="true">·</span>{% endif %}{% endfor %}
+  {% for key, label, url in MENU %}<a href="{{ url }}"{% if key == menu_current %} class="current" aria-current="page"{% endif %}>{{ label }}{% if key == "notices" and notice_strip %} <span class="count" aria-label="{% blocktranslate count n=notice_strip|length %}{{ n }} notice needs attention{% plural %}{{ n }} notices need attention{% endblocktranslate %}">{{ notice_strip|length }}</span>{% endif %}</a>{% if not forloop.last %} <span class="sep" aria-hidden="true">·</span> {% endif %}{% endfor %}
 </nav>
+{% if notice_strip and menu_current != "notices" %}
+<div class="page"><p class="notice-strip{% if notice_strip.0.level == 'urgent' %} urgent{% endif %}" role="status">
+  <strong>{% translate "Notice:" %}</strong> {{ notice_strip.0.text }} — {{ notice_strip.0.detail }}.
+  {% if notice_strip|length > 1 %}{% blocktranslate count n=notice_strip|length|add:"-1" %}{{ n }} more notice.{% plural %}{{ n }} more notices.{% endblocktranslate %}{% endif %}
+  <a href="{% url 'notices' %}">{% translate "See all notices" %}</a>
+</p></div>
+{% endif %}
 {% endif %}
 <main class="page">
   {% block page_head %}
+  {% if menu_section and menu_current != "home" and title != menu_section.0 %}
+  <p class="crumbs no-print"><a href="{% url 'home' %}">{% translate "Home" %}</a> › <a href="{{ menu_section.1 }}">{{ menu_section.0 }}</a> › <span>{{ title }}</span></p>
+  {% endif %}
   <h1>{{ title }}</h1>
   {% if instruction %}<p class="instruction">{{ instruction }}</p>{% endif %}
   {% endblock %}

@@ -4,6 +4,7 @@ PF ECR, ESI file) and reports. Everything reads the stored PayrollLine rows —
 nothing here recalculates salary.
 """
 from datetime import date, datetime
+from urllib.parse import urlencode
 from decimal import ROUND_FLOOR, Decimal as D
 
 from django.contrib import messages
@@ -17,11 +18,13 @@ from django.utils.translation import gettext as _
 
 from advances.models import Advance
 from core.formatting import add_months, fmt_date, month_label, month_short, tax_year_label, tax_year_of
-from core.tenancy import company_get, owner_required, page
+from core.tenancy import NoSalaryMonth, company_get, owner_required, page
 from employees.models import Employee, OpeningBalance, SalaryRevision
 from excel_io.common import as_number, table_workbook, xlsx_response
 from payroll import engine, service
 from payroll.models import PayrollLine, PayrollRun
+
+from core.notices import notices_for
 
 from . import payslip as payslip_design
 from . import queries
@@ -32,7 +35,10 @@ ZERO = D("0")
 
 # ---------------------------------------------------------------- helpers
 def _run(request, month):
-    return company_get(request, PayrollRun, month=month)
+    run = PayrollRun.objects.filter(company=request.company, month=month).first()
+    if run is None:
+        raise NoSalaryMonth(month)
+    return run
 
 
 def _lines(run):
@@ -50,6 +56,17 @@ def _files_need_final(request, run):
     messages.warning(request, _("Files for %(month)s can be downloaded after the month is finalised.")
                      % {"month": run.label})
     return redirect("payroll:month", month=run.month)
+
+
+def _files_phrase(company):
+    """'bank, PF and ESI files', without the parts this business does not have."""
+    if company.pf_enabled and company.esi_enabled:
+        return _("bank, PF and ESI files")
+    if company.pf_enabled:
+        return _("bank and PF files")
+    if company.esi_enabled:
+        return _("bank and ESI files")
+    return _("bank sheet")
 
 
 def _month_param(value):
@@ -101,7 +118,8 @@ def dashboard(request):
         {"label": _("Fill days present, leave, overtime and advances in Excel"), "done": uploaded},
         {"label": _("Upload the sheet; the system checks every row"), "done": uploaded},
         {"label": _("Look at the salary table and finalise"), "done": False},
-        {"label": _("Print payslips and register; download bank, PF and ESI files"), "done": False},
+        {"label": _("Print payslips and register; download the %(files)s") % {"files": _files_phrase(company)},
+         "done": False},
     ]
     if uploaded:
         next_step = {"label": _("Check and finalise %(month)s") % {"month": label},
@@ -130,7 +148,7 @@ def dashboard(request):
         active_count=Employee.objects.filter(company=company, status=Employee.Status.ACTIVE).count(),
         last=last, last_totals=last_totals, year_so_far=year_so_far,
         view=view, views=queries.COST_VIEWS, cost_rows=cost_rows, largest=largest,
-        reminders=queries.reminders(company, open_month, today), fixes=fixes, today=today,
+        home_notices=notices_for(company, today), fixes=fixes, today=today,
     )
 
 
@@ -353,6 +371,8 @@ def pf(request, month):
     ]
     challan_total = sum((amount for _l, amount in challan), ZERO)
     if _wants_xlsx(request):
+        if blocked := _files_need_final(request, run):
+            return blocked
         headers = ["UAN", "Code", "Name", "Gross", "EPF wages", "EPS wages", "EDLI wages", "Employee PF",
                    "Employer EPS", "Employer EPF", "EDLI", "Admin", "NCP days"]
         rows = [[l.emp_snapshot.get("uan", ""), l.code, l.name, _n(l.gross), _n(l.epf_wage), _n(l.eps_wage),
@@ -378,6 +398,8 @@ def esi(request, month):
     _included, missing = queries.esi_members(all_lines)
     totals = {f: sum((getattr(l, f) for l in covered), ZERO) for f in ("esi_wage", "ee_esi", "er_esi")}
     if _wants_xlsx(request):
+        if blocked := _files_need_final(request, run):
+            return blocked
         headers = ["IP Number", "Code", "Name", "Paid days", "ESI wages", "Employee ESI", "Employer ESI"]
         rows = [[l.emp_snapshot.get("esic_ip_no", ""), l.code, l.name, _n(l.paid_days), _n(l.esi_wage),
                  _n(l.ee_esi), _n(l.er_esi)] for l in covered]
@@ -404,6 +426,8 @@ def pt(request, month):
     slab_rows = [{"amount": amount, "count": c, "total": t} for amount, (c, t) in sorted(slabs.items(), reverse=True)]
     total = sum((l.pt for l in lines), ZERO)
     if _wants_xlsx(request):
+        if blocked := _files_need_final(request, run):
+            return blocked
         headers = ["Code", "Name", "Gross", "Professional tax"]
         rows = [[l.code, l.name, _n(l.gross), _n(l.pt)] for l in lines]
         wb = table_workbook(f"PT {month_short(run.month)}", headers, rows,
@@ -464,6 +488,7 @@ def tds(request, tax_year):
         _("TDS cut each month from finalised salaries, with the amount from opening balances."),
         tax_year=tax_year, months=months, rows=rows, month_totals=month_totals,
         total_tds=sum((p["tds"] for p in rows), ZERO), total_ytd=sum((p["ytd_tds"] for p in rows), ZERO),
+        total_opening=sum((p["opening_tds"] for p in rows), ZERO),
         tax_years=queries.tax_year_choices(company, timezone.localdate()),
     )
 
@@ -478,7 +503,17 @@ def cost(request):
     month = _month_param(request.GET.get("month"))
     run = None
     if month:
-        run = company_get(request, PayrollRun, month=month, status=PayrollRun.Status.FINALISED)
+        run = PayrollRun.objects.filter(company=company, month=month, status=PayrollRun.Status.FINALISED).first()
+        if run is None:  # a draft (or unknown) month: show the latest finalised month instead, and say so
+            text = _("The cost report uses finalised months only. %(month)s is not finalised yet.") % {
+                "month": month_label(month)}
+            if finals:
+                text += " " + _("Showing %(month)s instead.") % {"month": finals[0].label}
+            messages.info(request, text)
+            params = {"view": view} if "view" in request.GET else {}
+            if finals:
+                params["month"] = f"{finals[0].month:%Y-%m}"
+            return redirect(f"{reverse('reports:cost')}?{urlencode(params)}" if params else reverse("reports:cost"))
     elif finals:
         run = finals[0]
     lines = _lines(run) if run else []

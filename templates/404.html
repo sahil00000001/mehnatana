@@ -1,5 +1,10 @@
 {% extends "base.html" %}{% load i18n %}
 {% block content %}
+{% if salary_month %}
+<p>{% translate "The salary of this month has not been worked out yet, so there are no payslips or files for it." %}</p>
+<p><a class="btn btn-primary" href="{% url 'payroll:months' %}">{% translate "Go to Monthly Salary" %}</a></p>
+{% else %}
 <p>{% translate "This page does not exist, or it belongs to another business." %}</p>
 <p><a href="{% url 'home' %}">{% translate "Go to the Home page" %}</a></p>
+{% endif %}
 {% endblock %}

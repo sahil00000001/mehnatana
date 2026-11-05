@@ -56,11 +56,10 @@
     <div class="pm-net-amount">₹ {{ line.net_pay|inr }}</div>
   </div>
 
-  {% if company.payslip_show_employer %}
+  {% if company.payslip_show_employer and slip.employer_paid %}
   <table class="pm-employer">
     <caption>{% translate "Paid by the employer on top of your salary (not cut from your pay)" %}</caption>
-    <tr><td>{% translate "PF" %}</td><td class="num">{{ line.er_pf_total|inr }}</td><td>{% translate "EDLI" %}</td><td class="num">{{ line.edli|inr }}</td>
-        <td>{% translate "PF admin" %}</td><td class="num">{{ line.pf_admin|inr }}</td><td>{% translate "ESI" %}</td><td class="num">{{ line.er_esi|inr }}</td></tr>
+    <tr>{% for label, amount in slip.employer_paid %}<td>{{ label }}</td><td class="num">{{ amount|inr }}</td>{% endfor %}</tr>
   </table>
   {% endif %}
   {% if slip.advance_balance %}<p class="pm-small">{% translate "Advance still to be recovered after this month" %}: ₹ {{ slip.advance_balance|inr }}</p>{% endif %}

@@ -282,8 +282,8 @@ class OddRequestsTest(DemoTestCase):
         self.client.force_login(self.anps_user)
         self.finalise_november(self.anps)
         page = self.client.get(reverse("payroll:month", args=[NOV]))
-        self.assertNotContains(page, "PF ECR file")
-        self.assertContains(page, "ESI upload file")
+        self.assertNotContains(page, "PF statement")
+        self.assertContains(page, "ESI statement and ESI file")
 
     def test_reopen_link_only_for_latest_month(self):
         self.finalise_november()

@@ -106,7 +106,10 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 - **ESI file.** Dates are written DD/MM/YYYY. Reason code 2 plus the last working day if the person left that month; 1 if zero days; otherwise 0. **Before going live, compare the columns with the template on the ESIC portal.**
 - **"Advance balance after this month"** on the payslip = advances given up to month end, minus recoveries up to and including that month. On a draft it also subtracts this month's deduction.
 - **Cash payment list** includes cheque-paid staff, marked "(Cheque)", because they also sign for payment.
-- **Dashboard reminders** show the open month's dues, plus the last finalised month's dues that are still to come.
+- **Notices** replace the dashboard reminders (see "Notices" below).
+- **Draft months.** PF, ESI and PT statements of a draft month can be seen and printed (marked draft) but not downloaded as Excel, the same rule as the register and bank sheet. The cost report uses finalised months only; asking for a draft month opens the latest finalised month with a note.
+- **Shops without PF or ESI** do not see buttons, Home figures or payslip lines for the scheme they do not have. "Employer also paid" on a payslip lists only the parts that are not zero.
+- **TDS report.** The totals row includes the opening TDS, so "Incl. opening" adds up on the page.
 - **PT statement.** Slab-wise totals are grouped by the PT amount per person.
 - **Register page numbers** ("Page x of y") use CSS page counters. Recent Chrome prints them; other browsers may leave the number off.
 
@@ -121,6 +124,25 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 - **Pronouns.** Gender "Other" uses they/their/them.
 - **Particulars row 13 (ESI: Yes/No)** uses the rates for the month of the letter date.
 - **Mistyped placeholders** like `{{ Emp.Name }}` also produce a warning.
+- **Save pressed twice.** Within 10 minutes, a letter for the same person, type and date with exactly the same printed text is not saved again (checked while the company row is locked). A corrected text is a new letter with the next number.
+- **Resignation date** is kept only when the leaving reason is Resigned, and must be on or before the last working day. The relieving letter mentions the resignation letter only in that case.
+- **Relieving and experience letters dated before the last working day** show a warning on the preview, with a link to use the last working day.
+- **"Reset to original text"** asks once more before it replaces the company's wording.
+
+## Notices
+
+- **What they are.** The Notices page (and the strip at the top of every page) lists PF, ESI, PT, TDS and salary due dates with "due in N days" or "N days late", months not finalised after they end, staff leaving in the next 14 days, probation ending in the next 30 days, and the "things to fix" list.
+- **Urgent** means due within 3 days or late; **soon** means within 10 days. Only these show in the strip and the menu count.
+- **Paid or not.** The app does not know whether a due has been paid. A due disappears after its date once the month is finalised, and anything more than 45 days late is dropped.
+- **In the app only.** Notices are not sent by SMS, WhatsApp or e-mail.
+- **Never break a page.** If working out the notices fails, the error is logged and the page shows without them.
+
+## Uploads (added after the third test round)
+
+- **One answer per file.** The "salary changes" confirm page carries a token for its own file. If another file was uploaded meanwhile (another tab), the answer is refused and nothing is saved.
+- **New salary month.** A salary change from the upload never starts before the joining month or before a salary already set for a later month; it starts from that later month instead, and the confirm page says so.
+- **Stored files are deleted** as soon as they are not needed: a waiting file when it is answered, replaced or cancelled, and a failed file when it is replaced or the upload succeeds. They hold PAN and bank numbers.
+- **Advances added after a sheet is uploaded.** The uploaded sheet keeps what was typed in it. After a new advance or a changed monthly cut, the app says which month is affected and links to that row.
 
 ## Vercel deployment
 

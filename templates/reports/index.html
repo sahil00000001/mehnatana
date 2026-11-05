@@ -18,8 +18,8 @@
   </div>
   <h2>{% translate "PF, ESI and professional tax" %}</h2>
   <div class="actions">
-    <button class="btn" name="go" value="pf">{% translate "PF statement and ECR file" %}</button>
-    <button class="btn" name="go" value="esi">{% translate "ESI statement and ESI file" %}</button>
+    {% if request.company.pf_enabled %}<button class="btn" name="go" value="pf">{% translate "PF statement and ECR file" %}</button>{% endif %}
+    {% if request.company.esi_enabled %}<button class="btn" name="go" value="esi">{% translate "ESI statement and ESI file" %}</button>{% endif %}
     <button class="btn" name="go" value="pt">{% translate "Professional tax" %}</button>
   </div>
   <h2>{% translate "Cost" %}</h2>

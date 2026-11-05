@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% load i18n mtn %}
 {% block content %}
 {% include "reports/_draft_note.html" %}
-{% include "reports/_actions.html" with excel=True %}
+{% include "reports/_actions.html" with excel=run.is_final %}
 <p>{% translate "State" %}: <strong>{{ state }}</strong>{% if run.company.pt_registration_no %} · {% translate "PT registration" %}: {{ run.company.pt_registration_no }}{% endif %}</p>
 
 <h2>{% translate "Totals by slab" %}</h2>

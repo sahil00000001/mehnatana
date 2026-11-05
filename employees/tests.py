@@ -247,7 +247,8 @@ class SimpleUseTest(DemoTestCase):
         self.assertContains(response, "1 person has a different salary in your file")
         self.assertContains(response, "Yes, save and change these salaries")
         self.assertEqual(self.employee("E002").revisions.count(), 1)  # nothing saved yet
-        response = self.client.post(reverse("employees:upload_confirm"), {"salaries": "change", "month": "2026-11"})
+        response = self.client.post(reverse("employees:upload_confirm"),
+                                    {"salaries": "change", "month": "2026-11", "token": response.context["token"]})
         self.assertRedirects(response, reverse("employees:list"), fetch_redirect_response=False)
         e002 = self.employee("E002")
         self.assertEqual(e002.structure_on(NOV).basic, D(10000))
@@ -255,11 +256,12 @@ class SimpleUseTest(DemoTestCase):
         line = self.run_for().lines.get(employee=e002)
         self.assertEqual(line.rate_basic, D(10000))  # the draft month follows at once
         page = self.client.get(reverse("employees:list"))
-        self.assertContains(page, "New salary from November 2026 for 1 people.")
+        self.assertContains(page, "New salary from November 2026 for 1 person.")
 
     def test_salary_change_can_be_skipped(self):
-        self.client.post(reverse("employees:upload"), {"file": self.export_with({"E002": {"Basic": 10000}})})
-        self.client.post(reverse("employees:upload_confirm"), {"salaries": "keep"})
+        response = self.client.post(reverse("employees:upload"),
+                                    {"file": self.export_with({"E002": {"Basic": 10000}})})
+        self.client.post(reverse("employees:upload_confirm"), {"salaries": "keep", "token": response.context["token"]})
         self.assertEqual(self.employee("E002").structure_on(NOV).basic, D(9000))
 
     def test_finalised_month_not_offered(self):
@@ -267,9 +269,49 @@ class SimpleUseTest(DemoTestCase):
         response = self.client.post(reverse("employees:upload"), {"file": self.export_with({"E002": {"Basic": 10000}})})
         months = [m.strftime("%Y-%m") for m in response.context["months"]]
         self.assertNotIn("2026-11", months)
-        self.client.post(reverse("employees:upload_confirm"), {"salaries": "change", "month": "2026-11"})
+        self.client.post(reverse("employees:upload_confirm"),
+                         {"salaries": "change", "month": "2026-11", "token": response.context["token"]})
         self.assertEqual(self.employee("E002").structure_on(NOV).basic, D(9000))  # November is locked
         self.assertEqual(self.employee("E002").structure_on(date(2026, 12, 1)).basic, D(10000))
+
+    def test_answer_for_an_older_file_is_not_applied(self):
+        first = self.client.post(reverse("employees:upload"), {"file": self.export_with({"E002": {"Basic": 10000}})})
+        self.client.post(reverse("employees:upload"), {"file": self.export_with({"E005": {"Basic": 20000}})})
+        response = self.client.post(reverse("employees:upload_confirm"),
+                                    {"salaries": "change", "month": "2026-11", "token": first.context["token"]})
+        self.assertRedirects(response, reverse("employees:upload"), fetch_redirect_response=False)
+        self.assertEqual(self.employee("E005").structure_on(NOV).basic, D(14000))  # nothing saved
+        self.assertEqual(self.employee("E002").structure_on(NOV).basic, D(9000))
+        self.assertContains(self.client.get(reverse("employees:upload")), "you uploaded another file after this one")
+
+    def test_new_salary_never_before_joining_or_a_later_salary(self):
+        e002 = self.employee("E002")
+        SalaryRevision.objects.create(company=self.srks, employee=e002, effective_from=date(2027, 1, 1), basic=9500,
+                                      reason="Planned increment")
+        response = self.client.post(reverse("employees:upload"), {"file": self.export_with({"E002": {"Basic": 12000}})})
+        self.assertContains(response, "This new salary cannot start before January 2027")
+        self.client.post(reverse("employees:upload_confirm"),
+                         {"salaries": "change", "month": "2026-11", "token": response.context["token"]})
+        e002.refresh_from_db()
+        self.assertEqual(e002.structure_on(NOV).basic, D(9000))
+        self.assertEqual(e002.structure_on(date(2027, 1, 1)).basic, D(12000))  # not hidden behind January
+        self.assertContains(self.client.get(reverse("employees:list")),
+                            "New salary from January 2027 for 1 person.")
+
+    def test_files_waiting_for_an_answer_are_deleted(self):
+        from core.models import StoredFile
+        from core.test_storage import DATABASE_FILES
+
+        with self.settings(STORAGES=DATABASE_FILES):
+            for _n in range(3):
+                response = self.client.post(reverse("employees:upload"),
+                                            {"file": self.export_with({"E002": {"Basic": 10000}})})
+            self.assertEqual(StoredFile.objects.filter(name__contains="/pending/").count(), 1)  # replaced each time
+            self.client.post(reverse("employees:upload_confirm"), {"salaries": "keep", "token": response.context["token"]})
+            self.assertEqual(StoredFile.objects.filter(name__contains="/pending/").count(), 0)
+            self.client.post(reverse("employees:upload"), {"file": self.export_with({"E002": {"Basic": 10000}})})
+            self.client.get(reverse("employees:upload"))  # Cancel
+            self.assertEqual(StoredFile.objects.filter(name__contains="/pending/").count(), 0)
 
     def test_new_designation_typed_in(self):
         data = dict(FORM, designation_name="Store Keeper", department_name="godown")

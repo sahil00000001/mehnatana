@@ -1,9 +1,15 @@
+import logging
+
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+logger = logging.getLogger(__name__)
 
 MENU = [
     ("home", _("Home"), "home", ()),
+    ("notices", _("Notices"), "notices", ("/notices/",)),
     ("employees", _("Employees"), "employees:list", ("/employees/", "/organisation/")),
     ("salary", _("Monthly Salary"), "payroll:months", ("/salary/",)),
     ("advances", _("Advances"), "advances:list", ("/advances/",)),
@@ -23,6 +29,17 @@ def _current(path):
     return ""
 
 
+def _attention(company):
+    """Notices due soon or late. A problem here must never stop a page from opening."""
+    from core.notices import needs_attention, notices_for
+
+    try:
+        return needs_attention(notices_for(company))
+    except Exception:  # noqa: BLE001 - the notice strip is a convenience
+        logger.exception("Could not work out notices for company %s", company.pk)
+        return []
+
+
 def app(request):
     context = {
         "APP_NAME": settings.APP_NAME,
@@ -30,7 +47,15 @@ def app(request):
         "SUPPORT_PHONE": settings.SUPPORT_PHONE,
         "SUPPORT_EMAIL": settings.SUPPORT_EMAIL,
     }
-    if getattr(request, "company", None) is not None:
-        context["MENU"] = [(key, label, reverse(url)) for key, label, url, _p in MENU]
-        context["menu_current"] = _current(request.path)
+    company = getattr(request, "company", None)
+    if company is not None:
+        current = _current(request.path)
+        menu = [(key, label, reverse(url)) for key, label, url, _p in MENU]
+        context.update({
+            "MENU": menu,
+            "menu_current": current,
+            "menu_section": next(((label, url) for key, label, url in menu if key == current), None),
+            "today": timezone.localdate(),
+            "notice_strip": _attention(company),
+        })
     return context

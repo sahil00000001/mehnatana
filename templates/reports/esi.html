@@ -4,7 +4,7 @@
 <div class="actions no-print">
   {% if run.is_final %}<a class="btn btn-primary" href="{% url 'reports:esi_file' run.month %}">{% translate "Download ESI upload file" %}</a>{% endif %}
   <button type="button" class="btn js-only" data-print>{% translate "Print" %}</button>
-  <a class="btn" href="{% querystring format='xlsx' %}">{% translate "Download Excel" %}</a>
+  {% if run.is_final %}<a class="btn" href="{% querystring format='xlsx' %}">{% translate "Download Excel" %}</a>{% endif %}
 </div>
 {% if missing %}
 <div class="msg msg-warning">

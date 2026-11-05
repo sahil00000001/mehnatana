@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.utils.translation import gettext_lazy as _
 
+from core.formatting import indian_format
+
 # The biggest amount any one box may hold (₹99,99,999). Anything larger is a typing mistake,
 # and the database columns could not store the totals.
 MAX_AMOUNT = Decimal("9999999")
@@ -59,7 +61,7 @@ class WholeRupeesField(forms.DecimalField):
         self.validators += [
             MinValueValidator(0, message=_("Cannot be a negative number.")),
             MaxValueValidator(maximum, message=_("This looks too big (more than ₹%(max)s). Please check.")
-                              % {"max": f"{int(maximum):,}"}),
+                              % {"max": indian_format(int(maximum))}),
         ]
 
     def to_python(self, value):

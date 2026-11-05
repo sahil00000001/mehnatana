@@ -1,10 +1,13 @@
 {% extends "base.html" %}{% load i18n mtn %}
 {% block content %}
 {% include "reports/_draft_note.html" %}
+{% if not run.company.pf_enabled %}
+<div class="msg msg-info">{% translate "PF is turned off for your business in Settings, so there is nothing to deposit." %}</div>
+{% endif %}
 <div class="actions no-print">
-  {% if run.is_final %}<a class="btn btn-primary" href="{% url 'reports:ecr' run.month %}">{% translate "Download PF ECR file" %}</a>{% endif %}
+  {% if run.is_final and run.company.pf_enabled %}<a class="btn btn-primary" href="{% url 'reports:ecr' run.month %}">{% translate "Download PF ECR file" %}</a>{% endif %}
   <button type="button" class="btn js-only" data-print>{% translate "Print" %}</button>
-  <a class="btn" href="{% querystring format='xlsx' %}">{% translate "Download Excel" %}</a>
+  {% if run.is_final %}<a class="btn" href="{% querystring format='xlsx' %}">{% translate "Download Excel" %}</a>{% endif %}
 </div>
 {% if missing %}
 <div class="msg msg-warning">

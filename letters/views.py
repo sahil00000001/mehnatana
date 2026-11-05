@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import redirect, render
@@ -66,7 +64,8 @@ def new(request, letter_type):
                     _("Choose the employee and the date of the letter, then press Show the letter."),
                     form=form, slug=letter_type, letter_label=label)
 
-    _employee(request, data.get("employee"))  # another company's employee -> 404
+    if data.get("employee"):
+        _employee(request, data.get("employee"))  # another company's employee -> 404
     form = ChooseForm(company, ltype, data={"employee": data.get("employee"), "date": data.get("date") or today})
     if not form.is_valid():
         return page(request, "letters/choose.html", label,
@@ -82,22 +81,21 @@ def new(request, letter_type):
         text = text_for_editing(template.body, values)
 
     if request.method == "POST" and request.POST.get("action") == "save":
-        just_issued = IssuedLetter.objects.filter(
-            company=company, employee=emp, letter_type=ltype, issue_date=issue_date,
-            created_at__gte=timezone.now() - timedelta(minutes=10)).first()
-        if just_issued:  # pressed twice
-            messages.info(request, _("This letter was already saved as %(ref)s.") % {"ref": just_issued.ref_no})
-            return redirect("letters:detail", pk=just_issued.pk)
-        letter = issue_letter(request, company, emp, ltype, issue_date, text)
-        messages.success(request, _("Letter %(ref)s is saved. Print it now.") % {"ref": letter.ref_no})
+        letter, created = issue_letter(request, company, emp, ltype, issue_date, text)
+        if created:
+            messages.success(request, _("Letter %(ref)s is saved. Print it now.") % {"ref": letter.ref_no})
+        else:  # Save pressed twice with the same text
+            messages.info(request, _("This letter was already saved as %(ref)s.") % {"ref": letter.ref_no})
         return redirect("letters:detail", pk=letter.pk)
 
     _year, _seq, next_ref = next_reference(company, ltype, issue_date)
     preview, warnings = letter_html(company, emp, ltype, issue_date, text, next_ref)
+    early = ltype != LetterType.APPOINTMENT and emp.date_of_leaving and issue_date < emp.date_of_leaving
     return page(request, "letters/preview.html", label,
                 _("Check the letter. Change the text below if needed, then press Save and print."),
                 emp=emp, issue_date=issue_date, text=text, preview=preview, warnings=warnings,
-                next_ref=next_ref, slug=letter_type, letter_label=label)
+                next_ref=next_ref, slug=letter_type, letter_label=label,
+                before_last_day=emp.date_of_leaving if early else None)
 
 
 @owner_required
@@ -135,7 +133,8 @@ def template_edit(request, letter_type):
     else:
         form = TemplateForm(initial={"body": template.body})
     warnings = unknown_placeholders(form["body"].value() or "")
+    asking_reset = request.method == "GET" and request.GET.get("reset") == "ask"
     return page(request, "letters/template_edit.html", _("Default text: %(label)s") % {"label": label},
                 _("Change the words and press Save. Use only the {{ placeholders }} listed below."),
                 form=form, placeholders=PLACEHOLDERS, warnings=warnings, slug=letter_type, letter_label=label,
-                is_appointment=ltype == LetterType.APPOINTMENT)
+                is_appointment=ltype == LetterType.APPOINTMENT, asking_reset=asking_reset)

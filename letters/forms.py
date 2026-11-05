@@ -10,7 +10,8 @@ DATE_FORMATS = ["%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"]
 
 
 class ChooseForm(forms.Form):
-    employee = forms.ModelChoiceField(queryset=None, label=_("Employee"), empty_label=_("— choose —"))
+    employee = forms.ModelChoiceField(queryset=None, label=_("Employee"), empty_label=_("— choose —"),
+                                      error_messages={"required": _("Choose an employee from the list.")})
     date = forms.DateField(label=_("Date of the letter"), input_formats=DATE_FORMATS, validators=[sensible_date],
                            widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
 

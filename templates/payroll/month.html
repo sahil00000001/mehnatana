@@ -2,6 +2,7 @@
 {% block content %}
 {% if run.revision_no %}<div class="msg msg-info">{% blocktranslate with n=run.revision_no %}This month was reopened (revision {{ n }}).{% endblocktranslate %} {% translate "Reason:" %} {{ run.reopen_reason }}</div>{% endif %}
 
+<p class="where-now">{% if is_final %}{% translate "This month is done. Step 5: print payslips and download the files." %}{% elif has_lines %}{% translate "You are at step 3 of 5: check the salary table, then finalise (step 4)." %}{% elif blocker %}{{ blocker }}{% else %}{% translate "You are at step 1 of 5: download the attendance sheet." %}{% endif %}</p>
 <ol class="steps">
   <li class="step{% if has_lines %} done{% elif not blocker %} current{% endif %}">
     <h2>{% translate "Download the attendance sheet" %}</h2>
@@ -120,8 +121,8 @@
       <a class="btn" href="{% url 'reports:register' month %}">{% translate "Print salary register" %}</a>
       <a class="btn" href="{% url 'reports:bank_sheet' month %}">{% translate "Bank transfer sheet (Excel)" %}</a>
       <a class="btn" href="{% url 'reports:cash_list' month %}">{% translate "Cash payment list (print)" %}</a>
-      {% if request.company.pf_enabled %}<a class="btn" href="{% url 'reports:pf' month %}">{% translate "PF ECR file" %}</a>{% endif %}
-      {% if request.company.esi_enabled %}<a class="btn" href="{% url 'reports:esi' month %}">{% translate "ESI upload file" %}</a>{% endif %}
+      {% if request.company.pf_enabled %}<a class="btn" href="{% url 'reports:pf' month %}">{% translate "PF statement and ECR file" %}</a>{% endif %}
+      {% if request.company.esi_enabled %}<a class="btn" href="{% url 'reports:esi' month %}">{% translate "ESI statement and ESI file" %}</a>{% endif %}
     </div>
     {% if can_reopen %}<p><a href="{% url 'payroll:reopen' month %}">{% translate "Reopen this month" %}</a> — {% translate "only if you made a mistake." %}</p>{% endif %}
     {% elif has_lines %}

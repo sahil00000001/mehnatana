@@ -23,16 +23,16 @@
   <p class="small">{% blocktranslate with month=last.month|month_label %}Last finalised month: {{ month }}.{% endblocktranslate %}
     <a href="{% url 'reports:payslips' last.month %}">{% translate "Print payslips" %}</a> ·
     <a href="{% url 'reports:register' last.month %}">{% translate "Salary register" %}</a> ·
-    <a href="{% url 'reports:bank_sheet' last.month %}">{% translate "Bank sheet" %}</a> ·
-    {% if request.company.pf_enabled %}<a href="{% url 'reports:pf' last.month %}">{% translate "PF and ECR file" %}</a>{% endif %}
-    {% if request.company.esi_enabled %} · <a href="{% url 'reports:esi' last.month %}">{% translate "ESI file" %}</a>{% endif %}</p>
+    <a href="{% url 'reports:bank_sheet' last.month %}">{% translate "Bank sheet" %}</a>{% if request.company.pf_enabled %} ·
+    <a href="{% url 'reports:pf' last.month %}">{% translate "PF and ECR file" %}</a>{% endif %}{% if request.company.esi_enabled %} ·
+    <a href="{% url 'reports:esi' last.month %}">{% translate "ESI file" %}</a>{% endif %}</p>
   {% endif %}
 </section>
 {% endif %}
 
 <div class="stats">
   <div class="stat"><div class="label">{% translate "Active employees" %}</div><div class="value">{{ active_count }}</div></div>
-  <div class="stat"><div class="label">{% translate "Last finalised month" %}</div><div class="value">{% if last %}{{ last.month|month_short }}{% else %}—{% endif %}</div></div>
+  <div class="stat"><div class="label">{% translate "Last finalised month" %}</div><div class="value">{% if last %}{{ last.month|month_label }}{% else %}—{% endif %}</div></div>
   <div class="stat"><div class="label">{% translate "Net pay last month" %}</div><div class="value">{% if last_totals %}₹ {{ last_totals.net_pay|inr }}{% else %}—{% endif %}</div></div>
   <div class="stat"><div class="label">{% translate "Total cost last month" %}</div><div class="value">{% if last_totals %}₹ {{ last_totals.company_cost|inr }}{% else %}—{% endif %}</div></div>
 </div>
@@ -40,9 +40,11 @@
 <h2>{% translate "Salary cost by month" %}</h2>
 {% include "reports/_cost_table.html" %}
 
-<h2>{% if last %}{% blocktranslate with month=last.month|month_label %}PF and ESI — {{ month }}{% endblocktranslate %}{% else %}{% translate "PF and ESI" %}{% endif %}</h2>
+{% with pf_on=request.company.pf_enabled esi_on=request.company.esi_enabled %}
+<h2>{% if last %}{% blocktranslate with month=last.month|month_label %}Government dues — {{ month }}{% endblocktranslate %}{% else %}{% translate "Government dues" %}{% endif %}</h2>
 {% if last_totals %}
 <div class="side-by-side">
+{% if pf_on %}
 <table class="ledger details">
   <tbody>
     <tr><th>{% translate "Employee PF" %}</th><td class="num">{{ last_totals.ee_pf|inr }}</td></tr>
@@ -53,30 +55,33 @@
     <tr class="total"><td>{% translate "PF challan total" %}</td><td class="num">{{ last_totals.pf_challan|inr }}</td></tr>
   </tbody>
 </table>
+{% endif %}
 <table class="ledger details">
   <tbody>
+    {% if esi_on %}
     <tr><th>{% translate "Employee ESI" %}</th><td class="num">{{ last_totals.ee_esi|inr }}</td></tr>
     <tr><th>{% translate "Employer ESI" %}</th><td class="num">{{ last_totals.er_esi|inr }}</td></tr>
     <tr class="total"><td>{% translate "ESI challan total" %}</td><td class="num">{{ last_totals.esi_challan|inr }}</td></tr>
+    {% endif %}
     <tr><th>{% translate "Professional tax" %}</th><td class="num">{{ last_totals.pt|inr }}</td></tr>
     <tr><th>{% translate "Income tax (TDS)" %}</th><td class="num">{{ last_totals.tds|inr }}</td></tr>
   </tbody>
 </table>
 </div>
+{% if pf_on or esi_on %}
 <table class="ledger compact">
-  <thead><tr><th>{% blocktranslate with start=year_so_far.from|month_short end=year_so_far.to|month_short %}This tax year so far ({{ start }} to {{ end }}){% endblocktranslate %}</th><th class="num">{% translate "Employer PF ₹" %}</th><th class="num">{% translate "Employer ESI ₹" %}</th></tr></thead>
-  <tbody><tr><td>{% translate "Paid by the business" %}</td><td class="num">{{ year_so_far.pf|inr }}</td><td class="num">{{ year_so_far.esi|inr }}</td></tr></tbody>
+  <thead><tr><th>{% blocktranslate with start=year_so_far.from|month_label end=year_so_far.to|month_label %}This tax year so far ({{ start }} to {{ end }}){% endblocktranslate %}</th>{% if pf_on %}<th class="num">{% translate "Employer PF ₹" %}</th>{% endif %}{% if esi_on %}<th class="num">{% translate "Employer ESI ₹" %}</th>{% endif %}</tr></thead>
+  <tbody><tr><td>{% translate "Paid by the business" %}</td>{% if pf_on %}<td class="num">{{ year_so_far.pf|inr }}</td>{% endif %}{% if esi_on %}<td class="num">{{ year_so_far.esi|inr }}</td>{% endif %}</tr></tbody>
 </table>
-{% else %}
-<p class="muted">{% translate "PF and ESI figures appear here after you finalise a month." %}</p>
 {% endif %}
+{% else %}
+<p class="muted">{% translate "PF, ESI and tax figures appear here after you finalise a month." %}</p>
+{% endif %}
+{% endwith %}
 
-<h2>{% translate "Reminders" %}</h2>
-{% if reminders %}
-<ul class="checklist">
-  {% for r in reminders %}<li>{% if r.overdue %}<strong class="field-error">{% translate "Overdue:" %}</strong> {% endif %}{{ r.text }} {% translate "by" %} <strong>{{ r.due|dmy }}</strong></li>{% endfor %}
-</ul>
-{% else %}<p class="muted">{% translate "No reminders." %}</p>{% endif %}
+<h2>{% translate "Notice board" %}</h2>
+{% include "includes/notice_list.html" with notices=home_notices %}
+<p><a href="{% url 'notices' %}">{% translate "See all notices" %}</a></p>
 
 <h2>{% translate "Things to fix" %}</h2>
 {% if fixes %}

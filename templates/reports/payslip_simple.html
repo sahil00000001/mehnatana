@@ -13,7 +13,8 @@
     <tr><td><strong>{% translate "Days" %}:</strong> {% blocktranslate with paid=line.paid_days|num dim=line.days_in_month lop=line.lop|num %}{{ paid }} paid of {{ dim }} (LOP {{ lop }}){% endblocktranslate %}{% if line.ot_hours %} · {% translate "OT" %} {{ line.ot_hours|num }} h{% endif %}</td>
         <td><strong>{% translate "Wage period" %}:</strong> {{ period_start|dmy }} – {{ period_end|dmy }}</td></tr>
     <tr><td><strong>{% translate "UAN" %}:</strong> {{ s.uan|default:"—" }} · <strong>{% translate "ESIC" %}:</strong> {{ s.esic_ip_no|default:"—" }}</td>
-        <td><strong>{% translate "Paid by" %}:</strong> {{ s.payment_mode }}{% if s.bank_account_no %} · {{ s.bank_account_no }}{% endif %}</td></tr>
+        <td><strong>{% translate "PAN" %}:</strong> {{ s.pan|default:"—" }}</td></tr>
+    <tr><td colspan="2"><strong>{% translate "Paid by" %}:</strong> {{ s.payment_mode }}{% if s.bank_account_no %} · {{ s.bank_account_no }}{% if s.bank_name %} ({{ s.bank_name }}){% endif %}{% endif %}</td></tr>
   </table>
 
   <table class="print ps-money">
@@ -32,7 +33,7 @@
     <tr class="ps-net"><td>{% translate "NET PAY" %}</td><td class="num">₹ {{ line.net_pay|inr }}</td></tr>
   </table>
   <p class="ps-small">{% translate "In words" %}: {{ line.net_pay|words }}</p>
-  {% if company.payslip_show_employer %}<p class="ps-small">{% translate "Employer also paid" %}: {% translate "PF" %} {{ line.er_pf_total|inr }} · {% translate "EDLI" %} {{ line.edli|inr }} · {% translate "PF admin" %} {{ line.pf_admin|inr }} · {% translate "ESI" %} {{ line.er_esi|inr }}</p>{% endif %}
+  {% if company.payslip_show_employer and slip.employer_paid %}<p class="ps-small">{% translate "Employer also paid" %}: {% for label, amount in slip.employer_paid %}{{ label }} {{ amount|inr }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
   {% if slip.advance_balance %}<p class="ps-small">{% translate "Advance balance after this month" %}: ₹ {{ slip.advance_balance|inr }}</p>{% endif %}
   {% if line.remarks %}<p class="ps-small">{% translate "Remarks" %}: {{ line.remarks }}</p>{% endif %}
   {% if company.payslip_note %}<p class="ps-small ps-note">{{ company.payslip_note }}</p>{% endif %}

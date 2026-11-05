@@ -16,7 +16,7 @@
       <td class="num">{{ p.tds|inr }}</td><td class="num">{{ p.ytd_tds|inr }}</td></tr>
   {% endfor %}
   </tbody>
-  <tfoot><tr><td></td><td>{% translate "Total" %}</td><td></td><td></td>
+  <tfoot><tr><td></td><td>{% translate "Total" %}</td><td></td><td class="num">{{ total_opening|inr }}</td>
     {% for t in month_totals %}<td class="num">{{ t|dash_inr }}</td>{% endfor %}
     <td class="num">{{ total_tds|inr }}</td><td class="num">{{ total_ytd|inr }}</td></tr></tfoot>
 </table>

@@ -20,8 +20,18 @@ from .common import ERROR_FILL, XLSX_TYPE
 SESSION_KEY = "mtn_upload_errors"
 
 
+def _delete_file(entry):
+    """Uploaded lists hold PAN and bank numbers: delete them as soon as they are no longer needed."""
+    if entry and entry.get("path"):
+        try:
+            default_storage.delete(entry["path"])
+        except OSError:
+            pass
+
+
 def remember_failed_upload(request, kind, data, errors, file_errors):
     """Store the rejected file and its mistakes; kind is e.g. 'monthly:2026-11' or 'employees'."""
+    _delete_file(request.session.get(SESSION_KEY, {}).get(kind))  # the earlier failed file is replaced
     path = default_storage.save(f"private/uploads/{request.company.code}/failed/{uuid.uuid4().hex}.xlsx",
                                 ContentFile(data))
     store = request.session.get(SESSION_KEY, {})
@@ -33,7 +43,7 @@ def remember_failed_upload(request, kind, data, errors, file_errors):
 def forget_failed_upload(request, kind):
     store = request.session.get(SESSION_KEY, {})
     if kind in store:
-        store.pop(kind)
+        _delete_file(store.pop(kind))
         request.session[SESSION_KEY] = store
 
 
@@ -41,17 +51,32 @@ PENDING_KEY = "mtn_pending_uploads"
 
 
 def keep_pending_upload(request, kind, data):
-    """A checked file waiting for the owner's answer (e.g. 'change these salaries?')."""
+    """A checked file waiting for the owner's answer (e.g. 'change these salaries?').
+
+    Returns a token for the answer form, so an answer given on the page of an older file is not applied to a
+    newer one uploaded meanwhile in another tab.
+    """
+    store = request.session.get(PENDING_KEY, {})
+    _delete_file(store.get(kind))  # an earlier file still waiting is replaced
     path = default_storage.save(f"private/uploads/{request.company.code}/pending/{uuid.uuid4().hex}.xlsx",
                                 ContentFile(data))
-    store = request.session.get(PENDING_KEY, {})
-    store[kind] = {"path": path, "company": request.company.pk}
+    token = uuid.uuid4().hex
+    store[kind] = {"path": path, "company": request.company.pk, "token": token}
     request.session[PENDING_KEY] = store
+    return token
 
 
-def pending_upload_data(request, kind):
+def pending_upload_is_newer(request, kind, token):
+    """True when a different file is now waiting than the one this answer was given for."""
+    entry = request.session.get(PENDING_KEY, {}).get(kind)
+    return bool(entry) and entry.get("token") != token
+
+
+def pending_upload_data(request, kind, token=None):
     entry = request.session.get(PENDING_KEY, {}).get(kind)
     if not entry or entry.get("company") != request.company.pk:
+        return None
+    if token is not None and entry.get("token") != token:
         return None
     try:
         with default_storage.open(entry["path"], "rb") as handle:
@@ -62,7 +87,9 @@ def pending_upload_data(request, kind):
 
 def forget_pending_upload(request, kind):
     store = request.session.get(PENDING_KEY, {})
-    if store.pop(kind, None) is not None:
+    entry = store.pop(kind, None)
+    if entry is not None:
+        _delete_file(entry)
         request.session[PENDING_KEY] = store
 
 

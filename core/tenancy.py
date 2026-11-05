@@ -10,7 +10,16 @@ from functools import wraps
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
+from django.http import Http404
 from django.shortcuts import get_object_or_404, render
+
+
+class NoSalaryMonth(Http404):
+    """A month with no salary worked out yet: the 404 page says so and links to the month."""
+
+    def __init__(self, month):
+        super().__init__(f"No salary for {month:%Y-%m} yet")
+        self.month = month
 
 
 def owner_required(view):

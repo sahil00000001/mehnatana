@@ -7,7 +7,7 @@ from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import IndianDatesMixin, whole_rupees
-from core.formatting import add_months, month_label, month_start
+from core.formatting import add_months, fmt_date, month_label, month_start
 from core.validators import digits_only, upper_no_spaces
 
 from .models import Department, Designation, Employee
@@ -118,6 +118,8 @@ class EmployeeForm(IndianDatesMixin, forms.ModelForm):
             active = active.exclude(pk=self.instance.pk)
         self.fields["reports_to"].queryset = active.order_by("emp_code")
         self.fields["reports_to"].label_from_instance = lambda e: f"{e.full_name} ({e.emp_code})"
+        self.fields["reports_to"].empty_label = _("— nobody (this person is at the top) —")
+        self.fields["gender"].choices = [("", _("— choose —"))] + [c for c in self.fields["gender"].choices if c[0]]
         self.fields["designation_name"].widget = SuggestInput(
             Designation.objects.filter(company=company, is_active=True).values_list("name", flat=True))
         self.fields["department_name"].widget = SuggestInput(
@@ -260,8 +262,15 @@ class RelieveForm(IndianDatesMixin, forms.ModelForm):
 
     def clean(self):
         data = super().clean()
-        if data.get("leaving_reason") == Employee.LeavingReason.RESIGNED and not data.get("resignation_date"):
+        if data.get("leaving_reason") != Employee.LeavingReason.RESIGNED:
+            data["resignation_date"] = None  # only a person who resigned has a resignation letter
+            return data
+        resigned, last_day = data.get("resignation_date"), data.get("date_of_leaving")
+        if not resigned and "resignation_date" not in self.errors:
             self.add_error("resignation_date", _("Enter the date of the resignation letter."))
+        elif resigned and last_day and resigned > last_day:
+            self.add_error("resignation_date", _("The resignation letter must be dated on or before the last "
+                                                 "working day (%(date)s).") % {"date": fmt_date(last_day)})
         return data
 
 

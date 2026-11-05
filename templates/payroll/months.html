@@ -5,15 +5,15 @@
   <thead><tr><th>{% translate "Month" %}</th><th>{% translate "Status" %}</th><th class="num">{% translate "Employees" %}</th><th class="num">{% translate "Net pay ₹" %}</th><th class="num">{% translate "Total cost ₹" %}</th><th></th></tr></thead>
   <tbody>
   {% for row in rows %}
-    <tr>
-      <td>{{ row.month|month_label }}</td>
+    <tr{% if row.month == open_month %} class="current-month"{% endif %}>
+      <td>{{ row.month|month_label }}{% if row.month == open_month %} — {% translate "work on this month" %}{% endif %}</td>
       <td>{% if row.run and row.run.is_final %}<span class="badge badge-final">{% translate "Finalised" %}</span>{% if row.run.revision_no %} <span class="badge">{% translate "Revised" %}</span>{% endif %}
           {% elif row.totals %}<span class="badge badge-draft">{% translate "Draft" %}</span>
           {% else %}<span class="badge badge-off">{% translate "Not started" %}</span>{% endif %}</td>
       <td class="num">{% if row.totals %}{{ row.totals.count }}{% endif %}</td>
       <td class="num">{% if row.totals %}{{ row.totals.net_pay|inr }}{% endif %}</td>
       <td class="num">{% if row.totals %}{{ row.totals.company_cost|inr }}{% endif %}</td>
-      <td><a href="{% url 'payroll:month' row.month %}">{% translate "Open" %}</a></td>
+      <td><a class="btn btn-small{% if row.month == open_month %} btn-primary{% endif %}" href="{% url 'payroll:month' row.month %}">{% translate "Open" %}</a></td>
     </tr>
   {% endfor %}
   </tbody>

@@ -55,6 +55,10 @@ def slip_context(line, advance_balance):
     ]
     earnings_shown = [e for i, e in enumerate(earnings) if i == 0 or e[1] or e[2]]
     deductions_shown = [d for d in deductions if d[1]]
+    # A shop without PF (or ESI) should not print a row of zeros for it
+    employer_paid = [(label, amount) for label, amount in (
+        (_("PF"), line.er_pf_total), (_("EDLI"), line.edli), (_("PF admin"), line.pf_admin), (_("ESI"), line.er_esi),
+    ) if amount]
     return {
         "line": line,
         "s": s,
@@ -65,6 +69,7 @@ def slip_context(line, advance_balance):
         "earnings": earnings_shown,
         "deductions": deductions_shown,
         "advance_balance": advance_balance,
+        "employer_paid": employer_paid,
     }
 
 

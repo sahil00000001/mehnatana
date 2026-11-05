@@ -215,7 +215,9 @@ class IsolationTest(DemoTestCase):
                      "reports:cash_list", "reports:ecr", "reports:esi_file", "reports:pf", "reports:esi", "reports:pt"):
             with self.subTest(url=name):
                 self.assertEqual(self.client.get(reverse(name, args=[DEC])).status_code, 404)
-        self.assertEqual(self.client.get(reverse("reports:cost") + "?month=2026-12").status_code, 404)
+        # The cost report goes back to this company's own latest finalised month instead
+        response = self.client.get(reverse("reports:cost") + "?month=2026-12")
+        self.assertRedirects(response, reverse("reports:cost") + "?month=2026-11", fetch_redirect_response=False)
 
     def test_lists_never_show_other_company(self):
         urls = [reverse("home"), reverse("reports:payslips", args=[NOV]), reverse("reports:register", args=[NOV]),
@@ -247,6 +249,7 @@ class PayslipDesignTest(DemoTestCase):
     """Settings → Payslip design: three looks, same Form V particulars."""
 
     FORM_V = ["Sunita Devi", "Ram Lal", "E002", "Cashier", "01-07-2021", "101234567802", "1234567802",
+              "ABCPD1234E", "State Bank of India",
               "15,052", "Rupees Fifteen Thousand Fifty-Two Only", "16,200", "1,148", "9,000"]
 
     def slip(self):

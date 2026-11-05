@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% if not groups %}
+<div class="msg msg-success">{% translate "Nothing needs your attention right now. Well done!" %}</div>
+{% endif %}
+{% for title, items in groups %}
+<h2>{{ title }}</h2>
+<table class="ledger notice-board">
+  <tbody>
+  {% for n in items %}
+    <tr class="notice-{{ n.level }}">
+      <td class="nowrap">{% if n.when %}{{ n.when|dmy }}{% elif n.kind == "fix" %}{% translate "To do" %}{% endif %}</td>
+      <td><a href="{{ n.url }}">{{ n.text }}</a>{% if n.detail %}<div class="notice-detail">{{ n.detail }}</div>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+<p class="muted">{% translate "Due dates come from the government calendar kept by your administrator. The app does not know whether you have already paid — once paid, you can ignore the notice; it disappears after the date." %}</p>
+{% endblock %}

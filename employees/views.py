@@ -1,4 +1,5 @@
 import math
+from collections import Counter
 from datetime import timedelta
 
 from django.contrib import messages
@@ -8,6 +9,7 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _lazy
+from django.utils.translation import ngettext
 
 from advances.models import Advance
 from core.audit import audit, diff, snapshot
@@ -17,7 +19,7 @@ from excel_io import builders
 from excel_io.common import xlsx_response
 from excel_io.errors import (
     forget_failed_upload, forget_pending_upload, keep_pending_upload, marked_file_response, pending_upload_data,
-    remember_failed_upload,
+    pending_upload_is_newer, remember_failed_upload,
 )
 from excel_io.parsers import SheetError, parse_employees, read_upload
 from letters.models import IssuedLetter, LetterType
@@ -414,18 +416,20 @@ def _finish_upload(request, rows, change_salaries_from=None):
     company = request.company
     with transaction.atomic():
         added, updated = save_employees(company, rows, request.user, request=request)
-        changed = 0
+        months_used = []
         if change_salaries_from is not None:
-            changed = apply_salary_changes(company, salary_changes(company, rows), change_salaries_from,
-                                           request.user, request=request)
-        audit(request, "employee.upload", None, {"added": added, "updated": updated, "salaries_changed": changed})
+            months_used = apply_salary_changes(company, salary_changes(company, rows), change_salaries_from,
+                                               request.user, request=request)
+        audit(request, "employee.upload", None,
+              {"added": added, "updated": updated, "salaries_changed": len(months_used)})
     forget_failed_upload(request, UPLOAD_KIND)
     forget_pending_upload(request, UPLOAD_KIND)
     text = _("%(added)s added, %(updated)s updated, %(same)s already up to date.") % {
         "added": added, "updated": updated, "same": len(rows) - added - updated}
-    if changed:
-        text += " " + _("New salary from %(month)s for %(count)s people.") % {
-            "month": month_label(change_salaries_from), "count": changed}
+    for month, count in sorted(Counter(months_used).items()):
+        text += " " + ngettext("New salary from %(month)s for %(count)s person.",
+                               "New salary from %(month)s for %(count)s people.", count) % {
+            "month": month_label(month), "count": count}
     messages.success(request, text)
     _warn_joined_in_finalised_months(request, [r["emp_code"] for r in rows if r["_new"]])
     _report_draft_problems(request)
@@ -452,12 +456,14 @@ def upload(request):
             except UploadRejected as exc:
                 return _upload_failed(request, form, data, exc.errors, [])
         # Ask once: the file has different salaries for people already in the app.
-        keep_pending_upload(request, UPLOAD_KIND, data)
+        token = keep_pending_upload(request, UPLOAD_KIND, data)
         months = _salary_months(company)
         return page(request, "employees/upload_confirm.html", _("Salary changes in your file"),
                     _("Your file is correct. Some people have a different salary in it. Choose what to do."),
                     changes=changes, months=months, added=sum(1 for r in rows if r["_new"]),
-                    updated=sum(1 for r in rows if not r["_new"]))
+                    updated=sum(1 for r in rows if not r["_new"]), token=token)
+    if request.method == "GET":
+        forget_pending_upload(request, UPLOAD_KIND)  # Cancel or a fresh start: the waiting file is not needed
     return page(request, "employees/upload.html", UPLOAD_TITLE, UPLOAD_INSTRUCTION, form=form)
 
 
@@ -467,7 +473,13 @@ def upload_confirm(request):
     if request.method != "POST":
         return redirect("employees:upload")
     company = request.company
-    data = pending_upload_data(request, UPLOAD_KIND)
+    token = request.POST.get("token", "")
+    if pending_upload_is_newer(request, UPLOAD_KIND, token):
+        messages.error(request, _("Nothing was saved: you uploaded another file after this one. "
+                                  "Please choose the file you want and press Upload and check again."))
+        forget_pending_upload(request, UPLOAD_KIND)
+        return redirect("employees:upload")
+    data = pending_upload_data(request, UPLOAD_KIND, token)
     form = UploadForm()
     form.fields["file"].label = _("Employee list (.xlsx)")
     if data is None:

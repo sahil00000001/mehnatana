@@ -40,7 +40,8 @@ def months(request):
         totals = run.totals() if run is not None and run.lines.exists() else None
         rows.append({"month": month, "run": run, "totals": totals})
     return page(request, "payroll/months.html", _("Monthly Salary"),
-                _("Open a month to download its sheet, upload it, check the salary and finalise."), rows=rows)
+                _("Open a month to download its sheet, upload it, check the salary and finalise."), rows=rows,
+                open_month=service.first_open_month(request.company))
 
 
 def _month_context(request, month, run, **extra):

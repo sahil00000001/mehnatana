@@ -10,7 +10,7 @@
 /* ---------------------------------------------------------------- printing a normal page */
 @media print {
   body { background: #fff !important; color: #000 !important; font-size: 12pt; }
-  .band, .menu, .footer, .actions, .no-print, .messages, form.filters, .toolbar { display: none !important; }
+  .band, .menu, .footer, .actions, .no-print, .messages, form.filters, .toolbar, .notice-strip, .crumbs { display: none !important; }
   a { color: #000; text-decoration: none; }
   .table-wrap { overflow: visible; border: 0; }
   table.ledger { border-collapse: collapse; }

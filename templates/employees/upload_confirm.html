@@ -20,6 +20,9 @@
     <tr><td>{{ c.code }}</td><td>{{ c.name }}</td>
       <td class="num">{{ c.old.basic|inr }}</td><td class="num strong">{{ c.new.basic|inr }}</td>
       <td class="num">{{ c.old_gross|inr }}</td><td class="num strong">{{ c.new_gross|inr }}</td></tr>
+    {% if c.earliest > months.0 %}
+    <tr><td></td><td colspan="5" class="muted">{% blocktranslate with month=c.earliest|month_label %}This new salary cannot start before {{ month }} (the joining month, or a salary already set from then). If you choose an earlier month, it starts from {{ month }}.{% endblocktranslate %}</td></tr>
+    {% endif %}
   {% endfor %}
   </tbody>
 </table>
@@ -27,6 +30,7 @@
 
 <form method="post" action="{% url 'employees:upload_confirm' %}" class="box form">
   {% csrf_token %}
+  <input type="hidden" name="token" value="{{ token }}">
   <div class="field">
     <label for="month">{% translate "New salary from" %}</label>
     <select id="month" name="month">

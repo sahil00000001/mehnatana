@@ -8,11 +8,13 @@ reported as warnings. The appointment particulars table is made by code
 and is always included.
 """
 import re
+from datetime import timedelta
 from html import escape
 
 from django.db import IntegrityError, transaction
 from django.db.models import Max
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 
@@ -111,7 +113,7 @@ def probation_line(company):
 
 
 def resignation_line(emp):
-    if not emp.resignation_date:
+    if not emp.resignation_date or emp.leaving_reason != Employee.LeavingReason.RESIGNED:
         return ""
     return _("This refers to your resignation letter dated %(date)s.") % {"date": fmt_date(emp.resignation_date)}
 
@@ -363,11 +365,28 @@ def next_reference(company, letter_type, issue_date):
     return year, seq, f"{company.code}/{REF_CODES[letter_type]}/{tax_year_label(year)}/{seq:04d}"
 
 
+def same_letter_just_saved(company, emp, letter_type, issue_date, text):
+    """A letter with exactly this text saved in the last 10 minutes (Save pressed twice), or None.
+
+    A corrected text is a new letter, so the comparison is on the printed letter, not only the person and date.
+    """
+    recent = IssuedLetter.objects.filter(company=company, employee=emp, letter_type=letter_type, issue_date=issue_date,
+                                         created_at__gte=timezone.now() - timedelta(minutes=10))
+    for old in recent:
+        if letter_html(company, emp, letter_type, issue_date, text, old.ref_no)[0] == old.body_snapshot_html:
+            return old
+    return None
+
+
 def issue_letter(request, company, emp, letter_type, issue_date, text):
+    """Save and number a letter. Returns (letter, created); created is False when Save was pressed twice."""
     for _attempt in range(3):
         try:
             with transaction.atomic():
                 Company.objects.select_for_update().filter(pk=company.pk).first()  # one number at a time
+                old = same_letter_just_saved(company, emp, letter_type, issue_date, text)
+                if old:
+                    return old, False
                 year, seq, ref_no = next_reference(company, letter_type, issue_date)
                 html, _warnings = letter_html(company, emp, letter_type, issue_date, text, ref_no)
                 letter = IssuedLetter.objects.create(
@@ -377,7 +396,7 @@ def issue_letter(request, company, emp, letter_type, issue_date, text):
                 audit(request, "letter.issue", letter, {"ref_no": ref_no, "employee": emp.emp_code,
                                                         "letter_type": letter_type,
                                                         "issue_date": str(issue_date)})
-                return letter
+                return letter, True
         except IntegrityError:
             continue
     raise IntegrityError("Could not give the letter a reference number. Please try again.")

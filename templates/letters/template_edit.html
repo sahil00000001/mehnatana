@@ -19,12 +19,23 @@
   </div>
 </form>
 
-<form method="post" class="actions">
+{% if asking_reset %}
+<form method="post" class="box box-highlight" id="reset">
   {% csrf_token %}
   <input type="hidden" name="action" value="reset">
-  <button type="submit" class="btn">{% translate "Reset to original text" %}</button>
-  <span class="muted">{% translate "Puts back the text that came with the app. Your changes are lost." %}</span>
+  <p><strong>{% translate "Put back the original text?" %}</strong>
+    {% translate "Your own wording for this letter will be lost. Letters already issued do not change." %}</p>
+  <div class="actions">
+    <button type="submit" class="btn btn-primary">{% translate "Yes, put back the original text" %}</button>
+    <a href="{% url 'letters:template_edit' slug %}">{% translate "No, keep my text" %}</a>
+  </div>
 </form>
+{% else %}
+<p class="actions">
+  <a class="btn" href="?reset=ask#reset">{% translate "Reset to original text" %}</a>
+  <span class="muted">{% translate "Puts back the text that came with the app. You will be asked once more." %}</span>
+</p>
+{% endif %}
 
 <h2>{% translate "Words you can use" %}</h2>
 <p class="muted">{% translate "Type them exactly as shown, with the double curly brackets." %}</p>

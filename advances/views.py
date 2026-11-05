@@ -4,16 +4,41 @@ from django.contrib import messages
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.translation import gettext as _
 
 from core.audit import audit
-from core.formatting import indian_format
+from core.formatting import indian_format, month_end, month_label, month_start
 from core.tenancy import company_get, owner_required, page
 from employees.models import Employee
+from payroll import service
+from payroll.models import PayrollLine, PayrollRun
 
 from .forms import AdvanceForm, InstalmentForm
 from .models import Advance
+
+
+def _hint_for_uploaded_month(request, employee, since):
+    """A month whose sheet is already uploaded keeps the advance typed in it. Say so, and link to the row."""
+    line = (PayrollLine.objects.filter(company=request.company, employee=employee, run__status=PayrollRun.Status.DRAFT,
+                                       run__month__gte=month_start(since))
+            .select_related("run").order_by("run__month").first())
+    if line is None:
+        return
+    month = line.run.month
+    due = service.suggested_advance(
+        service.open_advances(request.company, [employee.pk], given_by=month_end(month)).get(employee.pk, []))
+    if due == line.advance_deduction:
+        return
+    url = reverse("payroll:line_edit", args=[month, line.pk])
+    messages.warning(request, format_html(
+        _("The salary sheet for {month} is already uploaded with ₹{typed} advance recovery for {name}, "
+          "so this change is not in it yet. <a href=\"{url}\">Change the row for {month}</a> to ₹{due}, "
+          "or upload the sheet again."),
+        month=month_label(month), typed=indian_format(line.advance_deduction), name=employee.full_name,
+        url=url, due=indian_format(due)))
 
 
 def _advances(request):
@@ -58,6 +83,7 @@ def advance_add(request):
                                                "instalment": adv.monthly_installment})
         messages.success(request, _("Advance of ₹%(amount)s given to %(name)s. ₹%(cut)s will be cut every month.") % {
             "amount": indian_format(adv.amount), "name": adv.employee.full_name, "cut": indian_format(adv.monthly_installment)})
+        _hint_for_uploaded_month(request, adv.employee, adv.date_given)
         return redirect("advances:detail", pk=adv.pk)
     return page(request, "advances/form.html", _("Give advance"),
                 _("Fill this form and press Save."), form=form)
@@ -77,6 +103,7 @@ def advance_detail(request, pk):
             adv.save(update_fields=["monthly_installment", "updated_at"])
             audit(request, "advance.instalment", adv, {"before": old, "after": new})
             messages.success(request, _("Monthly cut changed to ₹%(cut)s.") % {"cut": indian_format(new)})
+            _hint_for_uploaded_month(request, adv.employee, adv.date_given)
             return redirect("advances:detail", pk=adv.pk)
     recoveries = adv.recoveries.select_related("payroll_line__run").order_by("month")
     return page(request, "advances/detail.html",

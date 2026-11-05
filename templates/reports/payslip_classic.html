@@ -37,7 +37,7 @@
   </table>
 
   <div class="net">{% translate "NET WAGES PAID" %}: ₹ {{ line.net_pay|inr }} &nbsp; ({{ line.net_pay|words }})</div>
-  {% if company.payslip_show_employer %}<p class="slip-note">{% translate "Employer also paid" %}: {% translate "PF" %} {{ line.er_pf_total|inr }} · {% translate "EDLI" %} {{ line.edli|inr }} · {% translate "PF admin" %} {{ line.pf_admin|inr }} · {% translate "ESI" %} {{ line.er_esi|inr }}</p>{% endif %}
+  {% if company.payslip_show_employer and slip.employer_paid %}<p class="slip-note">{% translate "Employer also paid" %}: {% for label, amount in slip.employer_paid %}{{ label }} {{ amount|inr }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
   <p class="slip-note">{% translate "Advance balance after this month" %}: ₹ {{ slip.advance_balance|inr }}</p>
   {% if line.remarks %}<p class="slip-note">{% translate "Remarks" %}: {{ line.remarks }}</p>{% endif %}
   {% if company.payslip_note %}<p class="slip-note slip-custom-note">{{ company.payslip_note }}</p>{% endif %}

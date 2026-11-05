@@ -8,6 +8,14 @@ from .tenancy import company_get, owner_required, page
 
 
 def not_found(request, exception=None):
+    from .formatting import month_label
+    from .tenancy import NoSalaryMonth
+
+    if isinstance(exception, NoSalaryMonth) and getattr(request, "company", None) is not None:
+        return render(request, "404.html", {
+            "title": _("No salary for %(month)s yet") % {"month": month_label(exception.month)},
+            "salary_month": exception.month,
+        }, status=404)
     return render(request, "404.html", {"title": _("Page not found")}, status=404)
 
 
@@ -20,6 +28,22 @@ def csrf_failure(request, reason=""):
 
 def forbidden(request, exception=None):
     return render(request, "403.html", {"title": _("Not allowed")}, status=403)
+
+
+@owner_required
+def notices(request):
+    from .notices import notices_for
+
+    items = notices_for(request.company, include_fixes=True)
+    groups = [
+        (_("Needs attention now"), [n for n in items if n.level == "urgent"]),
+        (_("Coming up"), [n for n in items if n.level == "soon"]),
+        (_("Good to know"), [n for n in items if n.level == "info" and n.kind != "fix"]),
+        (_("Things to fix in your records"), [n for n in items if n.kind == "fix"]),
+    ]
+    return page(request, "core/notices.html", _("Notices"),
+                _("Payments due, people joining or leaving, and records to complete. Click a notice to act on it."),
+                groups=[(title, rows) for title, rows in groups if rows])
 
 
 @owner_required
