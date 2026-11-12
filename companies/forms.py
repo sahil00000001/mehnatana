@@ -1,10 +1,11 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import IndianDatesMixin, whole_rupees
+from core.forms import IndianDatesMixin, ModelErrorsOnPage, whole_rupees
 from core.validators import upper_no_spaces
 
-from .models import WEEKDAYS, Company, validate_logo
+from .models import WEEKDAYS, Company, MinimumWage, validate_logo
+from .states import STATE_CHOICES
 
 PAYROLL_HELP = {
     "salary_divisor": _("Salary for absent days is cut as monthly salary ÷ this number of days. With working days, "
@@ -14,7 +15,7 @@ PAYROLL_HELP = {
     "pf_employee_rate": _("Use 10% only if EPFO has notified your establishment for 10%."),
     "pf_restrict_to_ceiling": _("Usual practice: PF only on wages up to the ceiling (₹25,000 from October 2026)."),
     "esi_enabled": _("ESI applies to places with 10 or more persons in areas notified by ESIC."),
-    "pt_enabled": _("Professional tax is a state tax. It is worked out from the slabs for the state below."),
+    "pt_enabled": _("Professional tax is a state tax, worked out from the slabs of your state (see More rules)."),
     "pt_state": _("The state whose professional tax slabs are used. Usually your own state."),
     "tds_enabled": _("Income tax is cut each month from staff whose yearly income is taxable."),
     "default_tax_regime": _("Filled in for new staff. Each person can still choose."),
@@ -49,7 +50,7 @@ class WeeklyOffMixin:
         return "".join(days)
 
 
-class CompanyCreateForm(WeeklyOffMixin, IndianDatesMixin, forms.ModelForm):
+class CompanyCreateForm(ModelErrorsOnPage, WeeklyOffMixin, IndianDatesMixin, forms.ModelForm):
     """All companies → Add a company. Everything else can be changed later in Settings."""
 
     class Meta:
@@ -90,7 +91,7 @@ class CompanyCreateForm(WeeklyOffMixin, IndianDatesMixin, forms.ModelForm):
         return value.replace(day=1) if value else value
 
 
-class CompanyDetailsForm(forms.ModelForm):
+class CompanyDetailsForm(ModelErrorsOnPage, forms.ModelForm):
     class Meta:
         model = Company
         fields = [
@@ -118,15 +119,16 @@ class CompanyDetailsForm(forms.ModelForm):
         return "".join(self.cleaned_data["gstin"].split()).upper()
 
 
-class PayrollRulesForm(WeeklyOffMixin, IndianDatesMixin, forms.ModelForm):
+class PayrollRulesForm(ModelErrorsOnPage, WeeklyOffMixin, IndianDatesMixin, forms.ModelForm):
     class Meta:
         model = Company
         fields = [
-            "payroll_start_month", "weekly_off_days", "salary_divisor", "pf_enabled", "pf_employee_rate", "pf_restrict_to_ceiling",
-            "esi_enabled", "pt_enabled", "pt_state", "tds_enabled", "default_tax_regime", "ot_multiplier",
-            "ot_days_divisor", "ot_hours_per_day", "notice_period_days", "probation_months", "higher_wages_avenue",
+            "payroll_start_month", "weekly_off_days", "salary_divisor", "amount_paid_mode", "pf_enabled",
+            "pf_employee_rate", "pf_restrict_to_ceiling", "esi_enabled", "pt_enabled", "pt_state", "tds_enabled",
+            "default_tax_regime", "ot_multiplier", "ot_days_divisor", "ot_hours_per_day", "notice_period_days",
+            "probation_months", "higher_wages_avenue",
         ]
-        widgets = {"higher_wages_avenue": forms.Textarea(attrs={"rows": 2})}
+        widgets = {"higher_wages_avenue": forms.Textarea(attrs={"rows": 2}), "amount_paid_mode": forms.RadioSelect}
 
     def __init__(self, *args, start_locked=False, pt_warning="", **kwargs):
         super().__init__(*args, **kwargs)
@@ -143,7 +145,7 @@ class PayrollRulesForm(WeeklyOffMixin, IndianDatesMixin, forms.ModelForm):
         return value.replace(day=1) if value else value
 
 
-class PayslipDesignForm(forms.ModelForm):
+class PayslipDesignForm(ModelErrorsOnPage, forms.ModelForm):
     class Meta:
         model = Company
         fields = ["payslip_style", "payslip_show_employer", "payslip_two_per_page", "payslip_note"]
@@ -161,3 +163,25 @@ class OpeningBalanceForm(forms.Form):
     ytd_pt = whole_rupees(_("Professional tax already deducted ₹"))
     prev_employer_income = whole_rupees(_("Income from previous employer this year ₹"))
     prev_employer_tds = whole_rupees(_("TDS by previous employer ₹"))
+
+
+class MinimumWageForm(IndianDatesMixin, forms.Form):
+    """A plain form: saving the same state and month again replaces those rates (done in the view)."""
+
+    state = forms.ChoiceField(label=_("State"), choices=[("", _("— choose —"))] + list(STATE_CHOICES))
+    effective_from = forms.DateField(label=_("From month"),
+                                     help_text=_("Any day of the first month these rates apply, like 01-04-2026."))
+    unskilled = whole_rupees(_("Unskilled ₹ per month"))
+    semi_skilled = whole_rupees(_("Semi-skilled ₹ per month"))
+    skilled = whole_rupees(_("Skilled ₹ per month"))
+    highly_skilled = whole_rupees(_("Highly skilled ₹ per month"))
+
+    def clean_effective_from(self):
+        value = self.cleaned_data["effective_from"]
+        return value.replace(day=1) if value else value
+
+    def clean(self):
+        data = super().clean()
+        if not any(data.get(name) for name in MinimumWage.SKILLS):
+            raise forms.ValidationError(_("Write at least one minimum wage."))
+        return data

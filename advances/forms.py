@@ -3,13 +3,13 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import IndianDatesMixin, whole_rupees
+from core.forms import IndianDatesMixin, ModelErrorsOnPage, whole_rupees
 from employees.models import Employee
 
 from .models import Advance
 
 
-class AdvanceForm(IndianDatesMixin, forms.ModelForm):
+class AdvanceForm(ModelErrorsOnPage, IndianDatesMixin, forms.ModelForm):
     amount = whole_rupees(_("Amount given ₹"), required=True)
     monthly_installment = whole_rupees(_("Cut every month ₹"), required=True,
                                        help_text=_("This amount is filled in the monthly sheet until the advance is repaid."))

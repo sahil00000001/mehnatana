@@ -7,26 +7,32 @@
     {% include "includes/field.html" with field=form.payroll_start_month %}{% include "includes/field.html" with field=form.weekly_off_days %}
     {% include "includes/field.html" with field=form.salary_divisor %}
   </fieldset>
-  <fieldset><legend>{% translate "Provident Fund (PF)" %}</legend>
-    {% include "includes/field.html" with field=form.pf_enabled %}{% include "includes/field.html" with field=form.pf_employee_rate %}
-    {% include "includes/field.html" with field=form.pf_restrict_to_ceiling %}
+  <fieldset><legend>{% translate "Salary from the amount paid" %}</legend>
+    {% include "includes/field.html" with field=form.amount_paid_mode %}
+    <p class="muted">{% translate "Minimum wages are entered once for each state:" %} <a href="{% url 'portal:minimum_wages' %}">{% translate "Minimum wages" %}</a></p>
   </fieldset>
-  <fieldset><legend>{% translate "ESI" %}</legend>{% include "includes/field.html" with field=form.esi_enabled %}</fieldset>
-  <fieldset><legend>{% translate "Professional tax" %}</legend>
-    {% include "includes/field.html" with field=form.pt_enabled %}{% include "includes/field.html" with field=form.pt_state %}
+  <fieldset><legend>{% translate "PF, ESI and taxes" %}</legend>
+    {% include "includes/field.html" with field=form.pf_enabled %}{% include "includes/field.html" with field=form.esi_enabled %}
+    {% include "includes/field.html" with field=form.pt_enabled %}{% include "includes/field.html" with field=form.tds_enabled %}
   </fieldset>
-  <fieldset><legend>{% translate "Income tax (TDS)" %}</legend>
-    {% include "includes/field.html" with field=form.tds_enabled %}{% include "includes/field.html" with field=form.default_tax_regime %}
-  </fieldset>
-  <fieldset><legend>{% translate "Overtime" %}</legend>
-    {% include "includes/field.html" with field=form.ot_multiplier %}{% include "includes/field.html" with field=form.ot_days_divisor %}
-    {% include "includes/field.html" with field=form.ot_hours_per_day %}
-  </fieldset>
-  <fieldset><legend>{% translate "Letters and printing" %}</legend>
-    {% include "includes/field.html" with field=form.notice_period_days %}{% include "includes/field.html" with field=form.probation_months %}
-    {% include "includes/field.html" with field=form.higher_wages_avenue %}
-    <p><a href="{% url 'companies:payslip_design' %}">{% translate "Choose how payslips look" %}</a></p>
-  </fieldset>
+  <details class="more"{% if more_open %} open{% endif %}>
+    <summary>{% translate "More rules: PF rate, professional tax state, tax regime, overtime, letters" %}</summary>
+    <fieldset><legend>{% translate "Provident Fund (PF)" %}</legend>
+      {% include "includes/field.html" with field=form.pf_employee_rate %}{% include "includes/field.html" with field=form.pf_restrict_to_ceiling %}
+    </fieldset>
+    <fieldset><legend>{% translate "Professional tax and income tax" %}</legend>
+      {% include "includes/field.html" with field=form.pt_state %}{% include "includes/field.html" with field=form.default_tax_regime %}
+    </fieldset>
+    <fieldset><legend>{% translate "Overtime" %}</legend>
+      {% include "includes/field.html" with field=form.ot_multiplier %}{% include "includes/field.html" with field=form.ot_days_divisor %}
+      {% include "includes/field.html" with field=form.ot_hours_per_day %}
+    </fieldset>
+    <fieldset><legend>{% translate "Letters and printing" %}</legend>
+      {% include "includes/field.html" with field=form.notice_period_days %}{% include "includes/field.html" with field=form.probation_months %}
+      {% include "includes/field.html" with field=form.higher_wages_avenue %}
+      <p><a href="{% url 'companies:payslip_design' %}">{% translate "Choose how payslips look" %}</a></p>
+    </fieldset>
+  </details>
   <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
     <a href="{% url 'companies:index' %}">{% translate "Go back" %}</a></div>
 </form>

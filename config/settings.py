@@ -96,6 +96,8 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.app",
             ],
+            # {% csrf_token %} also carries the open company (see core/templatetags/company_csrf.py).
+            "builtins": ["core.templatetags.company_csrf"],
         },
     },
 ]

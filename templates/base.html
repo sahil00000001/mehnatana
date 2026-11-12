@@ -24,7 +24,7 @@
 </header>
 {% if MENU %}
 <nav class="page menu" aria-label="{% translate 'Main menu' %}">
-  {% for key, label, url in MENU %}<a href="{{ url }}"{% if key == menu_current %} class="current" aria-current="page"{% endif %}>{{ label }}{% if key == "notices" and notice_strip %} <span class="count" aria-label="{% blocktranslate count n=notice_strip|length %}{{ n }} notice needs attention{% plural %}{{ n }} notices need attention{% endblocktranslate %}">{{ notice_strip|length }}</span>{% endif %}</a>{% if not forloop.last %} <span class="sep" aria-hidden="true">·</span> {% endif %}{% endfor %}
+  {% for key, label, url in MENU %}<a href="{{ url }}"{% if key == menu_current %} class="current" aria-current="page"{% endif %}>{{ label }}{% if key == "home" and notice_strip %} <span class="count" aria-label="{% blocktranslate count n=notice_strip|length %}{{ n }} notice needs attention{% plural %}{{ n }} notices need attention{% endblocktranslate %}">{{ notice_strip|length }}</span>{% endif %}</a>{% if not forloop.last %} <span class="sep" aria-hidden="true">·</span> {% endif %}{% endfor %}
 </nav>
 {% if notice_strip and menu_current != "notices" %}
 <div class="page"><p class="notice-strip{% if notice_strip.0.level == 'urgent' %} urgent{% endif %}" role="status">

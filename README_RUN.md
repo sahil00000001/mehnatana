@@ -33,7 +33,7 @@ Then open:
 
 If `DATABASE_URL` and `POSTGRES_HOST` are empty, the data is kept in a local `db.sqlite3` file.
 
-Run the tests (256 tests, including all README §17 numbers):
+Run the tests (302 tests, including all README §17 numbers):
 
 ```
 python manage.py test
@@ -99,6 +99,14 @@ finalising.
 and when. Reports → *Annual salary report* shows, for a financial year (April to March), salary payable, paid to date
 and pending per employee, attendance totals, a month-by-month breakdown and the company's consolidated figures; it
 downloads as an Excel file with one sheet per view.
+
+**Salary from the amount paid.** Settings → Payroll rules → *Salary from the amount paid* (off by default). Enter the
+state's minimum wages once on All companies → *Minimum wages*. On a draft month, *Salary from the amount paid* lets you
+write what the owner paid each person (or use the *Amount Paid* column of the sheet): Basic becomes the minimum wage
+for the person's skill, PF and ESI are worked out on it and the rest is incentive, so the pay equals the amount.
+
+**Attendance sheet checks.** Settings → *Attendance sheet checks* switches the optional checks of the monthly sheet on
+or off (overtime and paid-leave limits, days present not above working days, weekly offs filled in, minimum wage).
 
 **Forgotten password or locked login** (5 wrong passwords lock it for 15 minutes): wait 15 minutes, or reset it on the
 server with `python manage.py changepassword <username>`.

@@ -35,10 +35,19 @@ def settings_index(request):
 def company_details(request):
     company = request.company
     before = snapshot(company)
+    old_state, old_pt_state = company.state, company.pt_state
     form = CompanyDetailsForm(request.POST or None, request.FILES or None, instance=company)
     if request.method == "POST" and form.is_valid():
-        company = form.save()
+        company = form.save(commit=False)
+        state_moved = company.state != old_state and old_pt_state in ("", old_state)
+        if state_moved:  # professional tax follows the corrected state, unless it was set to another one
+            company.pt_state = company.state
+        company.save()
         audit(request, "settings.company", company, {"changes": diff(before, snapshot(company))})
+        if state_moved:
+            _recalculate_drafts(request, company)
+            messages.info(request, _("Professional tax now uses the slabs of %(state)s (Settings → Payroll rules).")
+                          % {"state": company.state_name})
         messages.success(request, _("Company details saved."))
         return redirect("companies:company")
     return page(request, "companies/company.html", _("Company details"),
@@ -48,7 +57,7 @@ def company_details(request):
 def _recalculate_drafts(request, company):
     """Draft months are worked out again with the new rules. Problems are reported, not hidden."""
     for label, problem in service.recalculate_drafts(company):
-        messages.warning(request, _("%(month)s could not be worked out again: %(problem)s Upload its sheet again.")
+        messages.warning(request, _("%(month)s could not be worked out again: %(problem)s")
                          % {"month": label, "problem": problem})
 
 
@@ -70,8 +79,51 @@ def payroll_rules(request):
         _recalculate_drafts(request, company)
         messages.success(request, _("Payroll rules saved. Months that are not finalised use the new rules."))
         return redirect("companies:payroll")
+    more = ("pf_employee_rate", "pf_restrict_to_ceiling", "pt_state", "default_tax_regime", "ot_multiplier",
+            "ot_days_divisor", "ot_hours_per_day", "notice_period_days", "probation_months", "higher_wages_avenue")
     return page(request, "companies/payroll.html", _("Payroll rules"),
-                _("Each rule has a short explanation. Change what is needed and press Save."), form=form)
+                _("Each rule has a short explanation. Change what is needed and press Save."), form=form,
+                more_open=any(form[name].errors for name in more))
+
+
+@company_required
+def sheet_checks(request):
+    """Settings → Attendance sheet checks: switch checks on or off (payroll/checks.py)."""
+    from payroll import checks
+
+    company = request.company
+    current = checks.settings_for(company)
+    errors = {}
+    if request.method == "POST":
+        chosen = {}
+        for key, (label, _help, _default, kind, _number) in checks.CHECKS.items():
+            item = {"on": request.POST.get(f"{key}_on") == "on"}
+            if kind == "limit":
+                raw = request.POST.get(f"{key}_limit", "").strip()
+                try:
+                    number = Decimal(raw)
+                    if number <= 0 or number > 744 or number * 2 != (number * 2).to_integral_value():
+                        raise ValueError
+                    item["limit"] = int(number) if number == number.to_integral_value() else float(number)
+                except (ArithmeticError, ValueError):
+                    errors[key] = _("Write a number above 0, like 4 or 4.5.")
+                    item["limit"] = raw
+            chosen[key] = item
+        if not errors:
+            before = company.sheet_checks
+            company.sheet_checks = chosen
+            company.save(update_fields=["sheet_checks", "updated_at"])
+            audit(request, "settings.sheet_checks", company, {"before": before, "after": chosen})
+            messages.success(request, _("Attendance sheet checks saved. They are used from the next upload."))
+            return redirect("companies:checks")
+        current = chosen
+    rows = []
+    for key, (label, help_text, default, kind, number) in checks.CHECKS.items():
+        rows.append({"key": key, "label": label, "help": help_text, "kind": kind, "on": current[key]["on"],
+                     "limit": current[key].get("limit"), "default_on": default, "error": errors.get(key)})
+    return page(request, "companies/checks.html", _("Attendance sheet checks"),
+                _("Tick the checks you want when a sheet is uploaded or a person is changed, then press Save."),
+                rows=rows, always_on=checks.ALWAYS_ON, has_errors=bool(errors))
 
 
 @company_required

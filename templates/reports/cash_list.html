@@ -8,7 +8,7 @@
   <table class="print cash-list">
     <thead><tr><th>{% translate "Sl" %}</th><th>{% translate "Code" %}</th><th>{% translate "Name" %}</th><th class="num">{% translate "Net Pay ₹" %}</th><th class="sign-wide">{% translate "Signature / Thumb impression" %}</th></tr></thead>
     <tbody>
-    {% for l in lines %}<tr><td>{{ forloop.counter }}</td><td>{{ l.code }}</td><td>{{ l.name }}{% if l.emp_snapshot.payment_mode == "Cheque" %} ({% translate "Cheque" %}){% endif %}</td><td class="num">{{ l.net_pay|inr }}</td><td class="sign-wide"></td></tr>{% endfor %}
+    {% for l in lines %}<tr><td>{{ forloop.counter }}</td><td>{{ l.code }}</td><td>{{ l.name }}{% if l.emp_snapshot.payment_mode == "Cheque" %} ({% translate "Cheque" %}){% elif l.emp_snapshot.payment_mode == "UPI" %} (UPI){% endif %}</td><td class="num">{{ l.net_pay|inr }}</td><td class="sign-wide"></td></tr>{% endfor %}
     </tbody>
     <tfoot><tr><td></td><td></td><td>{% translate "Total" %}</td><td class="num">{{ total|inr }}</td><td></td></tr></tfoot>
   </table>

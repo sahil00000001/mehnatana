@@ -5,6 +5,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
+from companies.models import Company
 from core.formatting import indian_format, month_label
 from core.tenancy import company_get, company_required, page
 from excel_io import builders
@@ -49,18 +50,23 @@ def _month_context(request, month, run, **extra):
     company = request.company
     blocker = service.upload_blocker(company, month)
     lines, totals, only_notes = [], None, request.GET.get("notes") == "1"
+    notes_count = amounts_count = 0
     if run is not None:
         lines = list(run.lines.select_related("employee").order_by("employee__emp_code"))
         if lines:
             totals = run.totals()
         for line in lines:
             line.note_texts = _note_texts(line)
+        notes_count = sum(1 for l in lines if l.warnings)
+        amounts_count = sum(1 for l in lines if l.amount_paid_input is not None)
         if only_notes:
             lines = [l for l in lines if l.warnings]
     has_lines = totals is not None
     context = {
         "month": month, "run": run, "label": month_label(month), "blocker": blocker, "lines": lines,
-        "totals": totals, "has_lines": has_lines, "only_notes": only_notes,
+        "totals": totals, "has_lines": has_lines, "only_notes": only_notes, "notes_count": notes_count,
+        "full": request.GET.get("full") == "1", "amounts_count": amounts_count,
+        "amount_paid_on": company.amount_paid_mode != Company.AmountPaid.OFF,
         "is_final": bool(run and run.is_final), "upload_form": UploadForm(),
         "finalise_blockers": service.finalise_blockers(run) if run and has_lines and not run.is_final else [],
         "can_reopen": bool(run and run.is_final and not service.reopen_blockers(run)),
@@ -156,7 +162,8 @@ def line_edit(request, month, line_id):
     if run.is_final:
         messages.error(request, _("%(month)s is finalised. Reopen it to make changes.") % {"month": run.label})
         return redirect("payroll:month", month=month)
-    form = LineForm(request.POST or None, initial=LineForm.initial_from(line))
+    amount_paid_on = request.company.amount_paid_mode != Company.AmountPaid.OFF
+    form = LineForm(request.POST or None, initial=LineForm.initial_from(line), amount_paid_on=amount_paid_on)
     if request.method == "POST" and form.is_valid():
         row = form.row_input()
         try:
@@ -165,7 +172,8 @@ def line_edit(request, month, line_id):
             messages.error(request, str(exc))
             return redirect("payroll:month", month=month)
         emp = next((e for e in ctx.employees if e.pk == line.employee_id), None)
-        problems = service.check_row(ctx, emp, row) if emp else [("present", _("This employee is not paid this month."))]
+        problems = (service.check_row(ctx, emp, row, strict=True) if emp
+                    else [("present", _("This employee is not paid this month."))])
         for key, message in problems:
             form.add_error(key if key in form.fields else None, message)
         if not problems:
@@ -177,8 +185,13 @@ def line_edit(request, month, line_id):
                 messages.success(request, _("Saved. %(name)s: net pay is now ₹%(net)s.")
                                  % {"name": line.name, "net": indian_format(line.net_pay)})
                 return redirect(reverse("payroll:month", args=[month]) + "#review")
+    more = ("ot_hours", "ot_amount", "incentive", "increment", "advance", "other_deduction", "other_reason",
+            "tds_override", "remarks")
+    more_open = any(form[name].errors for name in more) or any(
+        form.initial.get(name) not in (None, "", 0) for name in more)
     return page(request, "payroll/line_edit.html", _("Change %(name)s — %(month)s") % {"name": line.name, "month": run.label},
-                _("Change the numbers and press Save. The salary is worked out again."), form=form, line=line, run=run)
+                _("Change the numbers and press Save. The salary is worked out again."), form=form, line=line, run=run,
+                more_open=more_open)
 
 
 @company_required

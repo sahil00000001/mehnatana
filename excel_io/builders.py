@@ -11,7 +11,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from core.formatting import month_label, tax_year_label, tax_year_of
 
 from .columns import (
-    DROPDOWNS, EMPLOYEE_COLUMNS, MONTHLY_COLUMNS, MONTHLY_PREFILLED_GREY, OPENING_COLUMNS, OPENING_PREFILLED_GREY,
+    DROPDOWNS, EMPLOYEE_COLUMNS, MONTHLY_PREFILLED_GREY, OPENING_COLUMNS, OPENING_PREFILLED_GREY, monthly_columns,
 )
 from .common import MONEY_FORMAT, PREFILLED_FILL, as_number, style_header
 
@@ -164,8 +164,9 @@ def monthly_workbook(ctx, existing_lines=None):
     wb = Workbook()
     ws = wb.active
     ws.title = month_label(ctx.month)[:31]
-    headers = [c[1] for c in MONTHLY_COLUMNS]
-    style_header(ws, headers, _widths(MONTHLY_COLUMNS))
+    columns = monthly_columns(ctx.company)
+    headers = [c[1] for c in columns]
+    style_header(ws, headers, _widths(columns))
     year, month = ctx.month.year, ctx.month.month
     dim = engine.days_in_month(year, month)
     weekly_off = ctx.company.weekly_off
@@ -193,12 +194,12 @@ def monthly_workbook(ctx, existing_lines=None):
                 "advance": as_number(line.advance_deduction) or None,
                 "other_deduction": as_number(line.other_deduction) or None,
                 "other_reason": line.other_deduction_reason, "tds_override": as_number(line.tds_override),
-                "remarks": line.remarks,
+                "remarks": line.remarks, "amount_paid": as_number(line.amount_paid_input),
             })
-        for c, (key, *_rest) in enumerate(MONTHLY_COLUMNS, start=1):
+        for c, (key, *_rest) in enumerate(columns, start=1):
             ws.cell(row=r, column=c, value=values.get(key))
-        _format_row(ws, r, MONTHLY_COLUMNS, MONTHLY_PREFILLED_GREY)
-    add_help_sheet(wb, MONTHLY_COLUMNS,
+        _format_row(ws, r, columns, MONTHLY_PREFILLED_GREY)
+    add_help_sheet(wb, columns,
                    f"Attendance and pay sheet for {month_label(ctx.month)} — fill one row per person, then upload.")
     add_meta_sheet(wb, MONTHLY, ctx.company, ctx.month)
     return wb
@@ -211,19 +212,20 @@ def monthly_sample_workbook(ctx):
     wb = Workbook()
     ws = wb.active
     ws.title = "Sample"
-    headers = [c[1] for c in MONTHLY_COLUMNS]
-    style_header(ws, headers, _widths(MONTHLY_COLUMNS))
+    columns = monthly_columns(ctx.company)
+    headers = [c[1] for c in columns]
+    style_header(ws, headers, _widths(columns))
     dim = engine.days_in_month(ctx.month.year, ctx.month.month)
     offs = engine.weekly_offs_between(ctx.month, ctx.month.replace(day=dim), ctx.company.weekly_off)
     example = {"emp_code": "EXAMPLE", "name": "Ramesh Kumar", "designation": "Helper", "days_in_month": dim,
                "working_days": dim - offs, "present": dim - offs - 1, "paid_leave": 1, "week_off_holiday": offs, "ot_hours": 10, "increment": 500,
                "advance": 1000, "remarks": "Example row — not read"}
-    for c, (key, *_rest) in enumerate(MONTHLY_COLUMNS, start=1):
+    for c, (key, *_rest) in enumerate(columns, start=1):
         ws.cell(row=2, column=c, value=example.get(key))
-    _format_row(ws, 2, MONTHLY_COLUMNS, MONTHLY_PREFILLED_GREY)
+    _format_row(ws, 2, columns, MONTHLY_PREFILLED_GREY)
     for cell in ws[2]:
         cell.font = Font(italic=True, color="666666")
-    add_help_sheet(wb, MONTHLY_COLUMNS,
+    add_help_sheet(wb, columns,
                    "Sample attendance sheet. Use 'Download sheet' on the month page to get one with your staff filled in.")
     add_meta_sheet(wb, MONTHLY, ctx.company, ctx.month)
     return wb

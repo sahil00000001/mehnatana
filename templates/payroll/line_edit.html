@@ -11,15 +11,23 @@
     {% include "includes/field.html" with field=form.present %}{% include "includes/field.html" with field=form.paid_leave %}
     {% include "includes/field.html" with field=form.week_off_holiday %}{% include "includes/field.html" with field=form.lop %}
   </fieldset>
-  <fieldset><legend>{% translate "Extra pay" %}</legend>
-    {% include "includes/field.html" with field=form.ot_hours %}{% include "includes/field.html" with field=form.ot_amount %}
-    {% include "includes/field.html" with field=form.incentive %}{% include "includes/field.html" with field=form.increment %}
+  {% if form.amount_paid %}
+  <fieldset><legend>{% translate "Salary from the amount paid" %}</legend>
+    {% include "includes/field.html" with field=form.amount_paid %}
   </fieldset>
-  <fieldset><legend>{% translate "Deductions" %}</legend>
-    {% include "includes/field.html" with field=form.advance %}{% include "includes/field.html" with field=form.other_deduction %}
-    {% include "includes/field.html" with field=form.other_reason %}{% include "includes/field.html" with field=form.tds_override %}
-    {% include "includes/field.html" with field=form.remarks %}
-  </fieldset>
+  {% endif %}
+  <details class="more"{% if more_open %} open{% endif %}>
+    <summary>{% translate "More: overtime, incentive, deductions, remarks" %}</summary>
+    <fieldset><legend>{% translate "Extra pay" %}</legend>
+      {% include "includes/field.html" with field=form.ot_hours %}{% include "includes/field.html" with field=form.ot_amount %}
+      {% include "includes/field.html" with field=form.incentive %}{% include "includes/field.html" with field=form.increment %}
+    </fieldset>
+    <fieldset><legend>{% translate "Deductions" %}</legend>
+      {% include "includes/field.html" with field=form.advance %}{% include "includes/field.html" with field=form.other_deduction %}
+      {% include "includes/field.html" with field=form.other_reason %}{% include "includes/field.html" with field=form.tds_override %}
+      {% include "includes/field.html" with field=form.remarks %}
+    </fieldset>
+  </details>
   <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
     <a href="{% url 'payroll:month' run.month %}#review">{% translate "Go back" %}</a></div>
 </form>

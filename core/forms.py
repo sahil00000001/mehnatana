@@ -2,8 +2,9 @@ from datetime import date
 from decimal import Decimal
 
 from django import forms
-from django.core.exceptions import ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, FieldDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 
 from core.formatting import indian_format
@@ -23,6 +24,33 @@ class DateInput(forms.DateInput):
 
     def __init__(self, attrs=None):
         super().__init__(attrs=attrs, format="%Y-%m-%d")
+
+
+class ModelErrorsOnPage:
+    """For model forms: the model's own checks may name a field this form does not show (for example the
+    last working day on the Edit form). Django would then crash with a server error; instead the message is
+    shown at the top of the form, starting with the field's name."""
+
+    def add_error(self, field, error):
+        if field is None and isinstance(error, ValidationError) and hasattr(error, "error_dict"):
+            model = getattr(getattr(self, "_meta", None), "model", None)
+            kept, moved = {}, []
+            for name, errors in error.error_dict.items():
+                if name == NON_FIELD_ERRORS or name in self.fields:
+                    kept[name] = errors
+                    continue
+                label = name.replace("_", " ")
+                if model is not None:
+                    try:
+                        label = str(model._meta.get_field(name).verbose_name)
+                    except FieldDoesNotExist:
+                        pass
+                for e in errors:
+                    moved.extend(ValidationError(f"{capfirst(label)}: {m}") for m in e.messages)
+            if moved:
+                kept.setdefault(NON_FIELD_ERRORS, []).extend(moved)
+            error = ValidationError(kept)
+        super().add_error(field, error)
 
 
 def sensible_date(value):

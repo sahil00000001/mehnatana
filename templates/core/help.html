@@ -20,11 +20,20 @@
       <li><strong>{% translate "Incentive / Bonus" %}</strong> — {% translate "one-time extra pay." %} <strong>{% translate "Increment" %}</strong> — {% translate "a raise added to Basic from this month." %}</li>
       <li><strong>{% translate "Advance Deduction" %}</strong> — {% translate "already filled with the instalment due." %} <strong>{% translate "Other Deduction" %}</strong> — {% translate "needs a reason." %}</li>
       <li><strong>{% translate "TDS Override" %}</strong> — {% translate "only if your CA gave you the tax figure." %}</li>
+      <li><strong>{% translate "Amount Paid" %}</strong> — {% translate "only when Salary from the amount paid is on (see below): what the owner actually paid the person." %}</li>
     </ul>
   </dd>
 
+  <dt id="amount-paid">{% translate "The owner tells me only what he paid each person. How do I make the salary?" %}</dt>
+  {% url 'portal:minimum_wages' as wages_url %}{% url 'companies:payroll' as rules_url %}
+  <dd>{% blocktranslate %}Turn on <strong>Salary from the amount paid</strong> in <a href="{{ rules_url }}">Settings → Payroll rules</a> and choose whether the amount is the take-home pay or the salary before PF and ESI. Enter the <a href="{{ wages_url }}">minimum wages</a> of the state once. Then, for the month: upload the attendance sheet as usual (the days come from it), press <strong>Salary from the amount paid</strong> on the month page and write each amount. Basic becomes the minimum wage for the person's skill (less for days not worked), PF (if the person is a PF member) and ESI are worked out on it, and the rest is shown as incentive, so the pay comes to exactly the amount paid. If the owner paid less than the minimum wage, the line says so. Leave a box empty to pay that person from their salary structure.{% endblocktranslate %}</dd>
+
+  <dt id="sheet-checks">{% translate "Can I change the checks made on the monthly sheet?" %}</dt>
+  {% url 'companies:checks' as checks_url %}
+  <dd>{% blocktranslate %}Yes: <a href="{{ checks_url }}">Settings → Attendance sheet checks</a>. Switch checks off (for example, allow empty rows or more overtime) or switch extra ones on (days present not more than working days, weekly offs filled in, a limit on paid leave, pay not below the minimum wage). The checks that keep the salary correct are always on.{% endblocktranslate %}</dd>
+
   <dt id="notices">{% translate "What are Notices?" %}</dt>
-  <dd>{% translate "The Notices page lists what needs doing soon: PF, ESI, TDS and professional tax due dates, salary to pay, staff leaving or finishing probation, and records to complete. When something is due within a few days, a yellow strip appears on every page and the menu shows a number next to Notices." %}</dd>
+  <dd>{% translate "The Notices page lists what needs doing soon: PF, ESI, TDS and professional tax due dates, salary to pay, staff leaving or finishing probation, and records to complete. Open it from Home (See all notices). When something is due within a few days, a yellow strip appears on every page and the menu shows a number next to Home." %}</dd>
 
   <dt>{% translate "What is LOP?" %}</dt>
   <dd>{% translate "Loss of pay: days not worked and not paid. Salary is cut by monthly salary ÷ days in the month for each LOP day, or ÷ the working days of that month if Settings → Payroll rules says so." %}</dd>

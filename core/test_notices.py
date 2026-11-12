@@ -44,7 +44,8 @@ class NoticesTest(DemoTestCase):
         Employee.objects.filter(company=self.srks, emp_code="E006").update(employment_type="Probation")
         self.srks.probation_months = 1
         self.srks.save()
-        texts = [n.text for n in notices_for(self.srks)]
+        with self.today_is(date(2026, 11, 5)):  # the leaving day must still be ahead
+            texts = [n.text for n in notices_for(self.srks)]
         self.assertIn("Gopal Rao's last working day is 12-11-2026", texts)
         self.assertNotIn("Kiran B's probation ends on 16-12-2026", texts)  # more than 30 days away
         with self.today_is(date(2026, 12, 1)):

@@ -7,14 +7,13 @@ from django.utils.translation import gettext_lazy as _
 
 logger = logging.getLogger(__name__)
 
+# Kept short on purpose. Notices are on Home (and the strip on every page); Advances and Letters are
+# buttons on Employees and on each employee's page.
 MENU = [
     ("companies", _("All companies"), "portal:list", ("/companies/",)),
-    ("home", _("Home"), "home", ()),
-    ("notices", _("Notices"), "notices", ("/notices/",)),
-    ("employees", _("Employees"), "employees:list", ("/employees/", "/organisation/")),
+    ("home", _("Home"), "home", ("/notices/",)),
+    ("employees", _("Employees"), "employees:list", ("/employees/", "/organisation/", "/advances/", "/letters/")),
     ("salary", _("Monthly Salary"), "payroll:months", ("/salary/",)),
-    ("advances", _("Advances"), "advances:list", ("/advances/",)),
-    ("letters", _("Letters"), "letters:index", ("/letters/",)),
     ("reports", _("Reports"), "reports:index", ("/reports/",)),
     ("settings", _("Settings"), "companies:index", ("/settings/", "/departments/", "/designations/", "/password/change/")),
     ("help", _("Help"), "help", ("/help/",)),
@@ -25,6 +24,7 @@ MENU = [
 PORTAL_MENU = [
     ("companies", _("All companies"), "portal:list", ("/companies/",)),
     ("add", _("Add a company"), "portal:add", ("/companies/add/",)),
+    ("minimum_wages", _("Minimum wages"), "portal:minimum_wages", ("/companies/minimum-wages/",)),
     ("password", _("Change password"), "password_change", ("/password/change/",)),
     ("help", _("Help"), "help", ("/help/",)),
 ]
@@ -35,6 +35,8 @@ def _current(path, menu=MENU):
         return "home"
     if path.startswith("/companies/add/") and menu is PORTAL_MENU:
         return "add"
+    if path.startswith("/companies/minimum-wages/") and menu is PORTAL_MENU:
+        return "minimum_wages"
     for key, _label, _url, prefixes in menu:
         if prefixes and path.startswith(prefixes):
             return key

@@ -45,7 +45,7 @@ def _employees(request):
 def _report_draft_problems(request):
     """After a change that affects pay, draft months are worked out again (finalised months never change)."""
     for label, problem in service.recalculate_drafts(request.company):
-        messages.warning(request, _("%(month)s could not be worked out again: %(problem)s Upload its sheet again.")
+        messages.warning(request, _("%(month)s could not be worked out again: %(problem)s")
                          % {"month": label, "problem": problem})
 
 

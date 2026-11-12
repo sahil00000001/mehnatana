@@ -43,6 +43,11 @@ class Company(TimeStamped):
         NEW = "NEW", _("New regime")
         OLD = "OLD", _("Old regime")
 
+    class AmountPaid(models.TextChoices):
+        OFF = "OFF", _("Off: salary comes from each person's salary structure")
+        IN_HAND = "IN_HAND", _("On: the amount is the take-home pay (after PF and ESI)")
+        GROSS = "GROSS", _("On: the amount is the salary before PF and ESI")
+
     class PayslipStyle(models.TextChoices):
         CLASSIC = "CLASSIC", _("Classic ledger")
         MODERN = "MODERN", _("Modern")
@@ -87,6 +92,12 @@ class Company(TimeStamped):
                     "Six-day week (Monday to Saturday): only Sunday."))
     salary_divisor = models.CharField(_("salary is divided by"), max_length=10, choices=Divisor.choices,
                                       default=Divisor.CALENDAR)
+    amount_paid_mode = models.CharField(
+        _("salary from the amount paid"), max_length=8, choices=AmountPaid.choices, default=AmountPaid.OFF,
+        help_text=_("When on, you can write what the owner actually paid each person. Basic becomes the minimum "
+                    "wage, PF and ESI are worked out on it, and the rest is shown as incentive."))
+    # Optional checks of the attendance sheet (see payroll/checks.py); empty = the defaults.
+    sheet_checks = models.JSONField(_("attendance sheet checks"), default=dict, blank=True)
     pf_enabled = models.BooleanField(_("PF applies"), default=True)
     pf_employee_rate = models.DecimalField(_("employee PF rate"), max_digits=4, decimal_places=2,
                                            choices=PF_RATE_CHOICES, default=Decimal("12.00"))
@@ -174,6 +185,45 @@ class Company(TimeStamped):
     @property
     def state_name(self):
         return dict(STATE_CHOICES).get(self.state, self.state)
+
+
+class MinimumWage(TimeStamped):
+    """Minimum wages per month for one state, from a month onwards. Entered once and used by every company there."""
+
+    SKILLS = ("unskilled", "semi_skilled", "skilled", "highly_skilled")
+    # Employee.skill_category value -> field
+    BY_SKILL = {"Unskilled": "unskilled", "Semi-skilled": "semi_skilled", "Skilled": "skilled",
+                "Highly skilled": "highly_skilled"}
+
+    state = models.CharField(_("state"), max_length=2, choices=STATE_CHOICES)
+    effective_from = models.DateField(_("from month"))
+    unskilled = models.DecimalField(_("unskilled ₹ per month"), max_digits=12, decimal_places=2, null=True, blank=True)
+    semi_skilled = models.DecimalField(_("semi-skilled ₹ per month"), max_digits=12, decimal_places=2, null=True,
+                                       blank=True)
+    skilled = models.DecimalField(_("skilled ₹ per month"), max_digits=12, decimal_places=2, null=True, blank=True)
+    highly_skilled = models.DecimalField(_("highly skilled ₹ per month"), max_digits=12, decimal_places=2, null=True,
+                                         blank=True)
+
+    class Meta:
+        db_table = "mtn_minimum_wage"
+        ordering = ["state", "-effective_from"]
+        constraints = [models.UniqueConstraint(fields=["state", "effective_from"], name="mtn_minimum_wage_unique")]
+
+    def __str__(self):
+        return f"{self.get_state_display()} from {self.effective_from:%m-%Y}"
+
+    def save(self, *args, **kwargs):
+        self.effective_from = self.effective_from.replace(day=1)
+        super().save(*args, **kwargs)
+
+    def for_skill(self, skill_category):
+        """Monthly minimum wage for an Employee.skill_category, or None if not entered."""
+        return getattr(self, self.BY_SKILL.get(skill_category, "unskilled"))
+
+    @classmethod
+    def in_force(cls, state, month):
+        """The rates for a state in force in a month (latest 'from month' on or before it), or None."""
+        return cls.objects.filter(state=state, effective_from__lte=month).order_by("-effective_from").first()
 
 
 def validate_logo(upload):

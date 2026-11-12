@@ -17,6 +17,11 @@ MESSAGES = {
     "OT_HOURS_HIGH": _("More than 100 overtime hours this month — please check."),
     "TDS_OVERRIDE_HIGH": _("The TDS override is more than 30% of the salary — please check."),
     "WEEK_OFF_EMPTY": _("Weekly offs were left empty, so those days were counted as LOP — please check."),
+    "BELOW_MINIMUM_WAGE": _("Basic + DA + other allowance is below the minimum wage for the days paid."),
+    "PAID_BELOW_MINIMUM": _("The amount paid is less than the minimum wage for the days worked. The salary shown is "
+                            "the legal minimum: the owner must pay the difference."),
+    "AMOUNT_NOT_EXACT": _("The pay could not be made exactly equal to the amount paid (a deduction changes in steps). "
+                          "Please check."),
 }
 
 

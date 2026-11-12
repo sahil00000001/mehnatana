@@ -123,7 +123,8 @@ def save_employees(company, rows, user, request=None):
                 emp.aadhaar = row["aadhaar"]
             if row.get("old_regime_deductions_annual") is not None:
                 emp.old_regime_deductions_annual = row["old_regime_deductions_annual"]
-            emp.department = _lookup(Department, company, depts, row.get("department"), user)
+            if "department" in row or is_new:  # a sheet without the column keeps the saved department
+                emp.department = _lookup(Department, company, depts, row.get("department"), user)
             emp.designation = _lookup(Designation, company, desigs, row.get("designation"), user) or emp.designation
             emp.reports_to = None if is_new else emp.reports_to
             if is_new:
@@ -161,6 +162,8 @@ def save_employees(company, rows, user, request=None):
             raise UploadRejected(errors)
         everyone = {e.emp_code: e for e in Employee.objects.filter(company=company)}
         for code, (emp, row) in saved.items():
+            if "reports_to" not in row:
+                continue  # a sheet without the Reports To column keeps the saved manager
             boss = row.get("reports_to")
             new_boss = everyone.get(boss) if boss else None
             if (new_boss.pk if new_boss else None) != emp.reports_to_id:

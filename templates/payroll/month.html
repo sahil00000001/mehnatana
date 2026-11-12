@@ -6,11 +6,15 @@
 <ol class="steps">
   <li class="step{% if has_lines %} done{% elif not blocker %} current{% endif %}">
     <h2>{% translate "Download the attendance sheet" %}</h2>
+    {% if has_lines %}
+      <p class="muted"><a href="{% url 'payroll:sheet' month %}">{% blocktranslate %}Download {{ label }} sheet{% endblocktranslate %}</a> — {% translate "it has the figures already uploaded, to correct them." %}</p>
+    {% else %}
     <p>{% translate "It already has the names of everyone to be paid this month." %}</p>
     <div class="actions">
-      <a class="btn{% if not has_lines %} btn-primary{% endif %}" href="{% url 'payroll:sheet' month %}">{% blocktranslate %}Download {{ label }} sheet{% endblocktranslate %}</a>
+      <a class="btn btn-primary" href="{% url 'payroll:sheet' month %}">{% blocktranslate %}Download {{ label }} sheet{% endblocktranslate %}</a>
       <a href="{% url 'help' %}#sheet-columns">{% translate "What do the columns mean?" %}</a>
     </div>
+    {% endif %}
   </li>
 
   <li class="step{% if has_lines %} done{% endif %}">
@@ -20,6 +24,10 @@
     {% elif blocker %}
       <p class="strong">{{ blocker }}</p>
     {% else %}
+      {% if has_lines and not upload_errors and not file_errors and not upload_form.errors %}
+      <details class="more">
+        <summary>{% translate "Upload a corrected sheet" %}</summary>
+      {% endif %}
       <p>{% translate "Fill days present, leave, overtime, advance and the other columns. Then choose the file and press Upload and check." %}{% if has_lines %} {% translate "Uploading again replaces the earlier figures." %}{% endif %}</p>
       <form method="post" action="{% url 'payroll:upload' month %}" enctype="multipart/form-data" class="form">
         {% csrf_token %}
@@ -29,6 +37,7 @@
           <a href="{% url 'payroll:sheet' month %}?sample=1">{% translate "Download sample file" %}</a>
         </div>
       </form>
+      {% if has_lines and not upload_errors and not file_errors and not upload_form.errors %}</details>{% endif %}
     {% endif %}
 
     {% if file_errors or upload_errors %}
@@ -51,30 +60,42 @@
   <li class="step{% if is_final %} done{% elif has_lines %} current{% endif %}" id="review">
     <h2>{% translate "Look at the salary table" %}</h2>
     {% if has_lines %}
-      <form method="get" class="filters inline-fields">
-        <label class="check"><input type="checkbox" name="notes" value="1" {% if only_notes %}checked{% endif %} data-autosubmit> <span>{% translate "Show only rows with notes" %}</span></label>
-        <button type="submit" class="btn btn-small">{% translate "Show" %}</button>
+      {% if amount_paid_on and not is_final %}
+      <div class="actions">
+        <a class="btn" href="{% url 'payroll:amounts' month %}">{% translate "Salary from the amount paid" %}</a>
+        <span class="muted">{% if amounts_count %}{% blocktranslate count n=amounts_count %}{{ n }} person is worked out from the amount paid.{% plural %}{{ n }} people are worked out from the amount paid.{% endblocktranslate %}{% else %}{% translate "Write what the owner paid; Basic becomes the minimum wage and the rest incentive." %}{% endif %}</span>
+      </div>
+      {% endif %}
+      <p class="table-tools">
+        {% if only_notes %}<a href="?{% if full %}full=1{% endif %}#review">{% translate "Show everyone" %}</a>{% elif notes_count %}<a href="?notes=1{% if full %}&amp;full=1{% endif %}#review">{% blocktranslate count n=notes_count %}Show only the {{ n }} row with notes{% plural %}Show only the {{ n }} rows with notes{% endblocktranslate %}</a>{% endif %}
+        {% if full %}<a href="?{% if only_notes %}notes=1{% endif %}#review">{% translate "Show fewer columns" %}</a>{% else %}<a href="?full=1{% if only_notes %}&amp;notes=1{% endif %}#review">{% translate "Show all columns (PF, ESI, tax, employer share)" %}</a>{% endif %}
         <a href="{% url 'payroll:export' month %}">{% translate "Download this table (Excel)" %}</a>
-      </form>
+      </p>
       <div class="table-wrap">
       <table class="ledger compact sticky-table">
         <thead><tr>
           <th class="sticky-1">{% translate "Code" %}</th><th class="sticky-2">{% translate "Name" %}</th>
-          <th class="num">{% translate "Paid days" %}</th><th class="num">{% translate "LOP" %}</th><th class="num">{% translate "Gross" %}</th>
+          <th class="num">{% translate "Paid days" %}</th>{% if full %}<th class="num">{% translate "LOP" %}</th>{% endif %}<th class="num">{% translate "Gross" %}</th>
+          {% if full %}
           <th class="num">{% translate "PF (emp)" %}</th><th class="num">{% translate "ESI (emp)" %}</th><th class="num">{% translate "PT" %}</th><th class="num">{% translate "TDS" %}</th>
-          <th class="num">{% translate "Advance" %}</th><th class="num">{% translate "Other ded." %}</th><th class="num">{% translate "Net pay" %}</th>
-          <th class="num">{% translate "Employer PF+EDLI+admin" %}</th><th class="num">{% translate "Employer ESI" %}</th><th class="num">{% translate "Total cost" %}</th>
+          <th class="num">{% translate "Advance" %}</th><th class="num">{% translate "Other ded." %}</th>
+          {% else %}<th class="num">{% translate "Deductions" %}</th>{% endif %}
+          <th class="num">{% translate "Net pay" %}</th>
+          {% if full %}<th class="num">{% translate "Employer PF+EDLI+admin" %}</th><th class="num">{% translate "Employer ESI" %}</th><th class="num">{% translate "Total cost" %}</th>{% endif %}
           <th>{% translate "Notes" %}</th>{% if not is_final %}<th></th>{% endif %}
         </tr></thead>
         <tbody>
         {% for l in lines %}
           <tr{% if l.warnings %} class="has-notes"{% endif %}>
             <td class="sticky-1">{{ l.code }}</td><td class="sticky-2">{{ l.name }}</td>
-            <td class="num">{{ l.paid_days|num }}</td><td class="num">{{ l.lop|num }}</td><td class="num">{{ l.gross|inr }}</td>
+            <td class="num">{{ l.paid_days|num }}</td>{% if full %}<td class="num">{{ l.lop|num }}</td>{% endif %}<td class="num">{{ l.gross|inr }}</td>
+            {% if full %}
             <td class="num">{{ l.ee_pf|inr }}</td><td class="num">{{ l.ee_esi|inr }}</td><td class="num">{{ l.pt|inr }}</td><td class="num">{{ l.tds|inr }}</td>
-            <td class="num">{{ l.advance|inr }}</td><td class="num">{{ l.other_deduction_amt|inr }}</td><td class="num strong">{{ l.net_pay|inr }}</td>
-            <td class="num">{{ l.employer_pf|inr }}</td><td class="num">{{ l.er_esi|inr }}</td><td class="num">{{ l.employer_cost|inr }}</td>
-            <td class="notes">{% for t in l.note_texts %}{{ t }}{% if not forloop.last %}<br>{% endif %}{% endfor %}{% if l.remarks %}{% if l.note_texts %}<br>{% endif %}<em>{{ l.remarks }}</em>{% endif %}</td>
+            <td class="num">{{ l.advance|inr }}</td><td class="num">{{ l.other_deduction_amt|inr }}</td>
+            {% else %}<td class="num">{{ l.total_deductions|inr }}</td>{% endif %}
+            <td class="num strong">{{ l.net_pay|inr }}</td>
+            {% if full %}<td class="num">{{ l.employer_pf|inr }}</td><td class="num">{{ l.er_esi|inr }}</td><td class="num">{{ l.employer_cost|inr }}</td>{% endif %}
+            <td class="notes">{% if l.amount_paid_input is not None %}<span class="tag">{% blocktranslate with amount=l.amount_paid_input|inr %}From amount paid ₹{{ amount }}{% endblocktranslate %}</span>{% if l.note_texts or l.remarks %}<br>{% endif %}{% endif %}{% for t in l.note_texts %}{{ t }}{% if not forloop.last %}<br>{% endif %}{% endfor %}{% if l.remarks %}{% if l.note_texts %}<br>{% endif %}<em>{{ l.remarks }}</em>{% endif %}</td>
             {% if not is_final %}<td><a href="{% url 'payroll:line_edit' month l.pk %}">{% translate "Edit" %}</a></td>{% endif %}
           </tr>
         {% empty %}
@@ -83,10 +104,13 @@
         </tbody>
         <tfoot><tr>
           <td class="sticky-1">{% translate "Total" %}</td><td class="sticky-2">{% blocktranslate count n=totals.count %}{{ n }} employee{% plural %}{{ n }} employees{% endblocktranslate %}</td>
-          <td></td><td></td><td class="num">{{ totals.gross|inr }}</td>
+          <td></td>{% if full %}<td></td>{% endif %}<td class="num">{{ totals.gross|inr }}</td>
+          {% if full %}
           <td class="num">{{ totals.ee_pf|inr }}</td><td class="num">{{ totals.ee_esi|inr }}</td><td class="num">{{ totals.pt|inr }}</td><td class="num">{{ totals.tds|inr }}</td>
-          <td class="num">{{ totals.advance|inr }}</td><td class="num">{{ totals.other_deduction_amt|inr }}</td><td class="num">{{ totals.net_pay|inr }}</td>
-          <td class="num">{{ totals.employer_pf|inr }}</td><td class="num">{{ totals.er_esi|inr }}</td><td class="num">{{ totals.employer_cost|inr }}</td>
+          <td class="num">{{ totals.advance|inr }}</td><td class="num">{{ totals.other_deduction_amt|inr }}</td>
+          {% else %}<td class="num">{{ totals.total_deductions|inr }}</td>{% endif %}
+          <td class="num">{{ totals.net_pay|inr }}</td>
+          {% if full %}<td class="num">{{ totals.employer_pf|inr }}</td><td class="num">{{ totals.er_esi|inr }}</td><td class="num">{{ totals.employer_cost|inr }}</td>{% endif %}
           <td{% if not is_final %} colspan="2"{% endif %}></td>
         </tr></tfoot>
       </table>
@@ -120,11 +144,16 @@
       <a class="btn btn-primary" href="{% url 'reports:payslips' month %}">{% translate "Print all payslips" %}</a>
       <a class="btn" href="{% url 'reports:register' month %}">{% translate "Print salary register" %}</a>
       <a class="btn" href="{% url 'reports:attendance' month %}">{% translate "Print attendance register" %}</a>
-      <a class="btn" href="{% url 'reports:bank_sheet' month %}">{% translate "Bank transfer sheet (Excel)" %}</a>
-      <a class="btn" href="{% url 'reports:cash_list' month %}">{% translate "Cash payment list (print)" %}</a>
-      {% if request.company.pf_enabled %}<a class="btn" href="{% url 'reports:pf' month %}">{% translate "PF statement and ECR file" %}</a>{% endif %}
-      {% if request.company.esi_enabled %}<a class="btn" href="{% url 'reports:esi' month %}">{% translate "ESI statement and ESI file" %}</a>{% endif %}
     </div>
+    <details class="more">
+      <summary>{% translate "More files: bank sheet, cash list, PF and ESI" %}</summary>
+      <ul class="plain-list">
+        <li><a href="{% url 'reports:bank_sheet' month %}">{% translate "Bank transfer sheet (Excel)" %}</a></li>
+        <li><a href="{% url 'reports:cash_list' month %}">{% translate "Cash payment list (print)" %}</a></li>
+        {% if request.company.pf_enabled %}<li><a href="{% url 'reports:pf' month %}">{% translate "PF statement and ECR file" %}</a></li>{% endif %}
+        {% if request.company.esi_enabled %}<li><a href="{% url 'reports:esi' month %}">{% translate "ESI statement and ESI file" %}</a></li>{% endif %}
+      </ul>
+    </details>
     <p><strong>{% translate "Salary payments:" %}</strong>
       {% if payment %}{% blocktranslate with paid=payment.paid_count count=payment.count %}{{ paid }} of {{ count }} marked as paid.{% endblocktranslate %}
       {% if payment.pending %}{% blocktranslate with amount=payment.pending|inr %}₹{{ amount }} still to be paid.{% endblocktranslate %}{% endif %}{% endif %}

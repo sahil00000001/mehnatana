@@ -24,7 +24,9 @@ from core.validators import (
 from core.forms import MAX_AMOUNT
 
 from .builders import EMPLOYEES, MONTHLY, OPENING
-from .columns import CHOICES, EMPLOYEE_COLUMNS, MONTHLY_COLUMNS, MONTHLY_READ_ONLY, OPENING_COLUMNS, header_of
+from .columns import (
+    CHOICES, EMPLOYEE_COLUMNS, MONTHLY_COLUMNS, MONTHLY_OPTIONAL, MONTHLY_READ_ONLY, OPENING_COLUMNS, header_of,
+)
 
 TEMPLATE_NAMES = {
     EMPLOYEES: "employee list",
@@ -281,7 +283,7 @@ def _no_code(errors, number, name, columns):
 
 # ---------------------------------------------------------------- monthly attendance sheet
 MONTHLY_NUMBER_KEYS = ["days_in_month", "present", "paid_leave", "week_off_holiday", "lop", "ot_hours", "ot_amount",
-                       "incentive", "increment", "advance", "other_deduction", "tds_override"]
+                       "incentive", "increment", "advance", "other_deduction", "tds_override", "amount_paid"]
 MONTHLY_KINDS = {c[0]: c[3] for c in MONTHLY_COLUMNS}
 
 
@@ -297,7 +299,9 @@ def parse_monthly(data, ctx):
             return {}, [], file_errors
         ws = wb.worksheets[0]
         # Every column of our sheet must be there: a deleted column would silently become 0.
-        index = header_index(ws, MONTHLY_COLUMNS, must=[c[0] for c in MONTHLY_COLUMNS if c[0] not in MONTHLY_READ_ONLY])
+        index = header_index(ws, MONTHLY_COLUMNS, must=[c[0] for c in MONTHLY_COLUMNS
+                                                         if c[0] not in MONTHLY_READ_ONLY | MONTHLY_OPTIONAL])
+        days_must_be_filled = ctx.check_on("days_filled")
         expected = {e.emp_code.upper(): e for e in ctx.employees}
         known = {c.upper() for c in Employee.objects.filter(company=ctx.company).values_list("emp_code", flat=True)}
         rows, errors, seen, blank_days = {}, [], {}, []
@@ -336,12 +340,15 @@ def parse_monthly(data, ctx):
             if bad:
                 continue
             # Weekly offs come filled in, so a row is empty when nothing else is written.
+            zero = Decimal("0")
             if all(parsed[k] is None for k in ("present", "paid_leave", "lop")):
                 blank_days.append(number)
-                err("present", _("The days are empty. Write the days present, paid leave and weekly offs "
-                                 "(write 0 in Days Present if the person did not work at all)."))
-                continue
-            zero = Decimal("0")
+                if days_must_be_filled:
+                    err("present", _("The days are empty. Write the days present, paid leave and weekly offs "
+                                     "(write 0 in Days Present if the person did not work at all)."))
+                    continue
+                # The company switched this check off: an empty row means the person did not work at all.
+                parsed.update(present=zero, week_off_holiday=zero)
             row = RowInput(
                 present=parsed["present"] or zero, paid_leave=parsed["paid_leave"] or zero,
                 week_off_holiday=parsed["week_off_holiday"] or zero, lop=parsed["lop"],
@@ -350,8 +357,9 @@ def parse_monthly(data, ctx):
                 advance=parsed["advance"] or zero, other_deduction=parsed["other_deduction"] or zero,
                 other_reason=to_text(_cell(values, index, "other_reason")),
                 tds_override=parsed["tds_override"], remarks=to_text(_cell(values, index, "remarks"))[:200],
+                amount_paid=parsed["amount_paid"],
             )
-            for key, message in check_row(ctx, emp, row, parsed["days_in_month"]):
+            for key, message in check_row(ctx, emp, row, parsed["days_in_month"], strict=True):
                 err(key, message)
             rows[emp.pk] = row
         missing = [e for code, e in expected.items() if code not in seen]
@@ -454,6 +462,9 @@ def parse_employees(data, company):
                 if kind == "money" and value is not None and value > MAX_AMOUNT:
                     err(key, _("This looks too big (more than ₹99,99,999). Please check."))
                     continue
+                if kind == "money" and value is not None and value < 0:
+                    err(key, _("Cannot be a negative number."))
+                    continue
                 if key in ("department", "designation") and len(value or "") > 100:
                     err(key, _("Write at most 100 letters."))
                     continue
@@ -487,10 +498,13 @@ def parse_employees(data, company):
                 err("aadhaar_consent", _("Write Yes here to save the Aadhaar number, or leave Aadhaar empty."))
             if not row.get("payment_mode"):
                 row["payment_mode"] = "Bank" if row.get("bank_account_no") else ("Cash" if is_new else None)
-            if row.get("payment_mode") == "Bank" or (row.get("payment_mode") is None and not is_new
-                                                    and existing[code].payment_mode == "Bank"):
+            saved = None if is_new else existing[code]
+            if row.get("payment_mode") == "Bank" or (row.get("payment_mode") is None and saved
+                                                    and saved.payment_mode == "Bank"):
                 for key in ("bank_name", "bank_account_no", "ifsc"):
-                    if not row.get(key):
+                    # A column left out of the sheet keeps the saved value.
+                    value = row.get(key) if key in row else (getattr(saved, key) if saved else "")
+                    if not value:
                         err(key, _("Needed when Payment Mode is Bank."))
             dob, doj = row.get("date_of_birth"), row.get("date_of_joining")
             if dob and doj:
@@ -498,7 +512,16 @@ def parse_employees(data, company):
                 if age < 14 or age > 80:
                     err("date_of_birth", _("Please check the date of birth: age at joining would be %(age)s.")
                         % {"age": age})
-            if row.get("tax_regime") != "OLD" and row.get("old_regime_deductions_annual"):
+            if doj and saved:
+                paid_before = (saved.payroll_lines.filter(run__status="FINALISED", run__month__lt=doj.replace(day=1))
+                               .select_related("run").order_by("run__month").first())
+                if paid_before:
+                    err("date_of_joining", _("%(name)s was already paid for %(month)s (finalised), so the date of "
+                                             "joining cannot be after that month.")
+                        % {"name": saved.first_name, "month": paid_before.run.label})
+            # The regime that will be saved: an empty cell keeps the saved one.
+            regime = row.get("tax_regime") or (saved.tax_regime if saved else company.default_tax_regime)
+            if regime != "OLD" and row.get("old_regime_deductions_annual"):
                 row["old_regime_deductions_annual"] = Decimal("0")
             errors.extend(row_errors)
             rows.append(row)

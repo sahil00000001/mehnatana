@@ -6,7 +6,7 @@ from django.core.validators import MaxLengthValidator
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import IndianDatesMixin, whole_rupees
+from core.forms import IndianDatesMixin, ModelErrorsOnPage, whole_rupees
 from core.formatting import add_months, fmt_date, month_label, month_start
 from core.validators import digits_only, upper_no_spaces
 
@@ -57,7 +57,7 @@ class SuggestInput(forms.TextInput):
 TIDIED_FIELDS = ["emp_code", "mobile", "pan", "aadhaar", "uan", "esic_ip_no", "ifsc"]
 
 
-class EmployeeForm(IndianDatesMixin, forms.ModelForm):
+class EmployeeForm(ModelErrorsOnPage, IndianDatesMixin, forms.ModelForm):
     GROUPS = [
         (_("Personal"), ["emp_code", "first_name", "surname", "relation_type", "relation_name", "gender",
                          "date_of_birth", "mobile", "email", "address"]),
@@ -221,6 +221,10 @@ class EmployeeForm(IndianDatesMixin, forms.ModelForm):
                 self.add_error("date_of_joining", _(
                     "%(name)s was already paid for %(month)s (finalised), so the date of joining cannot be after "
                     "that month.") % {"name": self.instance.first_name, "month": paid_before.run.label})
+            elif self.instance.date_of_leaving and doj > self.instance.date_of_leaving:
+                self.add_error("date_of_joining", _(
+                    "The date of joining cannot be after the last working day (%(date)s).")
+                    % {"date": fmt_date(self.instance.date_of_leaving)})
         self._designation = self._named(Designation, self.company, data.get("designation_name"))
         self._department = self._named(Department, self.company, data.get("department_name"))
         for field, label in UNIQUE_IDS.items():
@@ -248,7 +252,7 @@ class EmployeeForm(IndianDatesMixin, forms.ModelForm):
         return {name: self.cleaned_data.get(name) or 0 for name in SALARY_FIELDS}
 
 
-class RelieveForm(IndianDatesMixin, forms.ModelForm):
+class RelieveForm(ModelErrorsOnPage, IndianDatesMixin, forms.ModelForm):
     class Meta:
         model = Employee
         fields = ["date_of_leaving", "leaving_reason", "resignation_date", "exit_remarks"]

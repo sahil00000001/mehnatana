@@ -167,7 +167,7 @@ tr.has-notes td.notes { color: var(--warn-ink); }
 
 /* sticky first two columns inside a scrolling box (review table) */
 table.ledger.sticky-table { width: max-content; min-width: 100%; }
-.sticky-table td.notes { min-width: 320px; max-width: 560px; }
+.sticky-table td.notes { min-width: 200px; max-width: 420px; }
 .sticky-table th.sticky-1, .sticky-table td.sticky-1 { position: sticky; left: 0; z-index: 1; min-width: 72px; }
 .sticky-table th.sticky-2, .sticky-table td.sticky-2 { position: sticky; left: 72px; z-index: 1; min-width: 170px; box-shadow: 2px 0 0 var(--rule-dark); }
 .sticky-table tbody td.sticky-1, .sticky-table tbody td.sticky-2 { background: var(--white); }
@@ -273,3 +273,20 @@ tr.notice-urgent .notice-detail { color: var(--err-ink); font-weight: bold; }
 tr.current-month td { background: var(--warn-bg) !important; font-weight: bold; }
 .where-now { font-weight: bold; color: var(--maroon); margin: 0 0 12px; }
 @media (max-width: 600px) { .band .today { display: none; } }
+
+/* Amounts paid, line edit "More", sheet checks */
+tr.row-error td { background: var(--err-bg); }
+tr.has-notes.row-note td, tr.row-note td { color: var(--warn-ink); font-size: 15px; border-top: 0; }
+tr.row-error.row-note td { color: var(--err-ink); }
+input.amount-input { width: 9em; text-align: right; padding: 6px 8px; font-size: 17px; }
+details.more { border: 1px solid var(--rule-dark); background: var(--white); padding: 8px 14px; margin: 0 0 18px; }
+details.more > summary { cursor: pointer; font-weight: bold; padding: 6px 0; }
+details.more[open] > summary { margin-bottom: 8px; }
+table.checks td.limit input { width: 6em; }
+table.checks tr.always td { color: var(--muted, #555); }
+table.checks input[type="checkbox"] { width: 22px; height: 22px; }
+.table-tools { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 4px 0 8px; }
+.tag { display: inline-block; font-size: 14px; padding: 1px 7px; border: 1px solid var(--rule-dark); background: var(--head-bg); color: var(--ink); white-space: nowrap; }
+ul.plain-list { margin: 4px 0 4px; padding-left: 20px; }
+ul.plain-list li { margin: 4px 0; }
+input[type="radio"] { width: 20px; height: 20px; vertical-align: -4px; }

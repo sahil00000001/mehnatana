@@ -18,8 +18,8 @@ from core.tenancy import SESSION_COMPANY, page
 from employees.models import Employee
 from payroll.models import PayrollRun
 
-from .forms import CompanyCreateForm
-from .models import Company
+from .forms import CompanyCreateForm, MinimumWageForm
+from .models import Company, MinimumWage
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,59 @@ def company_open(request, company_id):
         return redirect("portal:list")
     open_company(request, company)
     return redirect(_safe_next(request, request.POST.get("next")) or "home")
+
+
+def _recalculate_state(request, state):
+    """Draft months of every company in the state are worked out again with the new minimum wages."""
+    from payroll.service import recalculate_drafts
+
+    for company in Company.objects.filter(state=state, is_active=True):
+        for label, problem in recalculate_drafts(company):
+            messages.warning(request, _("%(company)s, %(month)s could not be worked out again: %(problem)s")
+                             % {"company": company.trade_name, "month": label, "problem": problem})
+
+
+@login_required
+def minimum_wages(request):
+    """Minimum wages per state (used by 'Salary from the amount paid' and the minimum wage check)."""
+    from core.formatting import month_start
+    from django.utils import timezone
+
+    if request.method == "POST" and request.POST.get("delete"):
+        row = get_object_or_404(MinimumWage, pk=request.POST["delete"])
+        audit(request, "minimum_wage.delete", row, {"state": row.state, "from": str(row.effective_from)})
+        row.delete()
+        _recalculate_state(request, row.state)
+        messages.success(request, _("Removed the minimum wages of %(row)s.") % {"row": row})
+        return redirect("portal:minimum_wages")
+
+    editing = None
+    if request.GET.get("edit"):
+        editing = MinimumWage.objects.filter(pk=request.GET["edit"]).first()
+    company = getattr(request, "company", None)
+    if editing:
+        initial = {"state": editing.state, "effective_from": editing.effective_from,
+                   **{name: getattr(editing, name) for name in MinimumWage.SKILLS}}
+    else:
+        initial = {"state": company.state if company else "DL", "effective_from": month_start(timezone.localdate())}
+    form = MinimumWageForm(request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        row = MinimumWage.objects.filter(state=data["state"], effective_from=data["effective_from"]).first() \
+            or MinimumWage(state=data["state"], effective_from=data["effective_from"])
+        for name in MinimumWage.SKILLS:
+            setattr(row, name, data.get(name))
+        row.save()
+        audit(request, "minimum_wage.save", row, {name: getattr(row, name) for name in MinimumWage.SKILLS}
+              | {"state": row.state, "from": str(row.effective_from)})
+        _recalculate_state(request, row.state)
+        messages.success(request, _("Minimum wages saved for %(row)s. Months that are not finalised use them now.")
+                         % {"row": row})
+        return redirect("portal:minimum_wages")
+    return page(request, "companies/minimum_wages.html", _("Minimum wages"),
+                _("Write the minimum wage per month for each skill and the month they start. Enter them again "
+                  "when the government revises them (usually April and October)."),
+                rows=MinimumWage.objects.all(), form=form, editing=editing)
 
 
 @login_required

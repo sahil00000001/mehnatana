@@ -138,6 +138,53 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
   cannot be checked), and income tax uses the normal (under 60) slabs. The turning-58 list skips them.
 - The one-off import of the old data is not part of this repository: it holds clients' private details.
 
+## Salary from the amount paid (added 13-11-2026)
+
+- Asked for by the person running payroll for small shops: the owner says only what he paid each person.
+  `Company.amount_paid_mode` = OFF / IN_HAND (the amount is the take-home pay) / GROSS (before PF and ESI).
+- For a line with an amount: the structure for that month is **Basic = minimum wage** for the person's skill
+  category (state of the company, `MinimumWage.in_force`), nothing else. The engine is unchanged: Basic is cut
+  for unpaid days, PF follows the PF member tick, ESI coverage is judged on the minimum wage (so the person is
+  covered), and ESI/PF are on Labour Code wages as for anyone else. The **incentive** is then found by stepping
+  by the gap until the take-home (or gross) equals the amount: take-home rises by at most ₹1 per ₹1 of incentive,
+  so it lands exactly; a note is added in the rare case a stepped deduction prevents that.
+- If the owner paid less than the minimum wage salary for the days worked, the incentive is 0, the payslip shows
+  the legal minimum, and the line is noted "the owner must pay the difference".
+- The amount is an input (`PayrollLine.amount_paid_input`), so the month is worked out again correctly after any
+  change. An increment in the same month is refused (finalise would turn the minimum wage into the person's new
+  structure); a one-time incentive is replaced by the worked-out one. Switching the feature off returns drafts to
+  the salary structures.
+- **Minimum wages** are entered per state and month (All companies → Minimum wages), not shipped with the app:
+  they change twice a year and are notified per state and skill. Saving the same state and month replaces it;
+  every company of that state has its drafts worked out again.
+- When minimum wages are entered, any line whose Basic + DA + other allowance is below the minimum for the days
+  paid gets a note (and, if the company switches the check on, the upload is stopped).
+
+## Attendance sheet checks (added 13-11-2026)
+
+- Settings → Attendance sheet checks (`Company.sheet_checks`, catalogue in `payroll/checks.py`). Switchable:
+  days filled in every row, other-deduction reason, overtime limit (number); extra (off by default): days present
+  ≤ working days, weekly offs filled in, paid-leave limit (number), pay not below the minimum wage.
+- They apply only when figures are entered (upload, Change one person, Amounts paid), never when a saved draft
+  is worked out again, so changing a setting can never break a month already entered.
+- Checks that keep the salary arithmetic right (everyone once, days fit the month and employment, no negatives,
+  deductions not above pay, a completely empty sheet) are always on and are listed on the page.
+
+## Simpler screens (13-11-2026)
+
+- Menu cut to All companies · Home · Employees · Monthly Salary · Reports · Settings · Help. Notices open from
+  Home (the count shows on Home); Advances and Letters are buttons on Employees and on each employee's page.
+- Month page: steps already done fold away; the salary table shows Paid days, Gross, Deductions, Net pay and
+  Notes, with "Show all columns" for the PF / ESI / tax / employer breakdown. Payroll rules and Change one
+  person keep the rarely used settings under "More".
+
+## Two tabs, two companies
+
+- The open company is kept per login session. `{% csrf_token %}` (overridden as a template built-in,
+  `core/templatetags/company_csrf.py`) also writes the company the page was shown for, and the middleware refuses
+  a POST for a different company ("Nothing was saved. That page was for …"). All companies, login and help pages
+  are not checked.
+
 ## Settings
 
 - **Company code** is set by the platform admin. Owners cannot change it, because it is part of letter numbers and file names.

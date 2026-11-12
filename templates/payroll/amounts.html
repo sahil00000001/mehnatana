@@ -1,0 +1,55 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<div class="box">
+  <p>{% if in_hand %}{% translate "Write the take-home amount the owner paid each person this month." %}{% else %}{% translate "Write the salary the owner paid each person this month, before PF and ESI are cut." %}{% endif %}
+    {% translate "PayCore sets Basic to the minimum wage for the person's skill (less for days not worked), works out PF and ESI on it, and shows the rest as incentive so the pay comes to exactly this amount." %}</p>
+  <p class="muted">{% if minimum_wages %}{% blocktranslate with state=minimum_wages.get_state_display from=minimum_wages.effective_from|month_label %}Minimum wages used: {{ state }}, from {{ from }}.{% endblocktranslate %}{% else %}{% translate "No minimum wages are entered for this state yet." %}{% endif %}
+    <a href="{% url 'portal:minimum_wages' %}">{% translate "See or change minimum wages" %}</a></p>
+</div>
+
+{% if has_errors %}<div class="msg msg-error" role="alert">{% translate "Nothing was saved. Correct the rows marked in red and press Save again." %}</div>{% endif %}
+
+<form method="post" class="form form-wide" novalidate>
+  {% csrf_token %}
+  <div class="table-wrap">
+  <table class="ledger compact amounts-table">
+    <thead><tr>
+      <th>{% translate "Code" %}</th><th>{% translate "Name" %}</th>
+      <th class="num">{% translate "Paid days" %}</th><th class="num">{% translate "Minimum wage / month" %}</th>
+      <th class="num">{% if in_hand %}{% translate "Amount paid in hand ₹" %}{% else %}{% translate "Salary paid ₹" %}{% endif %}</th>
+      <th class="num">{% translate "Basic" %}</th><th class="num">{% translate "Incentive" %}</th>
+      <th class="num">{% translate "PF (emp)" %}</th><th class="num">{% translate "ESI (emp)" %}</th>
+      {% if not in_hand %}<th class="num">{% translate "Gross" %}</th>{% endif %}<th class="num">{% translate "Take-home" %}</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr class="{% if r.errors %}row-error{% elif r.notes %}has-notes{% endif %}">
+        <td>{{ r.line.code }}</td>
+        <td class="nowrap"><a href="{% url 'employees:detail' r.line.employee_id %}">{{ r.line.name }}</a></td>
+        <td class="num">{% if r.result %}{{ r.result.paid_days|num }}{% else %}{{ r.line.paid_days|num }}{% endif %}</td>
+        <td class="num">{% if r.minimum %}{{ r.minimum|inr }}{% else %}—{% endif %}<div class="muted small">{{ r.emp.get_skill_category_display }}</div></td>
+        <td class="num"><input type="text" inputmode="numeric" name="{{ r.name }}" value="{{ r.value }}" class="amount-input" aria-label="{% blocktranslate with name=r.line.name %}Amount paid to {{ name }}{% endblocktranslate %}"></td>
+        {% if r.result %}
+        <td class="num">{{ r.result.basic|inr }}</td><td class="num">{{ r.result.incentive|inr }}</td>
+        <td class="num">{{ r.result.ee_pf|inr }}</td><td class="num">{{ r.result.ee_esi|inr }}</td>
+        {% if not in_hand %}<td class="num">{{ r.result.gross|inr }}</td>{% endif %}<td class="num strong">{{ r.result.net_pay|inr }}</td>
+        {% else %}
+        <td colspan="{% if in_hand %}5{% else %}6{% endif %}"></td>
+        {% endif %}
+      </tr>
+      {% if r.errors or r.notes %}
+      <tr class="{% if r.errors %}row-error{% else %}has-notes{% endif %} row-note"><td></td><td colspan="{% if in_hand %}9{% else %}10{% endif %}">
+        {% for e in r.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
+        {% for n in r.notes %}<div>{{ n }}</div>{% endfor %}
+      </td></tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="actions">
+    <button type="submit" class="btn btn-primary">{% translate "Save and work out" %}</button>
+    <a href="{% url 'payroll:month' month %}#review">{% translate "Back to the month" %}</a>
+  </div>
+</form>
+{% endblock %}

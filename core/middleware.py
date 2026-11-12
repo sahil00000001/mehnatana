@@ -5,6 +5,8 @@ from django.utils.translation import gettext as _
 from .tenancy import SESSION_COMPANY
 
 ALWAYS_ALLOWED = ("/static/", "/logout/", "/password/change/")
+# Pages that work the same whichever company is open (no company check of their forms).
+NOT_COMPANY_PAGES = ("/companies/", "/login/", "/logout/", "/password/", "/admin/", "/help/")
 
 
 class TenantMiddleware:
@@ -31,4 +33,25 @@ class TenantMiddleware:
                 request.company = Company.objects.filter(pk=company_id, is_active=True).first()
                 if request.company is None:
                     request.session.pop(SESSION_COMPANY, None)
+            refused = self._form_for_another_company(request)
+            if refused:
+                return refused
         return self.get_response(request)
+
+    @staticmethod
+    def _form_for_another_company(request):
+        """A form shown for one company and sent after another company was opened (in another tab)."""
+        from companies.models import Company
+        from .templatetags.company_csrf import FIELD
+
+        if request.method != "POST" or request.company is None or request.path.startswith(NOT_COMPANY_PAGES):
+            return None
+        sent = request.POST.get(FIELD, "")
+        if not sent or sent == str(request.company.pk):
+            return None
+        was = Company.objects.filter(pk=sent).first() if sent.isdigit() else None
+        messages.error(request, _(
+            "Nothing was saved. That page was for %(was)s, but %(now)s is open now (it was opened in another tab "
+            "or window). Open %(was)s again on All companies and repeat the change.") % {
+            "was": was.trade_name if was else _("another company"), "now": request.company.trade_name})
+        return redirect("home")

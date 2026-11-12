@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+{% if has_errors %}<div class="msg msg-error" role="alert">{% translate "Nothing was saved. Please correct the numbers marked in red." %}</div>{% endif %}
+<form method="post" class="form form-wide" novalidate>
+  {% csrf_token %}
+  <div class="table-wrap">
+  <table class="ledger checks">
+    <thead><tr><th>{% translate "Use" %}</th><th>{% translate "Check" %}</th><th>{% translate "Limit" %}</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr{% if r.error %} class="row-error"{% endif %}>
+        <td><input type="checkbox" name="{{ r.key }}_on" id="id_{{ r.key }}_on" {% if r.on %}checked{% endif %}></td>
+        <td><label for="id_{{ r.key }}_on"><strong>{{ r.label }}</strong></label>
+          {% if r.help %}<div class="help">{{ r.help }}</div>{% endif %}
+          {% if not r.default_on %}<div class="help">{% translate "Extra check — off unless you switch it on." %}</div>{% endif %}
+          {% if r.error %}<div class="field-error">{{ r.error }}</div>{% endif %}</td>
+        <td class="limit">{% if r.kind == "limit" %}<input type="text" inputmode="decimal" name="{{ r.key }}_limit" value="{{ r.limit|default_if_none:'' }}" aria-label="{{ r.label }}">{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+    <a href="{% url 'companies:index' %}">{% translate "Go back" %}</a></div>
+</form>
+
+<h2>{% translate "Always checked" %}</h2>
+<p class="muted">{% translate "These keep the salary correct, so they cannot be switched off:" %}</p>
+<ul>{% for text in always_on %}<li>{{ text }}</li>{% endfor %}</ul>
+{% endblock %}

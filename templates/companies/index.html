@@ -3,7 +3,9 @@
 <table class="ledger form">
   <tbody>
     <tr><td><a href="{% url 'companies:company' %}">{% translate "Company details" %}</a></td><td>{% translate "Name, address, logo, PF/ESIC codes, LIN and who signs." %}</td></tr>
-    <tr><td><a href="{% url 'companies:payroll' %}">{% translate "Payroll rules" %}</a></td><td>{% translate "Working days (weekly offs), PF, ESI, professional tax, income tax and overtime settings." %}</td></tr>
+    <tr><td><a href="{% url 'companies:payroll' %}">{% translate "Payroll rules" %}</a></td><td>{% translate "Working days (weekly offs), salary from the amount paid, PF, ESI, taxes and overtime." %}</td></tr>
+    <tr><td><a href="{% url 'companies:checks' %}">{% translate "Attendance sheet checks" %}</a></td><td>{% translate "Which checks run when the monthly sheet is uploaded. Switch checks on or off." %}</td></tr>
+    <tr><td><a href="{% url 'portal:minimum_wages' %}">{% translate "Minimum wages" %}</a></td><td>{% translate "Minimum wage per month for each skill, entered once for each state." %}</td></tr>
     <tr><td><a href="{% url 'companies:payslip_design' %}">{% translate "Payslip design" %}</a></td><td>{% translate "Choose one of three payslip designs and what they show." %}</td></tr>
     <tr><td><a href="{% url 'companies:opening_balances' %}">{% translate "Opening balances" %}</a></td><td>{% translate "Pay and tax before you started using the app (for TDS)." %}</td></tr>
     <tr><td><a href="{% url 'employees:departments' %}">{% translate "Departments" %}</a></td><td>{% translate "Store, Accounts, Delivery…" %}</td></tr>

@@ -17,21 +17,24 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from advances.models import Advance, AdvanceRecovery
+from companies.models import Company, MinimumWage
 from core.audit import audit
-from core.formatting import add_months, fmt_date, month_end, month_label, month_start, plain_number, tax_year_of
+from core.formatting import (
+    add_months, fmt_date, indian_format, month_end, month_label, month_start, plain_number, tax_year_of,
+)
 from employees.models import Employee, OpeningBalance, SalaryRevision
 from statutory.rates import MissingRate, rates_for_month
 
-from . import engine
+from . import checks, engine
 from .models import PayrollLine, PayrollRun
 
 ZERO = D("0")
 DAY_KEYS = ("present", "paid_leave", "week_off_holiday", "lop")
 NUMBER_KEYS = ("present", "paid_leave", "week_off_holiday", "lop", "ot_hours", "ot_amount", "incentive",
-               "increment", "advance", "other_deduction", "tds_override")
-MONEY_KEYS = ("ot_amount", "incentive", "increment", "advance", "other_deduction", "tds_override")
+               "increment", "advance", "other_deduction", "tds_override", "amount_paid")
+MONEY_KEYS = ("ot_amount", "incentive", "increment", "advance", "other_deduction", "tds_override", "amount_paid")
 MAX_AMOUNT = D("9999999")  # same limit as the forms (core.forms.MAX_AMOUNT)
-MAX_OT_HOURS = 300
+HOURS_IN_A_MONTH = 744  # 31 x 24: always refused above this; the usual limit is a setting (payroll/checks.py)
 OT_HOURS_NOTE = 100  # more than this gets a note to check
 
 
@@ -55,6 +58,7 @@ class RowInput:
     other_reason: str = ""
     tds_override: Optional[D] = None
     remarks: str = ""
+    amount_paid: Optional[D] = None  # what the owner paid; the incentive is then worked out (see compute)
 
     def to_engine(self):
         return engine.MonthInput(
@@ -74,7 +78,7 @@ class RowInput:
             lop=dec(line.lop_days), ot_hours=D(line.ot_hours), ot_amount=dec(line.ot_amount_override),
             incentive=D(line.incentive), increment=D(line.increment), advance=D(line.advance_deduction),
             other_deduction=D(line.other_deduction), other_reason=line.other_deduction_reason,
-            tds_override=dec(line.tds_override), remarks=line.remarks,
+            tds_override=dec(line.tds_override), remarks=line.remarks, amount_paid=dec(line.amount_paid_input),
         )
 
     def as_dict(self):
@@ -177,6 +181,7 @@ def employee_snapshot(emp):
         "department": emp.department.name if emp.department_id else "",
         "doj": fmt_date(emp.date_of_joining),
         "dol": fmt_date(emp.date_of_leaving),
+        "leaving_reason": emp.leaving_reason,
         "uan": emp.uan,
         "name_as_per_uan": emp.name_as_per_uan,
         "esic_ip_no": emp.esic_ip_no,
@@ -252,6 +257,26 @@ class RunContext:
         ids = [e.pk for e in self.employees]
         self.ytd = ytd_map(company, self.month, ids)
         self.advances = open_advances(company, ids, given_by=month_end(self.month))
+        self.fit_mode = company.amount_paid_mode
+        self.minimum_wages = MinimumWage.in_force(company.state, self.month)
+        self.checks = checks.settings_for(company)
+
+    def check_on(self, key):
+        return self.checks[key]["on"]
+
+    def minimum_wage(self, emp):
+        """Monthly minimum wage for this person's skill in this month, or None if not entered."""
+        return self.minimum_wages.for_skill(emp.skill_category) if self.minimum_wages else None
+
+    def fits(self, row):
+        """True when this row's salary is worked out from the amount the owner paid."""
+        return self.fit_mode != Company.AmountPaid.OFF and row.amount_paid is not None
+
+    def no_minimum_wage_message(self, emp):
+        return _("There is no minimum wage for %(skill)s staff in %(state)s for %(month)s. Enter it on "
+                 "All companies → Minimum wages, or set the right skill on the employee page.") % {
+            "skill": emp.get_skill_category_display().lower(), "state": self.company.state_name,
+            "month": month_label(self.month)}
 
     def outstanding(self, emp):
         return sum((left for _a, left in self.advances.get(emp.pk, [])), ZERO)
@@ -261,16 +286,85 @@ class RunContext:
 
 
 # ---------------------------------------------------------------- calculate one row
+def _engine_line(ctx, emp, structure, esi_struct, inp):
+    return engine.compute_line(ctx.month.year, ctx.month.month, engine_employee(emp), structure, esi_struct, inp,
+                               ctx.settings, ctx.rates, ctx.ytd.get(emp.pk, engine.YTD()))
+
+
+def minimum_for_days(ctx, emp, result):
+    """Minimum wage earned for the paid days of `result`, or None when no minimum wage is entered."""
+    wage = ctx.minimum_wage(emp)
+    if not wage:
+        return None
+    factor, _outside = engine.pay_factor(ctx.month.year, ctx.month.month, engine_employee(emp), result.lop,
+                                         ctx.settings)
+    return engine.rupee(D(wage) * factor)
+
+
+def fit_to_amount(ctx, emp, row):
+    """Salary worked out from what the owner paid (Payroll rules → Salary from the amount paid).
+
+    Basic is the minimum wage for the person's skill (cut for unpaid days, like any salary). PF and ESI follow
+    the normal rules, with ESI coverage judged on the minimum wage. The incentive is then found so that the
+    take-home pay (or the gross, as the company chose) is exactly the amount paid. Take-home pay rises by at
+    most ₹1 for each ₹1 of incentive, so stepping by the gap always lands on the amount. If the owner paid
+    less than the minimum wage salary, the incentive is 0 and the line gets a note.
+
+    Returns (engine.Line, structure used, the minimum wage salary before any incentive).
+    """
+    wage = ctx.minimum_wage(emp)
+    if not wage:
+        raise PayrollError(ctx.no_minimum_wage_message(emp))
+    structure = engine.Structure(basic=D(wage))
+    target = row.amount_paid
+    gross_basis = ctx.fit_mode == Company.AmountPaid.GROSS
+
+    def run(incentive):
+        inp = row.to_engine()
+        inp.incentive, inp.increment = incentive, ZERO
+        try:
+            return _engine_line(ctx, emp, structure, structure, inp)
+        except ValueError as exc:
+            if "deductions are more than earnings" in str(exc):
+                return None  # more incentive is needed before the deductions fit
+            raise
+
+    def measure(line):
+        return line.gross if gross_basis else line.net_pay
+
+    base = run(ZERO)
+    if base is not None and measure(base) >= target:
+        return base, structure, base
+    incentive = target - (measure(base) if base is not None else ZERO)
+    result = None
+    for _step in range(80):
+        result = run(incentive)
+        gap = target - (measure(result) if result is not None else ZERO)
+        if gap == 0:
+            break
+        incentive = max(ZERO, incentive + gap)
+    if result is None:
+        raise ValueError(f"{emp.emp_code}: deductions are more than earnings")
+    return result, structure, base
+
+
 def compute(ctx, emp, row):
     """Run the engine for one employee. Returns (engine.Line, structure used, warnings). Raises ValueError."""
-    structure = structure_for_month(emp, ctx.month)
-    result = engine.compute_line(
-        ctx.month.year, ctx.month.month, engine_employee(emp), structure,
-        esi_structure(emp, ctx.month, row.increment), row.to_engine(), ctx.settings, ctx.rates,
-        ctx.ytd.get(emp.pk, engine.YTD()),
-    )
-    used = structure.plus_increment(row.increment) if row.increment else structure
-    warnings = list(result.warnings)
+    if ctx.fits(row):
+        result, used, base = fit_to_amount(ctx, emp, row)
+        warnings = list(result.warnings)
+        if base is not None and (base.gross if ctx.fit_mode == Company.AmountPaid.GROSS else base.net_pay) > row.amount_paid:
+            warnings.append("PAID_BELOW_MINIMUM")
+        elif (result.gross if ctx.fit_mode == Company.AmountPaid.GROSS else result.net_pay) != row.amount_paid:
+            warnings.append("AMOUNT_NOT_EXACT")
+    else:
+        structure = structure_for_month(emp, ctx.month)
+        result = _engine_line(ctx, emp, structure, esi_structure(emp, ctx.month, row.increment), row.to_engine())
+        used = structure.plus_increment(row.increment) if row.increment else structure
+        warnings = list(result.warnings)
+        minimum = minimum_for_days(ctx, emp, result)
+        if minimum is not None and result.paid_days > 0 and result.basic + result.da + result.other < minimum:
+            warnings.append("BELOW_MINIMUM_WAGE")
     start, end = ctx.month, month_end(ctx.month)
     if ctx.settings.pf_enabled and emp.pf_member and result.epf_wage > 0 and not emp.uan:
         warnings.append("NO_UAN")
@@ -297,8 +391,49 @@ def compute(ctx, emp, row):
     return result, used, list(dict.fromkeys(warnings))
 
 
-def check_row(ctx, emp, row, days_in_month_value=None):
-    """Mistakes that block saving, as [(column key, message)]. Empty list = fine."""
+def _switchable_errors(ctx, emp, row):
+    """The company's switchable checks that need no calculation (Settings → Attendance sheet checks)."""
+    errors = []
+    note = _("(This check is set in Settings → Attendance sheet checks.)")
+    if ctx.check_on("other_reason") and row.other_deduction > 0 and not row.other_reason.strip():
+        errors.append(("other_reason", _("Write the reason for the other deduction.")))
+    if ctx.check_on("present_le_working"):
+        working = engine.working_days_employed(ctx.month.year, ctx.month.month, emp.date_of_joining,
+                                               emp.date_of_leaving, ctx.settings.weekly_off)
+        if row.present > working:
+            errors.append(("present", _("Days present (%(p)s) are more than the working days of this person in "
+                                        "%(month)s (%(w)s). %(note)s") % {
+                "p": plain_number(row.present), "month": month_label(ctx.month), "w": working, "note": note}))
+    if ctx.check_on("paid_leave_limit"):
+        most = D(ctx.checks["paid_leave_limit"]["limit"])
+        if row.paid_leave > most:
+            errors.append(("paid_leave", _("More than %(n)s days of paid leave in a month. %(note)s")
+                           % {"n": plain_number(most), "note": note}))
+    return errors
+
+
+def _minimum_wage_errors(ctx, emp, row, result, warnings):
+    note = _("(This check is set in Settings → Attendance sheet checks.)")
+    if not ctx.minimum_wage(emp):
+        return [("present", ctx.no_minimum_wage_message(emp))]
+    if "PAID_BELOW_MINIMUM" in warnings:
+        return [("amount_paid", _("₹%(paid)s was paid, but the minimum wage for the days worked comes to more. "
+                                  "The owner must pay at least the minimum wage. %(note)s")
+                 % {"paid": indian_format(row.amount_paid), "note": note})]
+    if "BELOW_MINIMUM_WAGE" in warnings:
+        return [("present", _("Basic + DA + other allowance (₹%(earned)s) is below the minimum wage for the days "
+                              "paid (₹%(minimum)s). Revise the salary. %(note)s") % {
+            "earned": indian_format(result.basic + result.da + result.other),
+            "minimum": indian_format(minimum_for_days(ctx, emp, result)), "note": note})]
+    return []
+
+
+def check_row(ctx, emp, row, days_in_month_value=None, strict=False):
+    """Mistakes that block saving, as [(column key, message)]. Empty list = fine.
+
+    strict=True when figures are being entered (upload, Change one person, Amounts paid): the company's
+    switchable checks (payroll/checks.py) are applied too. Working a saved month out again never uses them.
+    """
     errors = []
     dim = engine.days_in_month(ctx.month.year, ctx.month.month)
     label = month_label(ctx.month)
@@ -320,10 +455,28 @@ def check_row(ctx, emp, row, days_in_month_value=None):
         value = getattr(row, key)
         if value is not None and value > MAX_AMOUNT:
             errors.append((key, _("This looks too big (more than ₹99,99,999). Please check.")))
-    if row.ot_hours > MAX_OT_HOURS:
-        errors.append(("ot_hours", _("More than %(max)s overtime hours in a month? Please check.") % {"max": MAX_OT_HOURS}))
+    if row.ot_hours > HOURS_IN_A_MONTH:
+        errors.append(("ot_hours", _("More than %(max)s overtime hours in a month? Please check. A month has at "
+                                     "most %(max)s hours.") % {"max": HOURS_IN_A_MONTH}))
+    elif strict and ctx.check_on("ot_limit") and row.ot_hours > D(ctx.checks["ot_limit"]["limit"]):
+        errors.append(("ot_hours", _("More than %(max)s overtime hours in a month? Please check. (This limit is set "
+                                     "in Settings → Attendance sheet checks.)") % {"max": ctx.checks["ot_limit"]["limit"]}))
     if len(row.other_reason) > 200:
         errors.append(("other_reason", _("Write the reason in at most 200 letters.")))
+    if row.amount_paid is not None:
+        if ctx.fit_mode == Company.AmountPaid.OFF:
+            errors.append(("amount_paid", _("Salary from the amount paid is off for this company. Turn it on in "
+                                            "Settings → Payroll rules, or leave Amount Paid empty.")))
+        elif row.increment:
+            errors.append(("increment", _("An increment of ₹%(amount)s is written for this month. Leave Increment "
+                                          "empty when Amount Paid is written (change the person's line on the month "
+                                          "page), or leave Amount Paid empty. To raise the salary, use Revise salary "
+                                          "on the employee page.") % {"amount": indian_format(row.increment)}))
+        elif row.incentive:
+            errors.append(("incentive", _("Leave Incentive empty when Amount Paid is written: PayCore works out the "
+                                          "incentive from the amount paid.")))
+        elif not ctx.minimum_wage(emp):
+            errors.append(("amount_paid", ctx.no_minimum_wage_message(emp)))
     if errors:
         return errors
 
@@ -356,12 +509,17 @@ def check_row(ctx, emp, row, days_in_month_value=None):
     if row.advance > outstanding:
         errors.append(("advance", _("Advance deduction (₹%(a)s) is more than the advance still to be recovered (₹%(o)s).")
                        % {"a": engine.indian_format(row.advance), "o": engine.indian_format(outstanding)}))
-    if row.other_deduction > 0 and not row.other_reason.strip():
-        errors.append(("other_reason", _("Write the reason for the other deduction.")))
+    if strict:
+        errors.extend(_switchable_errors(ctx, emp, row))
     if errors:
         return errors
     try:
-        compute(ctx, emp, row)
+        result, _used, warnings = compute(ctx, emp, row)
+        if strict and ctx.check_on("min_wage"):
+            errors.extend(_minimum_wage_errors(ctx, emp, row, result, warnings))
+        if strict and ctx.check_on("week_off_filled") and "WEEK_OFF_EMPTY" in warnings:
+            errors.append(("week_off_holiday", _("Weekly offs are empty, so they were counted as absent. Write the "
+                                                 "weekly offs (this check is set in Settings → Attendance sheet checks).")))
     except ValueError as exc:
         if "deductions are more than earnings" in str(exc):
             if row.advance:
@@ -407,6 +565,7 @@ def fill_line(line, ctx, emp, row, result, used, warnings):
     line.lop_days = row.lop
     line.ot_hours, line.ot_amount_override = row.ot_hours, row.ot_amount
     line.incentive, line.increment = row.incentive, row.increment
+    line.amount_paid_input = row.amount_paid if ctx.fits(row) else None
     line.advance_deduction, line.other_deduction = row.advance, row.other_deduction
     line.other_deduction_reason = row.other_reason.strip()
     line.tds_override, line.remarks = row.tds_override, row.remarks.strip()
@@ -484,9 +643,12 @@ def recompute_run(run, ctx=None):
             raise PayrollError(_("%(name)s is no longer paid in %(month)s. Upload the sheet again.")
                                % {"name": line.name, "month": month_label(run.month)})
         rows[emp.pk] = RowInput.from_line(line)
+        if not ctx.fits(rows[emp.pk]):
+            rows[emp.pk].amount_paid = None  # the company switched 'salary from the amount paid' off
     missing = [e for e in ctx.employees if e.pk not in rows]
     if missing:
-        raise PayrollError(_("These employees are missing from %(month)s: %(names)s. Upload the sheet again.") % {
+        raise PayrollError(_("New in %(month)s: %(names)s. Download the %(month)s sheet again (it now has them), "
+                             "fill their days and upload it.") % {
             "month": month_label(run.month), "names": ", ".join(f"{e.emp_code} {e.full_name}" for e in missing)})
     _check_or_raise(ctx, rows)
     for line in lines:
@@ -509,7 +671,7 @@ def update_line(run, line, row, user, request=None):
         emp = next((e for e in ctx.employees if e.pk == line.employee_id), None)
         if emp is None:
             raise PayrollError(_("This employee is not paid in %(month)s.") % {"month": run.label})
-        errors = check_row(ctx, emp, row)
+        errors = check_row(ctx, emp, row, strict=True)
         if errors:
             raise PayrollError(" ".join(m for _k, m in errors))
         result, used, warnings = compute(ctx, emp, row)
@@ -520,6 +682,59 @@ def update_line(run, line, row, user, request=None):
         audit(request, "payroll.line_edit", line, {"month": str(run.month), "employee": emp.emp_code,
                                                    "inputs": row.as_dict()}, company=run.company)
     return line
+
+
+def amounts_preview(run, amounts):
+    """Check the amounts paid typed on the Amounts paid page, without saving.
+
+    amounts: {line id: Decimal or None}. Returns (rows, errors) where rows are dicts for the page and errors is
+    {line id: [messages]}. A line whose amount is left empty is worked out from the salary structure as usual.
+    """
+    ctx = RunContext(run.company, run.month)
+    by_emp = {e.pk: e for e in ctx.employees}
+    rows, errors = [], {}
+    for line in run.lines.select_related("employee").order_by("employee__emp_code"):
+        emp = by_emp.get(line.employee_id)
+        row = RowInput.from_line(line)
+        row.amount_paid = amounts.get(line.pk, row.amount_paid)
+        if row.amount_paid is not None:
+            row.incentive = ZERO  # replaced by the worked-out incentive (an increment is refused by check_row)
+        item = {"line": line, "emp": emp, "row": row, "minimum": ctx.minimum_wage(emp) if emp else None,
+                "result": None, "warnings": []}
+        problems = check_row(ctx, emp, row, strict=True) if emp else [("present", _("Not paid this month."))]
+        if problems:
+            errors[line.pk] = [m for _k, m in problems]
+        else:
+            item["result"], _used, item["warnings"] = compute(ctx, emp, row)
+        rows.append(item)
+    return rows, errors
+
+
+def save_amounts(run, amounts, user, request=None):
+    """Store the amounts paid of a draft month and work those lines out again (all or nothing)."""
+    with transaction.atomic():
+        run = PayrollRun.objects.select_for_update().get(pk=run.pk)
+        if run.is_final:
+            raise PayrollError(_("%(month)s is finalised. Reopen it first.") % {"month": run.label})
+        rows, errors = amounts_preview(run, amounts)
+        if errors:
+            raise PayrollError(_("Nothing was saved. Correct the amounts marked in red."))
+        ctx = RunContext(run.company, run.month)
+        changed = 0
+        for item in rows:
+            line, row = item["line"], item["row"]
+            if line.pk not in amounts:
+                continue
+            result, used, warnings = compute(ctx, item["emp"], row)
+            fill_line(line, ctx, item["emp"], row, result, used, warnings)
+            line.save()
+            changed += 1
+        update_run_pf_admin(run, ctx.rates, list(run.lines.all()))
+        run.save()
+        audit(request, "payroll.amounts_paid", run, {"month": str(run.month), "lines": changed,
+                                                     "amounts": {str(k): v for k, v in amounts.items()}},
+              company=run.company)
+    return changed
 
 
 # ---------------------------------------------------------------- months, finalise, reopen
@@ -697,7 +912,10 @@ def recalculate_drafts(company):
         try:
             recompute_run(run)
         except (PayrollError, MissingRate) as exc:
-            problems.append((run.label, str(exc)))
+            text = str(exc)
+            if "sheet again" not in text:
+                text = f"{text} {_('Upload its sheet again.')}"
+            problems.append((run.label, text))
     return problems
 
 

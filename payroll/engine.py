@@ -329,24 +329,10 @@ class Line:
     warnings: list = field(default_factory=list)
 
 
-def compute_line(year: int, month: int, emp: Employee, structure: Structure,
-                 structure_at_esi_period_start: Structure, inp: MonthInput,
-                 settings: Settings, rates: Rates, ytd: YTD) -> Line:
-    L = Line(emp.code, emp.name)
+def pay_factor(year: int, month: int, emp: Employee, lop: D, settings: Settings):
+    """(share of the monthly rates earned this month, days outside employment) for `lop` unpaid days."""
     dim = days_in_month(year, month)
     month_start, month_end = date(year, month, 1), date(year, month, dim)
-
-    # 1. salary for this month (increment applies from this month)
-    s = structure.plus_increment(inp.increment) if inp.increment else structure
-
-    # 2. days
-    counted = inp.present + inp.paid_leave + inp.week_off_holiday
-    lop = inp.lop if inp.lop is not None else max(ZERO, D(dim) - counted)
-    if counted + lop != D(dim):
-        raise ValueError(f"{emp.code}: days do not add up to {dim}")
-    L.lop = lop
-    L.paid_days = D(dim) - lop
-
     # days outside employment (before joining, after leaving)
     not_employed = 0
     if emp.doj > month_start:
@@ -364,6 +350,27 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
     else:
         divisor = {"CALENDAR": D(dim), "FIXED_30": D(30), "FIXED_26": D(26)}[settings.salary_divisor]
         factor = max(ZERO, 1 - lop / divisor)
+    return factor, not_employed
+
+
+def compute_line(year: int, month: int, emp: Employee, structure: Structure,
+                 structure_at_esi_period_start: Structure, inp: MonthInput,
+                 settings: Settings, rates: Rates, ytd: YTD) -> Line:
+    L = Line(emp.code, emp.name)
+    dim = days_in_month(year, month)
+    month_start, month_end = date(year, month, 1), date(year, month, dim)
+
+    # 1. salary for this month (increment applies from this month)
+    s = structure.plus_increment(inp.increment) if inp.increment else structure
+
+    # 2. days
+    counted = inp.present + inp.paid_leave + inp.week_off_holiday
+    lop = inp.lop if inp.lop is not None else max(ZERO, D(dim) - counted)
+    if counted + lop != D(dim):
+        raise ValueError(f"{emp.code}: days do not add up to {dim}")
+    L.lop = lop
+    L.paid_days = D(dim) - lop
+    factor, not_employed = pay_factor(year, month, emp, lop, settings)
 
     # days outside employment are not NCP days for EPFO
     L.ncp_days = int(max(ZERO, lop - not_employed).to_integral_value(rounding=ROUND_FLOOR))
@@ -428,6 +435,9 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
             # earns nothing after it, so the year's tax is worked out on actual pay and settled now
             # (otherwise a leaver is over-taxed in the final pay). README cases are unchanged.
             left = 1
+        elif emp.dol and emp.dol <= tax_year_end(year, month):
+            # Serving notice: salary is projected only until the month of the last working day.
+            left = min(left, (emp.dol.year - year) * 12 + emp.dol.month - month + 1)
         later = future_months(year, month, left - 1)
         projected = ytd.gross + L.gross + s.gross() * (left - 1)
         if emp.tax_regime == "NEW":

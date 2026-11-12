@@ -72,9 +72,10 @@ def _files_phrase(company):
 def _month_param(value):
     try:
         year, month = str(value).split("-")
-        return date(int(year), int(month), 1)
+        day = date(int(year), int(month), 1)
     except (TypeError, ValueError):
         return None
+    return day if 1900 <= day.year <= 2099 else None  # the page addresses only take 19xx and 20xx
 
 
 def _date_param(value):
@@ -304,7 +305,7 @@ def bank_sheet(request, month):
     blocked = _files_need_final(request, run)
     if blocked:
         return blocked
-    lines = [l for l in _lines(run) if l.emp_snapshot.get("payment_mode") in ("Bank", "UPI")]
+    lines = [l for l in _lines(run) if l.emp_snapshot.get("payment_mode") == "Bank"]
     narration = f"Salary {month_short(run.month)}"
     headers = ["Sl", "Emp Code", "Name", "Bank", "Account No", "IFSC", "Net Pay", "Narration"]
     rows = []
@@ -322,7 +323,7 @@ def bank_sheet(request, month):
 @company_required
 def cash_list(request, month):
     run = _run(request, month)
-    lines = [l for l in _lines(run) if l.emp_snapshot.get("payment_mode") in ("Cash", "Cheque")]
+    lines = [l for l in _lines(run) if l.emp_snapshot.get("payment_mode") in ("Cash", "Cheque", "UPI")]
     return render(request, "reports/cash_list.html", {
         "title": _("Cash payment list — %(month)s") % {"month": run.label},
         "run": run, "company": run.company, "lines": lines,
@@ -347,6 +348,7 @@ def ecr(request, month):
 
 ESI_HEADERS = ["IP Number", "IP Name", "No. of Days for which wages paid/payable", "Total Monthly Wages",
                "Reason Code for Zero working days", "Last Working Day"]
+ESI_LEAVING_CODES = {"Retired": 3, "Deceased": 5}
 
 
 def _esi_rows(lines):
@@ -356,7 +358,9 @@ def _esi_rows(lines):
         days = int(D(l.paid_days).to_integral_value(rounding=ROUND_FLOOR))
         last_day = ""
         if "LEFT_THIS_MONTH" in (l.warnings or []) and s.get("dol"):
-            reason, last_day = 2, s["dol"].replace("-", "/")
+            # ESIC reason codes: 2 left service, 3 retired, 5 expired (deceased)
+            reason = ESI_LEAVING_CODES.get(s.get("leaving_reason", ""), 2)
+            last_day = s["dol"].replace("-", "/")
         elif days == 0:
             reason = 1
         else:

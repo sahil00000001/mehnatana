@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% if rows %}
+<div class="table-wrap">
+<table class="ledger">
+  <thead><tr><th>{% translate "State" %}</th><th>{% translate "From" %}</th>
+    <th class="num">{% translate "Unskilled" %}</th><th class="num">{% translate "Semi-skilled" %}</th>
+    <th class="num">{% translate "Skilled" %}</th><th class="num">{% translate "Highly skilled" %}</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr{% if editing and editing.pk == r.pk %} class="current-month"{% endif %}>
+      <td>{{ r.get_state_display }}</td><td>{{ r.effective_from|month_label }}</td>
+      <td class="num">{% if r.unskilled %}{{ r.unskilled|inr }}{% else %}—{% endif %}</td>
+      <td class="num">{% if r.semi_skilled %}{{ r.semi_skilled|inr }}{% else %}—{% endif %}</td>
+      <td class="num">{% if r.skilled %}{{ r.skilled|inr }}{% else %}—{% endif %}</td>
+      <td class="num">{% if r.highly_skilled %}{{ r.highly_skilled|inr }}{% else %}—{% endif %}</td>
+      <td class="row-actions"><a href="?edit={{ r.pk }}#rates">{% translate "Change" %}</a>
+        <form method="post" class="inline" data-confirm="{% translate 'Remove these minimum wages?' %}">{% csrf_token %}
+          <button type="submit" name="delete" value="{{ r.pk }}" class="link-button">{% translate "Remove" %}</button></form></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="msg msg-info">{% translate "No minimum wages are entered yet. Add the rates of your state below." %}</div>
+{% endif %}
+
+<h2 id="rates">{% if editing %}{% translate "Change minimum wages" %}{% else %}{% translate "Add minimum wages" %}{% endif %}</h2>
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  <fieldset><legend>{% translate "Where and from when" %}</legend>
+    {% include "includes/field.html" with field=form.state %}{% include "includes/field.html" with field=form.effective_from %}
+  </fieldset>
+  <fieldset><legend>{% translate "Minimum wage per month" %}</legend>
+    {% include "includes/field.html" with field=form.unskilled %}{% include "includes/field.html" with field=form.semi_skilled %}
+    {% include "includes/field.html" with field=form.skilled %}{% include "includes/field.html" with field=form.highly_skilled %}
+    <p class="muted">{% translate "Use the all-inclusive monthly rate of the latest government notification. Saving the same state and month again replaces those rates." %}</p>
+  </fieldset>
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+    {% if editing %}<a href="{% url 'portal:minimum_wages' %}">{% translate "Cancel" %}</a>{% endif %}</div>
+</form>
+{% endblock %}
