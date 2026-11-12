@@ -7,6 +7,7 @@ import calendar
 from datetime import date
 from decimal import Decimal as D
 
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -17,7 +18,7 @@ from letters.models import LetterType
 from payroll import engine, service
 from statutory.rates import MissingRate, rates_for_month
 
-EMPLOYEE_FIXES = ("no_uan", "no_esic", "no_appointment_letter", "below_50", "turning_58")
+EMPLOYEE_FIXES = ("missing_details", "no_uan", "no_esic", "no_appointment_letter", "below_50", "turning_58")
 ADVANCE_FIXES = ("no_instalment",)
 
 
@@ -40,6 +41,10 @@ def fix_querysets(company, today=None):
     month = month_start(today)
     active = Employee.objects.filter(company=company, status=Employee.Status.ACTIVE)
     out = {}
+
+    # Only possible for records brought over from an older payroll system (the form asks for both).
+    out["missing_details"] = (_("Staff without date of birth or father's / spouse's name"),
+                              active.filter(Q(date_of_birth=None) | Q(relation_name="")))
 
     if company.pf_enabled:
         out["no_uan"] = (_("PF members without UAN"), active.filter(pf_member=True, uan=""))
@@ -79,7 +84,7 @@ def fix_querysets(company, today=None):
                        active.filter(pk__in=below))
 
     limit = _plus_months(today, 3)
-    turning = [e.pk for e in active.only("pk", "date_of_birth")
+    turning = [e.pk for e in active.exclude(date_of_birth=None).only("pk", "date_of_birth")
                if today <= _birthday(e.date_of_birth, 58) <= limit]
     out["turning_58"] = (_("Employees turning 58 in the next 3 months"), active.filter(pk__in=turning))
 

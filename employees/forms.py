@@ -113,6 +113,9 @@ class EmployeeForm(IndianDatesMixin, forms.ModelForm):
         for name, text in HELP.items():
             if name in self.fields:
                 self.fields[name].help_text = text
+        # Empty only on records brought over from an older system (see the model); always asked for here.
+        self.fields["date_of_birth"].required = True
+        self.fields["relation_name"].required = True
         active = Employee.objects.filter(company=company, status=Employee.Status.ACTIVE)
         if self.instance.pk:
             active = active.exclude(pk=self.instance.pk)

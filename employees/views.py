@@ -139,7 +139,7 @@ def employee_add(request):
                 source=SalaryRevision.Source.OPENING, reason=_("Starting salary"), created_by=request.user, **values)
             audit(request, "employee.create", emp, {"after": snapshot(emp), "salary": values})
         messages.success(request, _("%(name)s is added with code %(code)s.") % {"name": emp.full_name, "code": emp.emp_code})
-        if engine.age_on(emp.date_of_birth, emp.date_of_joining) < 18:
+        if emp.date_of_birth and engine.age_on(emp.date_of_birth, emp.date_of_joining) < 18:
             messages.warning(request, _("This person was under 18 at joining. Please check the rules for young workers."))
         _warn_joined_in_finalised_months(request, [emp.emp_code])
         _report_draft_problems(request)

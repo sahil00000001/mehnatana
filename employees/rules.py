@@ -14,7 +14,8 @@ def default_eps_member(date_of_birth, date_of_joining, structure):
     if ceiling is None:
         return True
     wages = engine.code_wages(structure.wage_part(), structure.gross(), min_pct)
-    return engine.rupee(wages) <= ceiling and engine.age_on(date_of_birth, date_of_joining) < int(max_age)
+    young = date_of_birth is None or engine.age_on(date_of_birth, date_of_joining) < int(max_age)
+    return engine.rupee(wages) <= ceiling and young
 
 
 def first_revision_month(company, date_of_joining):

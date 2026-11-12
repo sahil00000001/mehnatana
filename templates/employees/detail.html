@@ -22,9 +22,9 @@
 <table class="ledger details">
   <tr><th>{% translate "Employee code" %}</th><td>{{ emp.emp_code }}</td></tr>
   <tr><th>{% translate "Name" %}</th><td>{{ emp.title }} {{ emp.full_name }}</td></tr>
-  <tr><th>{{ emp.get_relation_type_display }}</th><td>{{ emp.relation_name }}</td></tr>
+  <tr><th>{{ emp.get_relation_type_display }}</th><td>{% if emp.relation_name %}{{ emp.relation_name }}{% else %}<span class="field-error">{% translate "Not given yet — please add it (Edit)" %}</span>{% endif %}</td></tr>
   <tr><th>{% translate "Gender" %}</th><td>{{ emp.get_gender_display }}</td></tr>
-  <tr><th>{% translate "Date of birth" %}</th><td>{{ emp.date_of_birth|dmy }}</td></tr>
+  <tr><th>{% translate "Date of birth" %}</th><td>{% if emp.date_of_birth %}{{ emp.date_of_birth|dmy }}{% else %}<span class="field-error">{% translate "Not given yet — please add it (Edit)" %}</span>{% endif %}</td></tr>
   <tr><th>{% translate "Mobile" %}</th><td>{{ emp.mobile }}</td></tr>
   <tr><th>{% translate "Email" %}</th><td>{{ emp.email }}</td></tr>
   <tr><th>{% translate "Address" %}</th><td>{{ emp.address|linebreaksbr }}</td></tr>

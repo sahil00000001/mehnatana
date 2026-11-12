@@ -389,7 +389,8 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
     if settings.pf_enabled and emp.pf_member and L.code_wages > 0:
         cap = rates.pf_ceiling
         L.epf_wage = min(L.code_wages, cap) if settings.pf_restrict_to_ceiling else L.code_wages
-        too_old = age_on(emp.dob, month_start) >= rates.eps_max_age
+        # No date of birth on record (brought over from an older system): EPS follows the eps_member tick.
+        too_old = emp.dob is not None and age_on(emp.dob, month_start) >= rates.eps_max_age
         if too_old and emp.eps_member:
             L.warnings.append("EPS_STOPPED_AGE_58")
         L.eps_wage = min(L.code_wages, cap) if (emp.eps_member and not too_old) else ZERO
@@ -439,7 +440,7 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
             pt_year = ytd.pt + L.pt + pt_later
             taxable = projected - min(cfg["std_deduction"], projected) - pt_year - emp.old_regime_deductions
         taxable = max(ZERO, taxable)
-        age = age_on(emp.dob, tax_year_end(year, month))
+        age = age_on(emp.dob, tax_year_end(year, month)) if emp.dob else 0  # unknown: the normal (under 60) slabs
         annual = annual_income_tax(taxable, emp.tax_regime, age, cfg)
         L.tds = max(ZERO, rupee((annual - ytd.tds) / left))
 

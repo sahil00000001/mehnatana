@@ -95,9 +95,12 @@ class Employee(CompanyOwned):
     first_name = models.CharField(_("first name"), max_length=60)
     surname = models.CharField(_("surname"), max_length=60, blank=True)
     relation_type = models.CharField(_("relation"), max_length=10, choices=Relation.choices, default=Relation.FATHER)
-    relation_name = models.CharField(_("father's / mother's / spouse's name"), max_length=120)
+    # These two may be empty only for people brought over from an older payroll system that did not
+    # have them. The add / edit form and the Excel upload still ask for both, and "Things to fix" lists
+    # everyone who is missing them.
+    relation_name = models.CharField(_("father's / mother's / spouse's name"), max_length=120, blank=True)
     gender = models.CharField(_("gender"), max_length=1, choices=Gender.choices)
-    date_of_birth = models.DateField(_("date of birth"))
+    date_of_birth = models.DateField(_("date of birth"), null=True, blank=True)
     mobile = models.CharField(_("mobile"), max_length=10, blank=True, validators=[mobile_validator])
     email = models.EmailField(_("email"), blank=True)
     address = models.TextField(_("address"), blank=True)

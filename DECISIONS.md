@@ -128,6 +128,16 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
   repository and the live address are unchanged, so nothing had to be moved.
 - **Language.** Only English is listed in `LANGUAGES`, and `LocaleMiddleware` is not on yet. Otherwise the Django admin would switch to Hindi from the browser language before our own strings are translated. All UI strings are wrapped in gettext and ready for Hindi.
 
+## Staff brought over from an older payroll system
+
+- Old payroll records often have no date of birth or father's / spouse's name. Such people can still be
+  saved: both fields may be empty **in the database only**. The add / edit form and the Excel upload still
+  ask for both, so a person is completed the next time they are edited.
+- "Things to fix" lists active staff missing either one, and the employee page says "Not given yet".
+- Payroll without a date of birth: EPS follows the person's "pension (EPS) member" tick (the age-58 stop
+  cannot be checked), and income tax uses the normal (under 60) slabs. The turning-58 list skips them.
+- The one-off import of the old data is not part of this repository: it holds clients' private details.
+
 ## Settings
 
 - **Company code** is set by the platform admin. Owners cannot change it, because it is part of letter numbers and file names.
