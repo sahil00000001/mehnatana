@@ -18,7 +18,7 @@ def find_user(username):
 class LockoutBackend(ModelBackend):
     """Locks a username for LOGIN_LOCK_MINUTES after LOGIN_MAX_FAILURES wrong passwords.
 
-    Used for both the owner login page and the platform admin login.
+    Used by the one login page (the admin screens send people there too).
     """
 
     def authenticate(self, request, username=None, password=None, **kwargs):

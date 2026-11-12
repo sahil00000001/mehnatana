@@ -16,5 +16,19 @@
     if (event.target.matches("[data-autosubmit]")) {
       event.target.form.submit();
     }
+    // "Tick all" box: ticks or clears every box with the same name in its table.
+    if (event.target.matches("[data-tick-all]")) {
+      var name = event.target.getAttribute("data-tick-all");
+      var boxes = event.target.closest("table").querySelectorAll('input[type=checkbox][name="' + name + '"]');
+      for (var i = 0; i < boxes.length; i++) { boxes[i].checked = event.target.checked; }
+    }
+  });
+
+  // Forms that need a "Are you sure?" before they are sent.
+  document.addEventListener("submit", function (event) {
+    var message = event.target.getAttribute("data-confirm");
+    if (message && !window.confirm(message)) {
+      event.preventDefault();
+    }
   });
 })();

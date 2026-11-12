@@ -18,7 +18,7 @@ from django.utils.translation import gettext as _
 
 from advances.models import Advance
 from core.formatting import add_months, fmt_date, month_label, month_short, tax_year_label, tax_year_of
-from core.tenancy import NoSalaryMonth, company_get, owner_required, page
+from core.tenancy import NoSalaryMonth, company_get, company_required, page
 from employees.models import Employee, OpeningBalance, SalaryRevision
 from excel_io.common import as_number, table_workbook, xlsx_response
 from payroll import engine, service
@@ -105,7 +105,7 @@ def _print_flags(run):
 
 
 # ---------------------------------------------------------------- Home
-@owner_required
+@company_required
 def dashboard(request):
     company = request.company
     today = timezone.localdate()
@@ -169,7 +169,7 @@ def _payslip_page(request, run, lines, single=False):
     })
 
 
-@owner_required
+@company_required
 def payslips(request, month):
     run = _run(request, month)
     lines = _lines(run)
@@ -179,7 +179,7 @@ def payslips(request, month):
     return _payslip_page(request, run, lines)
 
 
-@owner_required
+@company_required
 def payslip(request, month, line_id):
     run = _run(request, month)
     line = company_get(request, PayrollLine.objects.select_related("employee"), pk=line_id, run=run)
@@ -195,7 +195,7 @@ REGISTER_COLUMNS = [
 ]
 
 
-@owner_required
+@company_required
 def register(request, month):
     run = _run(request, month)
     lines = _lines(run)
@@ -210,7 +210,7 @@ def register(request, month):
     })
 
 
-@owner_required
+@company_required
 def register_xlsx(request, month):
     run = _run(request, month)
     blocked = _files_need_final(request, run)
@@ -231,8 +231,74 @@ def register_xlsx(request, month):
     return xlsx_response(wb, f"{run.company.code}_register_{run.month:%Y-%m}.xlsx")
 
 
+# ---------------------------------------------------------------- attendance register
+ATTENDANCE_DAY_FIELDS = ["present", "paid_leave", "week_off_holiday", "lop", "paid_days", "ot_hours"]
+
+
+def _attendance(run):
+    """Rows of the attendance register: employee details from the employee record, days from the month."""
+    company = run.company
+    year, month = run.month.year, run.month.month
+    weekly_off = company.weekly_off
+    rows, totals = [], {f: ZERO for f in ATTENDANCE_DAY_FIELDS + ["working_days"]}
+    for line in _lines(run):
+        emp, snap = line.employee, line.emp_snapshot
+        working = engine.working_days_employed(year, month, emp.date_of_joining, emp.date_of_leaving, weekly_off)
+        row = {
+            "line": line, "code": line.code, "name": line.name, "designation": snap.get("designation", ""),
+            "doj": emp.date_of_joining, "pan": emp.pan or snap.get("pan", ""), "uan": emp.uan or snap.get("uan", ""),
+            "esi": emp.esic_ip_no or snap.get("esic_ip_no", ""), "working_days": working,
+            "days": [getattr(line, f) for f in ATTENDANCE_DAY_FIELDS],
+        }
+        rows.append(row)
+        totals["working_days"] += working
+        for f in ATTENDANCE_DAY_FIELDS:
+            totals[f] += getattr(line, f)
+    month_working = (rows[0]["line"].working_days if rows and rows[0]["line"].working_days is not None
+                     else engine.working_days(year, month, weekly_off))
+    return rows, totals, month_working
+
+
+@company_required
+def attendance(request, month):
+    run = _run(request, month)
+    rows, totals, month_working = _attendance(run)
+    return render(request, "reports/attendance.html", {
+        "title": _("Attendance Register — %(month)s — %(company)s") % {"month": run.label,
+                                                                       "company": run.company.trade_name},
+        "run": run, "company": run.company, "rows": rows, "totals": totals,
+        "total_days": [totals[f] for f in ATTENDANCE_DAY_FIELDS], "month_working": month_working,
+        "days_in_month": engine.days_in_month(run.month.year, run.month.month), "today": timezone.localdate(),
+        "back_url": reverse("payroll:month", args=[run.month]), **_print_flags(run),
+    })
+
+
+@company_required
+def attendance_xlsx(request, month):
+    run = _run(request, month)
+    blocked = _files_need_final(request, run)
+    if blocked:
+        return blocked
+    rows, totals, _month_working = _attendance(run)
+    headers = ["Sl", "Emp No.", "Name", "Designation", "Date of Joining", "PAN", "UAN (PF No.)", "ESI No.",
+               "Working Days", "Present", "Paid Leave", "Weekly Off + Holidays", "LOP", "Paid Days", "OT Hours"]
+    data = [[i, r["code"], r["name"], r["designation"], r["doj"], r["pan"], r["uan"], r["esi"], r["working_days"]]
+            + [_n(v) for v in r["days"]] for i, r in enumerate(rows, start=1)]
+    total_row = ["", "", "Total", "", "", "", "", "", _n(totals["working_days"])] + [
+        _n(totals[f]) for f in ATTENDANCE_DAY_FIELDS]
+    wb = table_workbook(f"Attendance {month_short(run.month)}", headers, data, totals=total_row,
+                        widths={"Name": 24, "Designation": 18, "Date of Joining": 14, "PAN": 13, "UAN (PF No.)": 15,
+                                "ESI No.": 13, "Weekly Off + Holidays": 12})
+    ws = wb.active
+    for row in ws.iter_rows(min_row=2, max_row=len(data) + 1):
+        row[4].number_format = "DD-MM-YYYY"
+        for cell in row[5:8]:
+            cell.number_format = "@"  # keep PAN, UAN and ESI numbers exactly as written
+    return xlsx_response(wb, f"{run.company.code}_attendance_{run.month:%Y-%m}.xlsx")
+
+
 # ---------------------------------------------------------------- paying the salary
-@owner_required
+@company_required
 def bank_sheet(request, month):
     run = _run(request, month)
     blocked = _files_need_final(request, run)
@@ -253,7 +319,7 @@ def bank_sheet(request, month):
     return xlsx_response(wb, f"{run.company.code}_bank_{run.month:%Y-%m}.xlsx")
 
 
-@owner_required
+@company_required
 def cash_list(request, month):
     run = _run(request, month)
     lines = [l for l in _lines(run) if l.emp_snapshot.get("payment_mode") in ("Cash", "Cheque")]
@@ -266,7 +332,7 @@ def cash_list(request, month):
 
 
 # ---------------------------------------------------------------- government files
-@owner_required
+@company_required
 def ecr(request, month):
     run = _run(request, month)
     blocked = _files_need_final(request, run)
@@ -299,7 +365,7 @@ def _esi_rows(lines):
     return rows
 
 
-@owner_required
+@company_required
 def esi_file(request, month):
     run = _run(request, month)
     blocked = _files_need_final(request, run)
@@ -316,13 +382,14 @@ def esi_file(request, month):
 
 # ---------------------------------------------------------------- reports list
 MONTH_REPORTS = {
-    "payslips": "reports:payslips", "register": "reports:register", "bank_sheet": "reports:bank_sheet",
+    "payslips": "reports:payslips", "register": "reports:register", "attendance": "reports:attendance",
+    "payments": "payroll:payments", "bank_sheet": "reports:bank_sheet",
     "cash_list": "reports:cash_list", "ecr": "reports:ecr", "esi_file": "reports:esi_file",
     "pf": "reports:pf", "esi": "reports:esi", "pt": "reports:pt",
 }
 
 
-@owner_required
+@company_required
 def index(request):
     company = request.company
     go = request.GET.get("go")
@@ -331,14 +398,14 @@ def index(request):
         if month is None:
             raise Http404
         return redirect(MONTH_REPORTS[go], month=month)
-    if go == "tds":
+    if go in ("tds", "annual"):
         try:
             year = int(request.GET.get("tax_year", ""))
         except ValueError:
             raise Http404
         if not 2000 <= year <= 2098:
             raise Http404
-        return redirect("reports:tds", tax_year=year)
+        return redirect(f"reports:{go}", tax_year=year)
     if go == "cost":
         month = _month_param(request.GET.get("month"))
         url = reverse("reports:cost")
@@ -356,7 +423,7 @@ def index(request):
 
 
 # ---------------------------------------------------------------- PF / ESI / PT statements
-@owner_required
+@company_required
 def pf(request, month):
     run = _run(request, month)
     lines = queries.pf_lines(run, _lines(run))
@@ -390,7 +457,7 @@ def pf(request, month):
     )
 
 
-@owner_required
+@company_required
 def esi(request, month):
     run = _run(request, month)
     all_lines = _lines(run)
@@ -415,7 +482,7 @@ def esi(request, month):
     )
 
 
-@owner_required
+@company_required
 def pt(request, month):
     run = _run(request, month)
     lines = _lines(run)
@@ -444,7 +511,7 @@ def pt(request, month):
 
 
 # ---------------------------------------------------------------- TDS (tax year)
-@owner_required
+@company_required
 def tds(request, tax_year):
     company = request.company
     start = date(tax_year, 4, 1)
@@ -494,7 +561,7 @@ def tds(request, tax_year):
 
 
 # ---------------------------------------------------------------- cost
-@owner_required
+@company_required
 def cost(request):
     company = request.company
     view = request.GET.get("view") if request.GET.get("view") in queries.COST_VIEWS else "net"
@@ -545,7 +612,7 @@ def cost(request):
 
 
 # ---------------------------------------------------------------- advances register
-@owner_required
+@company_required
 def advances(request):
     company = request.company
     items = list(
@@ -582,7 +649,7 @@ def advances(request):
 
 
 # ---------------------------------------------------------------- joiners and leavers
-@owner_required
+@company_required
 def joiners_leavers(request):
     company = request.company
     start, end = _date_range(request)
@@ -606,7 +673,7 @@ def joiners_leavers(request):
 
 
 # ---------------------------------------------------------------- increments
-@owner_required
+@company_required
 def increments(request):
     company = request.company
     start, end = _date_range(request)

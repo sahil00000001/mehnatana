@@ -24,7 +24,7 @@ from core.validators import (
 from core.forms import MAX_AMOUNT
 
 from .builders import EMPLOYEES, MONTHLY, OPENING
-from .columns import CHOICES, EMPLOYEE_COLUMNS, MONTHLY_COLUMNS, OPENING_COLUMNS, header_of
+from .columns import CHOICES, EMPLOYEE_COLUMNS, MONTHLY_COLUMNS, MONTHLY_READ_ONLY, OPENING_COLUMNS, header_of
 
 TEMPLATE_NAMES = {
     EMPLOYEES: "employee list",
@@ -297,7 +297,7 @@ def parse_monthly(data, ctx):
             return {}, [], file_errors
         ws = wb.worksheets[0]
         # Every column of our sheet must be there: a deleted column would silently become 0.
-        index = header_index(ws, MONTHLY_COLUMNS, must=[c[0] for c in MONTHLY_COLUMNS if c[0] not in ("name", "designation")])
+        index = header_index(ws, MONTHLY_COLUMNS, must=[c[0] for c in MONTHLY_COLUMNS if c[0] not in MONTHLY_READ_ONLY])
         expected = {e.emp_code.upper(): e for e in ctx.employees}
         known = {c.upper() for c in Employee.objects.filter(company=ctx.company).values_list("emp_code", flat=True)}
         rows, errors, seen, blank_days = {}, [], {}, []
@@ -335,7 +335,8 @@ def parse_monthly(data, ctx):
                     bad = True
             if bad:
                 continue
-            if all(parsed[k] is None for k in ("present", "paid_leave", "week_off_holiday", "lop")):
+            # Weekly offs come filled in, so a row is empty when nothing else is written.
+            if all(parsed[k] is None for k in ("present", "paid_leave", "lop")):
                 blank_days.append(number)
                 err("present", _("The days are empty. Write the days present, paid leave and weekly offs "
                                  "(write 0 in Days Present if the person did not work at all)."))

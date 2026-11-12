@@ -3,14 +3,15 @@
 <table class="ledger form">
   <tbody>
     <tr><td><a href="{% url 'companies:company' %}">{% translate "Company details" %}</a></td><td>{% translate "Name, address, logo, PF/ESIC codes, LIN and who signs." %}</td></tr>
-    <tr><td><a href="{% url 'companies:payroll' %}">{% translate "Payroll rules" %}</a></td><td>{% translate "PF, ESI, professional tax, income tax and overtime settings." %}</td></tr>
+    <tr><td><a href="{% url 'companies:payroll' %}">{% translate "Payroll rules" %}</a></td><td>{% translate "Working days (weekly offs), PF, ESI, professional tax, income tax and overtime settings." %}</td></tr>
     <tr><td><a href="{% url 'companies:payslip_design' %}">{% translate "Payslip design" %}</a></td><td>{% translate "Choose one of three payslip designs and what they show." %}</td></tr>
     <tr><td><a href="{% url 'companies:opening_balances' %}">{% translate "Opening balances" %}</a></td><td>{% translate "Pay and tax before you started using the app (for TDS)." %}</td></tr>
     <tr><td><a href="{% url 'employees:departments' %}">{% translate "Departments" %}</a></td><td>{% translate "Store, Accounts, Delivery…" %}</td></tr>
     <tr><td><a href="{% url 'employees:designations' %}">{% translate "Designations" %}</a></td><td>{% translate "Job titles like Helper or Cashier." %}</td></tr>
     <tr><td><a href="{% url 'letters:index' %}">{% translate "Letter texts" %}</a></td><td>{% translate "Default words of appointment, relieving and experience letters." %}</td></tr>
-    <tr><td><a href="{% url 'password_change' %}">{% translate "Change password" %}</a></td><td>{% translate "Choose a new password for this login." %}</td></tr>
+    <tr><td><a href="{% url 'password_change' %}">{% translate "Change password" %}</a></td><td>{% translate "Choose a new password for this login (the same login opens every company)." %}</td></tr>
+    {% if user.is_staff %}<tr><td><a href="{% url 'admin:index' %}">{% translate "Rates and tax tables" %}</a></td><td>{% translate "PF and ESI rates, professional tax and income tax slabs, due dates. Shared by every company; change only when the law changes." %}</td></tr>{% endif %}
   </tbody>
 </table>
-<p class="muted">{% blocktranslate with code=request.company.code start=request.company.payroll_start_month|month_label %}Company code: {{ code }}. First salary month in the app: {{ start }}.{% endblocktranslate %}</p>
+<p class="muted">{% blocktranslate with code=request.company.code start=request.company.payroll_start_month|month_label week=request.company.working_week_label %}Company code: {{ code }}. First salary month in the app: {{ start }}. Working week: {{ week }}.{% endblocktranslate %}</p>
 {% endblock %}

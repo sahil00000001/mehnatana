@@ -124,6 +124,7 @@ def engine_settings(company):
         ot_multiplier=D(company.ot_multiplier),
         ot_days_divisor=D(company.ot_days_divisor),
         ot_hours_per_day=D(company.ot_hours_per_day),
+        weekly_off=company.weekly_off,
     )
 
 
@@ -401,6 +402,7 @@ def fill_line(line, ctx, emp, row, result, used, warnings):
     line.employee = emp
     line.emp_snapshot = employee_snapshot(emp)
     line.days_in_month = engine.days_in_month(ctx.month.year, ctx.month.month)
+    line.working_days = engine.working_days(ctx.month.year, ctx.month.month, ctx.settings.weekly_off)
     line.present, line.paid_leave, line.week_off_holiday = row.present, row.paid_leave, row.week_off_holiday
     line.lop_days = row.lop
     line.ot_hours, line.ot_amount_override = row.ot_hours, row.ot_amount

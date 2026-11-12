@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<p>{% blocktranslate with paid=totals.paid_count count=totals.count %}{{ paid }} of {{ count }} people are marked as paid.{% endblocktranslate %}
+  {% if totals.pending %}<strong>{% blocktranslate with amount=totals.pending|inr %}₹{{ amount }} is still to be paid.{% endblocktranslate %}</strong>{% else %}<strong>{% translate "Everyone is paid." %}</strong>{% endif %}</p>
+<form method="post" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  <div class="table-wrap">
+  <table class="ledger">
+    <thead><tr>
+      <th><input type="checkbox" class="js-only" data-tick-all="line" aria-label="{% translate 'Tick everyone' %}" title="{% translate 'Tick everyone' %}"></th>
+      <th>{% translate "Emp No." %}</th><th>{% translate "Name" %}</th><th>{% translate "Paid by" %}</th>
+      <th class="num">{% translate "Net pay ₹" %}</th><th class="num">{% translate "Paid ₹" %}</th><th>{% translate "Paid on" %}</th><th>{% translate "Status" %}</th>
+    </tr></thead>
+    <tbody>
+    {% for l in lines %}
+      <tr>
+        <td><input type="checkbox" name="line" value="{{ l.pk }}" id="line{{ l.pk }}"></td>
+        <td><label for="line{{ l.pk }}">{{ l.code }}</label></td><td><label for="line{{ l.pk }}">{{ l.name }}</label></td>
+        <td>{{ l.emp_snapshot.payment_mode|title }}</td>
+        <td class="num">{{ l.net_pay|inr }}</td><td class="num">{{ l.paid_amount|inr }}</td>
+        <td>{% if l.paid_on %}{{ l.paid_on|dmy }}{% else %}—{% endif %}</td>
+        <td>{% if l.is_paid %}<span class="badge badge-final">{% translate "Paid" %}</span>{% elif l.paid_on %}<span class="badge badge-draft">{% blocktranslate with amount=l.pending|inr %}₹{{ amount }} still due{% endblocktranslate %}</span>{% else %}<span class="badge badge-draft">{% translate "Pending" %}</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td></td><td></td><td>{% translate "Total" %}</td><td></td>
+      <td class="num">{{ totals.net|inr }}</td><td class="num">{{ totals.paid|inr }}</td><td></td>
+      <td>{% if totals.pending %}{% blocktranslate with amount=totals.pending|inr %}₹{{ amount }} pending{% endblocktranslate %}{% else %}{% translate "All paid" %}{% endif %}</td></tr></tfoot>
+  </table>
+  </div>
+  <div class="box inline-fields">
+    {% include "includes/field.html" with field=form.paid_on %}
+    <button type="submit" class="btn btn-primary" name="action" value="paid">{% translate "Mark ticked as paid" %}</button>
+    <button type="submit" class="btn" name="action" value="unpaid">{% translate "Mark ticked as not paid" %}</button>
+  </div>
+</form>
+<p><a href="{% url 'payroll:month' run.month %}">{% blocktranslate with month=run.label %}Back to {{ month }}{% endblocktranslate %}</a></p>
+{% endblock %}

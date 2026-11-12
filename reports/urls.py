@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import annual, views
 
 app_name = "reports"
 
@@ -10,6 +10,8 @@ urlpatterns = [
     path("salary/<ym:month>/payslip/<int:line_id>/", views.payslip, name="payslip"),
     path("salary/<ym:month>/register/", views.register, name="register"),
     path("salary/<ym:month>/register.xlsx", views.register_xlsx, name="register_xlsx"),
+    path("salary/<ym:month>/attendance/", views.attendance, name="attendance"),
+    path("salary/<ym:month>/attendance.xlsx", views.attendance_xlsx, name="attendance_xlsx"),
     path("salary/<ym:month>/bank-sheet.xlsx", views.bank_sheet, name="bank_sheet"),
     path("salary/<ym:month>/cash-list/", views.cash_list, name="cash_list"),
     path("salary/<ym:month>/ecr.txt", views.ecr, name="ecr"),
@@ -21,6 +23,7 @@ urlpatterns = [
     path("reports/esi/<ym:month>/", views.esi, name="esi"),
     path("reports/pt/<ym:month>/", views.pt, name="pt"),
     path("reports/tds/<ty:tax_year>/", views.tds, name="tds"),
+    path("reports/annual/<ty:tax_year>/", annual.annual, name="annual"),
     path("reports/advances/", views.advances, name="advances"),
     path("reports/joiners-leavers/", views.joiners_leavers, name="joiners_leavers"),
     path("reports/increments/", views.increments, name="increments"),

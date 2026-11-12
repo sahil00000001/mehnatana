@@ -1,6 +1,10 @@
 {% extends "base.html" %}{% load i18n %}
 {% block content %}
 <dl class="qa">
+  <dt id="companies">{% translate "How do I work on another company?" %}</dt>
+  {% url 'portal:list' as companies_url %}
+  <dd>{% blocktranslate %}One login opens every company. Press <strong>Change company</strong> at the top (or <a href="{{ companies_url }}">All companies</a> in the menu), then <strong>Open</strong> next to the company. Everything you do after that is for that company only. <strong>Add a company</strong> is on the same page.{% endblocktranslate %}</dd>
+
   <dt id="monthly">{% translate "How do I pay this month's salary?" %}</dt>
   {% url 'payroll:months' as months_url %}
   <dd>{% blocktranslate %}Open <a href="{{ months_url }}">Monthly Salary</a> and the month. Download the sheet, fill days and amounts in Excel, upload it, check the table and press Finalise. Then print payslips and download the bank, PF and ESI files.{% endblocktranslate %}</dd>
@@ -9,7 +13,8 @@
   <dd>
     <ul>
       <li><strong>{% translate "Days Present" %}</strong> — {% translate "days the person came to work (half days like 25.5 are fine)." %}</li>
-      <li><strong>{% translate "Paid Leave Days" %}</strong> — {% translate "leave with pay." %} <strong>{% translate "Weekly Off + Holidays" %}</strong> — {% translate "paid weekly offs and holidays." %}</li>
+      <li><strong>{% translate "Paid Leave Days" %}</strong> — {% translate "leave with pay." %} <strong>{% translate "Weekly Off + Holidays" %}</strong> — {% translate "paid weekly offs and holidays. The weekly offs of the month are already filled in; add paid holidays." %}</li>
+      <li><strong>{% translate "Working Days, PAN, UAN, ESI No., Date of Joining" %}</strong> — {% translate "filled in from your records, for reading only. Working days = days employed minus the weekly offs set in Settings → Payroll rules." %}</li>
       <li><strong>{% translate "Absent / LOP Days" %}</strong> — {% translate "days without pay. Leave it empty and it is worked out." %}</li>
       <li><strong>{% translate "OT Hours / OT Amount" %}</strong> — {% translate "overtime. Hours are paid at twice the ordinary rate; a filled amount is used instead." %}</li>
       <li><strong>{% translate "Incentive / Bonus" %}</strong> — {% translate "one-time extra pay." %} <strong>{% translate "Increment" %}</strong> — {% translate "a raise added to Basic from this month." %}</li>
@@ -22,7 +27,7 @@
   <dd>{% translate "The Notices page lists what needs doing soon: PF, ESI, TDS and professional tax due dates, salary to pay, staff leaving or finishing probation, and records to complete. When something is due within a few days, a yellow strip appears on every page and the menu shows a number next to Notices." %}</dd>
 
   <dt>{% translate "What is LOP?" %}</dt>
-  <dd>{% translate "Loss of pay: days not worked and not paid. Salary is cut by monthly salary ÷ days in the month for each LOP day." %}</dd>
+  <dd>{% translate "Loss of pay: days not worked and not paid. Salary is cut by monthly salary ÷ days in the month for each LOP day, or ÷ the working days of that month if Settings → Payroll rules says so." %}</dd>
 
   <dt>{% translate "Why is PF only on ₹25,000?" %}</dt>
   <dd>{% translate "From October 2026 the PF wage ceiling is ₹25,000 (it was ₹15,000). PF is worked out on wages up to the ceiling, unless you choose otherwise in Payroll rules." %}</dd>

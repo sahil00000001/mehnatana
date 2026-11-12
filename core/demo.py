@@ -3,13 +3,11 @@ Demo data (README §16): Shri Ram Kirana Stores (SRKS, Bengaluru) and
 Annapurna Sweets (ANPS, Pune), each with a draft November 2026 salary month.
 Used by `python manage.py seed_demo` and by the tests.
 """
-import secrets
 from datetime import date
 from decimal import Decimal as D
 
 from django.db import transaction
 
-from accounts.models import User
 from advances.models import Advance, AdvanceRecovery
 from companies.models import Company
 from core.models import AuditLog, StoredFile
@@ -59,11 +57,6 @@ ANPS_STAFF = [
     ("A002", "Rahul", "More", "M", date(1996, 9, 3), date(2024, 1, 15), "Counter Salesman", "Counter", None,
      "Father", "Prakash More", (9500, 0, 0, 0, 0), {}, dict(present=26, week_off_holiday=4)),
 ]
-
-
-def _password():
-    alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    return "".join(secrets.choice(alphabet) for _ in range(12))
 
 
 def _staff(company, rows, uan_prefix, esi_prefix, esi_covered, pf_on):
@@ -123,12 +116,11 @@ def demo_companies():
 
 
 @transaction.atomic
-def create_demo(password=None):
-    """Create both demo companies. Returns {code: (company, owner user, password)}.
+def create_demo():
+    """Create both demo companies with staff and a draft November 2026. Returns {code: company}.
 
-    With `password`, both owners get it; otherwise each gets a random one.
+    There are no business logins: the one login opens every company.
     """
-    result = {}
     srks = Company.objects.create(
         code="SRKS", legal_name="Shri Ram Kirana Stores", trade_name="Shri Ram Kirana Stores",
         address_line1="12, Main Road, Jayanagar", city="Bengaluru", state="KA", pincode="560041",
@@ -156,15 +148,9 @@ def create_demo(password=None):
     )
     anps_people = _staff(anps, ANPS_STAFF, "", "22345678", {"A001", "A002"}, pf_on=False)
 
-    for company, mobile in ((srks, "9876500001"), (anps, "9876500002")):
-        owner_password = password or _password()
-        user = User.objects.create_user(username=mobile, password=owner_password, company=company,
-                                        first_name="Owner", last_name=company.code)
-        result[company.code] = (company, user, owner_password)
-
-    service.save_inputs(srks, NOV_2026, _inputs(SRKS_STAFF, srks_people), result["SRKS"][1])
-    service.save_inputs(anps, NOV_2026, _inputs(ANPS_STAFF, anps_people), result["ANPS"][1])
-    return result
+    service.save_inputs(srks, NOV_2026, _inputs(SRKS_STAFF, srks_people), None)
+    service.save_inputs(anps, NOV_2026, _inputs(ANPS_STAFF, anps_people), None)
+    return {"SRKS": srks, "ANPS": anps}
 
 
 @transaction.atomic
@@ -183,7 +169,6 @@ def delete_company(company):
     Department.objects.filter(company=company).delete()
     Designation.objects.filter(company=company).delete()
     AuditLog.objects.filter(company=company).delete()
-    User.objects.filter(company=company).delete()
     StoredFile.objects.filter(name__startswith=f"private/uploads/{company.code}/").delete()
     if company.logo:
         company.logo.delete(save=False)

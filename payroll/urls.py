@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import payments, views
 
 app_name = "payroll"
 
@@ -14,4 +14,5 @@ urlpatterns = [
     path("<ym:month>/finalise/", views.finalise, name="finalise"),
     path("<ym:month>/reopen/", views.reopen, name="reopen"),
     path("<ym:month>/export.xlsx", views.export, name="export"),
+    path("<ym:month>/payments/", payments.payments, name="payments"),
 ]

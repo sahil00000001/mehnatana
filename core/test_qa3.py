@@ -126,7 +126,8 @@ class ShopWithoutPfTest(DemoTestCase):
     """ANPS has no PF: no PF buttons, no rows of PF zeros, no stray separators."""
 
     def setUp(self):
-        self.client.force_login(self.anps_user)
+        super().setUp()
+        self.open_company(self.anps)
         self.finalise_november(self.anps)
 
     def test_reports_and_home(self):

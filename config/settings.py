@@ -1,5 +1,5 @@
 """
-Settings for Mehnatana.
+Settings for PayCore (payroll and salary management).
 
 Everything that differs between computers (passwords, hosts, the database)
 is read from the environment / the .env file. See .env.example.
@@ -33,8 +33,8 @@ def env_list(name, default=""):
 
 # ------------------------------------------------------------ product name
 # To rename the product change APP_NAME here (or in .env). It is not written anywhere else.
-APP_NAME = env("APP_NAME", "Mehnatana")
-APP_TAGLINE = env("APP_TAGLINE", "Har mehnat ka pakka hisaab.")
+APP_NAME = env("APP_NAME", "PayCore")
+APP_TAGLINE = env("APP_TAGLINE", "Payroll and salary management")
 SUPPORT_PHONE = env("SUPPORT_PHONE", "+91 98765 43210")
 SUPPORT_EMAIL = env("SUPPORT_EMAIL", "")
 
@@ -104,7 +104,7 @@ TEMPLATES = [
 # No database settings -> SQLite file (local development).
 # DATABASE_URL or POSTGRES_HOST -> PostgreSQL (Supabase or any other server).
 # All tables live in their own schema (POSTGRES_SCHEMA, default "mehnatana") and
-# every Mehnatana table name starts with "mtn_", so nothing mixes with other tables.
+# every table name of this app starts with "mtn_", so nothing mixes with other tables.
 DB_SCHEMA = env("POSTGRES_SCHEMA", "mehnatana")
 
 
@@ -165,7 +165,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = ["accounts.backends.LockoutBackend"]
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "home"
+LOGIN_REDIRECT_URL = "portal:list"
 LOGOUT_REDIRECT_URL = "login"
 LOGIN_MAX_FAILURES = 5
 LOGIN_LOCK_MINUTES = 15

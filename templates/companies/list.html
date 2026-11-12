@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+<div class="actions">
+  <a class="btn btn-primary" href="{% url 'portal:add' %}">{% translate "Add a company" %}</a>
+  {% if user.is_staff %}<a href="{% url 'admin:index' %}">{% translate "Rates and tax tables (for all companies)" %}</a>{% endif %}
+</div>
+
+{% if active %}
+<div class="table-wrap">
+<table class="ledger">
+  <thead><tr>
+    <th class="num">{% translate "Sl." %}</th><th>{% translate "Company" %}</th><th>{% translate "Code" %}</th><th>{% translate "City" %}</th>
+    <th>{% translate "Working week" %}</th><th class="num">{% translate "Staff" %}</th><th>{% translate "Latest salary month" %}</th>
+    <th class="num">{% translate "Notices" %}</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for row in active %}{% with c=row.company %}
+    <tr class="company-row{% if row.current %} current{% endif %}">
+      <td class="num">{{ forloop.counter }}</td>
+      <td><strong>{{ c.trade_name }}</strong>{% if c.legal_name != c.trade_name %}<br><span class="muted">{{ c.legal_name }}</span>{% endif %}{% if row.current %}<br><em>{% translate "Open now" %}</em>{% endif %}</td>
+      <td>{{ c.code }}</td>
+      <td>{{ c.city }}, {{ c.state_name }}</td>
+      <td>{{ c.working_week_label }}</td>
+      <td class="num">{{ row.staff }}</td>
+      <td>{% if row.latest %}{{ row.latest.label }} <span class="badge {% if row.latest.is_final %}badge-final{% else %}badge-draft{% endif %}">{{ row.latest.get_status_display }}</span>{% else %}<span class="muted">{% blocktranslate with month=c.payroll_start_month|month_label %}None yet (starts {{ month }}){% endblocktranslate %}</span>{% endif %}</td>
+      <td class="num">{% if row.attention %}<strong>{{ row.attention }}</strong>{% else %}0{% endif %}</td>
+      <td>
+        <form method="post" action="{% url 'portal:open' c.pk %}" class="inline">{% csrf_token %}
+          {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+          <button type="submit" class="btn btn-primary btn-small">{% translate "Open" %}</button></form>
+        <form method="post" action="{% url 'portal:switch' c.pk %}" class="inline" data-confirm="{% blocktranslate with name=c.trade_name %}Switch off {{ name }}? Its records are kept and it can be switched on again.{% endblocktranslate %}">{% csrf_token %}
+          <button type="submit" class="link-button">{% translate "Switch off" %}</button></form>
+      </td>
+    </tr>
+  {% endwith %}{% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="msg msg-info">{% translate "There are no companies yet. Press Add a company to start." %}</p>
+{% endif %}
+
+{% if switched_off %}
+<h2>{% translate "Switched off" %}</h2>
+<p class="muted">{% translate "These companies are kept with all their records, but cannot be opened until they are switched on." %}</p>
+<table class="ledger">
+  <tbody>
+  {% for row in switched_off %}
+    <tr><td>{{ row.company.trade_name }} ({{ row.company.code }})</td><td>{{ row.company.city }}</td>
+      <td><form method="post" action="{% url 'portal:switch' row.company.pk %}" class="inline">{% csrf_token %}
+        <button type="submit" class="btn btn-small">{% translate "Switch on" %}</button></form></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

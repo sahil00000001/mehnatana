@@ -1,0 +1,35 @@
+{% extends "base.html" %}{% load i18n %}
+{% block content %}
+<form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  <fieldset><legend>{% translate "Name and address" %}</legend>
+    {% include "includes/field.html" with field=form.code %}
+    {% include "includes/field.html" with field=form.trade_name %}{% include "includes/field.html" with field=form.legal_name %}
+    {% include "includes/field.html" with field=form.address_line1 %}{% include "includes/field.html" with field=form.address_line2 %}
+    {% include "includes/field.html" with field=form.city %}{% include "includes/field.html" with field=form.state %}
+    {% include "includes/field.html" with field=form.pincode %}{% include "includes/field.html" with field=form.phone %}
+    {% include "includes/field.html" with field=form.email %}
+  </fieldset>
+  <fieldset><legend>{% translate "Working days and salary" %}</legend>
+    {% include "includes/field.html" with field=form.payroll_start_month %}
+    {% include "includes/field.html" with field=form.weekly_off_days %}
+    {% include "includes/field.html" with field=form.salary_divisor %}
+  </fieldset>
+  <fieldset><legend>{% translate "PF, ESI and taxes" %}</legend>
+    {% include "includes/field.html" with field=form.pf_enabled %}{% include "includes/field.html" with field=form.esi_enabled %}
+    {% include "includes/field.html" with field=form.pt_enabled %}{% include "includes/field.html" with field=form.tds_enabled %}
+  </fieldset>
+  <fieldset><legend>{% translate "Registration numbers (can be filled later)" %}</legend>
+    {% include "includes/field.html" with field=form.pan %}{% include "includes/field.html" with field=form.tan %}
+    {% include "includes/field.html" with field=form.gstin %}{% include "includes/field.html" with field=form.pf_establishment_code %}
+    {% include "includes/field.html" with field=form.esic_employer_code %}{% include "includes/field.html" with field=form.lin %}
+    {% include "includes/field.html" with field=form.pt_registration_no %}
+  </fieldset>
+  <fieldset><legend>{% translate "Who signs payslips and letters" %}</legend>
+    {% include "includes/field.html" with field=form.signatory_name %}{% include "includes/field.html" with field=form.signatory_designation %}
+  </fieldset>
+  <div class="actions"><button type="submit" class="btn btn-primary">{% translate "Save" %}</button>
+    <a href="{% url 'portal:list' %}">{% translate "Go back" %}</a></div>
+</form>
+{% endblock %}

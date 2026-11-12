@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 
 from core.formatting import indian_format, month_label
-from core.tenancy import company_get, owner_required, page
+from core.tenancy import company_get, company_required, page
 from excel_io import builders
 from excel_io.common import as_number, table_workbook, xlsx_response
 from excel_io.errors import forget_failed_upload, marked_file_response, remember_failed_upload
@@ -14,6 +14,7 @@ from excel_io.parsers import SheetError, parse_monthly, read_upload
 from statutory.rates import MissingRate
 
 from . import service
+from .payments import payment_totals
 from .forms import LineForm, ReopenForm, UploadForm
 from .models import PayrollLine, PayrollRun
 from .warnings import message_for
@@ -33,7 +34,7 @@ def _note_texts(line):
     return [str(message_for(code)) for code in line.warnings]
 
 
-@owner_required
+@company_required
 def months(request):
     rows = []
     for month, run in service.month_rows(request.company):
@@ -63,12 +64,13 @@ def _month_context(request, month, run, **extra):
         "is_final": bool(run and run.is_final), "upload_form": UploadForm(),
         "finalise_blockers": service.finalise_blockers(run) if run and has_lines and not run.is_final else [],
         "can_reopen": bool(run and run.is_final and not service.reopen_blockers(run)),
+        "payment": payment_totals(lines) if run and run.is_final and lines and not only_notes else None,
     }
     context.update(extra)
     return context
 
 
-@owner_required
+@company_required
 def month_page(request, month):
     run = _check_month(request, month)
     context = _month_context(request, month, run)
@@ -76,7 +78,7 @@ def month_page(request, month):
                 _("Follow the five steps in order. Each step has one button."), **context)
 
 
-@owner_required
+@company_required
 def sheet(request, month):
     _check_month(request, month)
     company = request.company
@@ -94,7 +96,7 @@ def sheet(request, month):
     return xlsx_response(builders.monthly_workbook(ctx, existing), f"{company.code}_salary_{month:%Y-%m}.xlsx")
 
 
-@owner_required
+@company_required
 def upload(request, month):
     run = _check_month(request, month)
     if request.method != "POST":
@@ -138,14 +140,14 @@ def upload(request, month):
     return redirect(reverse("payroll:month", args=[month]) + "#review")
 
 
-@owner_required
+@company_required
 def errors_file(request, month):
     _check_month(request, month)
     return marked_file_response(request, _kind(month),
                                 f"{request.company.code}_salary_{month:%Y-%m}_mistakes.xlsx")
 
 
-@owner_required
+@company_required
 def line_edit(request, month, line_id):
     run = _check_month(request, month)
     if run is None:
@@ -179,7 +181,7 @@ def line_edit(request, month, line_id):
                 _("Change the numbers and press Save. The salary is worked out again."), form=form, line=line, run=run)
 
 
-@owner_required
+@company_required
 def finalise(request, month):
     run = _check_month(request, month)
     if run is None or not run.lines.exists():
@@ -206,7 +208,7 @@ def finalise(request, month):
                 run=run, totals=run.totals(), blockers=blockers)
 
 
-@owner_required
+@company_required
 def reopen(request, month):
     run = _check_month(request, month)
     if run is None:
@@ -231,7 +233,7 @@ REVIEW_HEADERS = ["Emp Code", "Name", "Paid days", "LOP", "Gross", "PF (emp)", "
 REVIEW_MONEY = REVIEW_HEADERS[4:15]
 
 
-@owner_required
+@company_required
 def export(request, month):
     run = _check_month(request, month)
     if run is None or not run.lines.exists():

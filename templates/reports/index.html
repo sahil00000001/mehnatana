@@ -13,6 +13,8 @@
   <div class="actions">
     <button class="btn" name="go" value="payslips">{% translate "Payslips" %}</button>
     <button class="btn" name="go" value="register">{% translate "Salary register" %}</button>
+    <button class="btn" name="go" value="attendance">{% translate "Attendance register" %}</button>
+    <button class="btn" name="go" value="payments">{% translate "Salary payments (paid / pending)" %}</button>
     <button class="btn" name="go" value="bank_sheet">{% translate "Bank transfer sheet (Excel)" %}</button>
     <button class="btn" name="go" value="cash_list">{% translate "Cash payment list" %}</button>
   </div>
@@ -32,16 +34,18 @@
 {% endif %}
 
 <form method="get" class="box">
-  <h2>{% translate "Income tax (TDS)" %}</h2>
+  <h2>{% translate "Yearly reports" %}</h2>
   <div class="inline-fields">
     <div class="field">
-      <label for="id_tax_year">{% translate "Tax year" %}</label>
+      <label for="id_tax_year">{% translate "Financial year (April to March)" %}</label>
       <select name="tax_year" id="id_tax_year">
         {% for y in tax_years %}<option value="{{ y }}"{% if y == default_tax_year %} selected{% endif %}>{{ y|tax_year_label }}</option>{% endfor %}
       </select>
     </div>
+    <button class="btn" name="go" value="annual">{% translate "Annual salary report" %}</button>
     <button class="btn" name="go" value="tds">{% translate "TDS for the tax year" %}</button>
   </div>
+  <div class="help">{% translate "Annual salary report: salary payable, paid and pending for each employee, month by month, with attendance and working days." %}</div>
 </form>
 
 <div class="box">

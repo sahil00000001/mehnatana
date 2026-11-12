@@ -34,7 +34,16 @@ def table_workbook(sheet_title, headers, rows, money_columns=(), totals=None, wi
     totals: list of values for the totals row (same length as headers), or None.
     """
     wb = Workbook()
-    ws = wb.active
+    fill_table(wb.active, sheet_title, headers, rows, money_columns, totals, widths)
+    return wb
+
+
+def add_table_sheet(wb, sheet_title, headers, rows, money_columns=(), totals=None, widths=None):
+    """One more sheet in the same plain look as table_workbook."""
+    return fill_table(wb.create_sheet(), sheet_title, headers, rows, money_columns, totals, widths)
+
+
+def fill_table(ws, sheet_title, headers, rows, money_columns=(), totals=None, widths=None):
     ws.title = sheet_title[:31]
     style_header(ws, headers, widths)
     money_idx = {i for i, h in enumerate(headers, start=1) if h in set(money_columns)}
@@ -51,7 +60,7 @@ def table_workbook(sheet_title, headers, rows, money_columns=(), totals=None, wi
             cell.border = DOUBLE_TOP
             if c in money_idx:
                 cell.number_format = MONEY_FORMAT
-    return wb
+    return ws
 
 
 def neutralise_formulas(wb):

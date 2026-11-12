@@ -14,7 +14,7 @@ from django.utils.translation import ngettext
 from advances.models import Advance
 from core.audit import audit, diff, snapshot
 from core.formatting import add_months, fmt_date, indian_format, month_label, month_start, plain_number
-from core.tenancy import company_get, owner_required, page
+from core.tenancy import company_get, company_required, page
 from excel_io import builders
 from excel_io.common import xlsx_response
 from excel_io.errors import (
@@ -71,7 +71,7 @@ def _fix_filters(company):
 
 
 # ---------------------------------------------------------------- list
-@owner_required
+@company_required
 def employee_list(request):
     company = request.company
     qs = _employees(request).prefetch_related("revisions")
@@ -116,7 +116,7 @@ def employee_list(request):
 
 
 # ---------------------------------------------------------------- add / edit
-@owner_required
+@company_required
 def employee_add(request):
     company = request.company
     initial = {"emp_code": next_emp_code(company), "pf_member": company.pf_enabled,
@@ -150,7 +150,7 @@ def employee_add(request):
                 _("Fill this form and press Save. Fields with * must be filled."), form=form, adding=True)
 
 
-@owner_required
+@company_required
 def employee_edit(request, pk):
     emp = company_get(request, _employees(request), pk=pk)
     before = snapshot(emp)
@@ -171,7 +171,7 @@ def employee_edit(request, pk):
 
 
 # ---------------------------------------------------------------- view page
-@owner_required
+@company_required
 def employee_detail(request, pk):
     emp = company_get(request, _employees(request).prefetch_related("revisions"), pk=pk)
     revisions = list(emp.revisions.select_related("payroll_run").order_by("-effective_from", "-id"))
@@ -190,7 +190,7 @@ def employee_detail(request, pk):
 
 
 # ---------------------------------------------------------------- relieve
-@owner_required
+@company_required
 def relieve(request, pk):
     emp = company_get(request, _employees(request), pk=pk)
     if emp.status == Employee.Status.RELIEVED:
@@ -235,7 +235,7 @@ def relieve(request, pk):
                 _("Fill the last working day and the reason, then press Relieve."), form=form, emp=emp)
 
 
-@owner_required
+@company_required
 def undo_relieve(request, pk):
     emp = company_get(request, _employees(request), pk=pk)
     if emp.status != Employee.Status.RELIEVED:
@@ -257,7 +257,7 @@ def undo_relieve(request, pk):
 
 
 # ---------------------------------------------------------------- revise salary
-@owner_required
+@company_required
 def revise_salary(request, pk):
     emp = company_get(request, _employees(request).prefetch_related("revisions"), pk=pk)
     company = request.company
@@ -289,7 +289,7 @@ def revise_salary(request, pk):
 
 
 # ---------------------------------------------------------------- organisation chart
-@owner_required
+@company_required
 def organisation(request):
     people = list(_employees(request).filter(status=Employee.Status.ACTIVE).order_by("emp_code"))
     ids = {p.pk for p in people}
@@ -346,37 +346,37 @@ def _name_edit(request, model, pk, back):
                 form=form, back=back)
 
 
-@owner_required
+@company_required
 def departments(request):
     return _names_page(request, Department, _("Departments"),
                        _("Type a new department and press Add. Departments are never deleted."), "employees:departments",
                        "employees:department_edit")
 
 
-@owner_required
+@company_required
 def department_edit(request, pk):
     return _name_edit(request, Department, pk, "employees:departments")
 
 
-@owner_required
+@company_required
 def designations(request):
     return _names_page(request, Designation, _("Designations"),
                        _("Type a new designation (job title) and press Add."), "employees:designations",
                        "employees:designation_edit")
 
 
-@owner_required
+@company_required
 def designation_edit(request, pk):
     return _name_edit(request, Designation, pk, "employees:designations")
 
 
 # ---------------------------------------------------------------- Excel
-@owner_required
+@company_required
 def upload_sample(request):
     return xlsx_response(builders.employee_workbook(request.company), "employees_sample.xlsx")
 
 
-@owner_required
+@company_required
 def export(request):
     employees = _employees(request).prefetch_related("revisions").order_by("emp_code")
     return xlsx_response(builders.employee_workbook(request.company, employees),
@@ -436,7 +436,7 @@ def _finish_upload(request, rows, change_salaries_from=None):
     return redirect("employees:list")
 
 
-@owner_required
+@company_required
 def upload(request):
     company = request.company
     form = UploadForm(request.POST or None, request.FILES or None)
@@ -467,7 +467,7 @@ def upload(request):
     return page(request, "employees/upload.html", UPLOAD_TITLE, UPLOAD_INSTRUCTION, form=form)
 
 
-@owner_required
+@company_required
 def upload_confirm(request):
     """The owner's one answer about salary changes: change them (from a month) or keep the old ones."""
     if request.method != "POST":
@@ -498,6 +498,6 @@ def upload_confirm(request):
         return _upload_failed(request, form, data, exc.errors, [])
 
 
-@owner_required
+@company_required
 def upload_errors(request):
     return marked_file_response(request, UPLOAD_KIND, "employees_mistakes.xlsx")

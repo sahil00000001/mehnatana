@@ -166,13 +166,22 @@ def monthly_workbook(ctx, existing_lines=None):
     ws.title = month_label(ctx.month)[:31]
     headers = [c[1] for c in MONTHLY_COLUMNS]
     style_header(ws, headers, _widths(MONTHLY_COLUMNS))
-    dim = engine.days_in_month(ctx.month.year, ctx.month.month)
+    year, month = ctx.month.year, ctx.month.month
+    dim = engine.days_in_month(year, month)
+    weekly_off = ctx.company.weekly_off
     existing_lines = existing_lines or {}
     for r, emp in enumerate(ctx.employees, start=2):
         line = existing_lines.get(emp.pk)
+        start, end = engine.employed_span(year, month, emp.date_of_joining, emp.date_of_leaving)
+        offs = engine.weekly_offs_between(start, end, weekly_off) if start else 0
         values = {
             "emp_code": emp.emp_code, "name": emp.full_name,
-            "designation": emp.designation.name if emp.designation_id else "", "days_in_month": dim,
+            "designation": emp.designation.name if emp.designation_id else "",
+            "doj": emp.date_of_joining, "pan": emp.pan, "uan": emp.uan, "esic_ip_no": emp.esic_ip_no,
+            "days_in_month": dim,
+            "working_days": engine.working_days_employed(year, month, emp.date_of_joining, emp.date_of_leaving,
+                                                         weekly_off),
+            "week_off_holiday": offs or None,
             "advance": as_number(ctx.suggested_advance(emp)) or None,
         }
         if line is not None:
@@ -205,8 +214,9 @@ def monthly_sample_workbook(ctx):
     headers = [c[1] for c in MONTHLY_COLUMNS]
     style_header(ws, headers, _widths(MONTHLY_COLUMNS))
     dim = engine.days_in_month(ctx.month.year, ctx.month.month)
+    offs = engine.weekly_offs_between(ctx.month, ctx.month.replace(day=dim), ctx.company.weekly_off)
     example = {"emp_code": "EXAMPLE", "name": "Ramesh Kumar", "designation": "Helper", "days_in_month": dim,
-               "present": dim - 5, "paid_leave": 1, "week_off_holiday": 4, "ot_hours": 10, "increment": 500,
+               "working_days": dim - offs, "present": dim - offs - 1, "paid_leave": 1, "week_off_holiday": offs, "ot_hours": 10, "increment": 500,
                "advance": 1000, "remarks": "Example row — not read"}
     for c, (key, *_rest) in enumerate(MONTHLY_COLUMNS, start=1):
         ws.cell(row=2, column=c, value=example.get(key))

@@ -334,13 +334,12 @@ class SimpleUseTest(DemoTestCase):
         self.assertContains(response, "This UAN already belongs to Sunita Devi (E002).")
 
     def test_first_day_shows_start_here(self):
-        from accounts.models import User
         from companies.models import Company
 
         shop = Company.objects.create(code="NEWS", legal_name="New Shop", trade_name="New Shop",
                                       address_line1="1 Road", city="Pune", state="MH", pincode="411001",
                                       payroll_start_month=NOV)
-        self.client.force_login(User.objects.create_user(username="9000000001", password="x-pass-123", company=shop))
+        self.open_company(shop)
         self.assertContains(self.client.get(reverse("home")), "Start here: add your employees")
         page = self.client.get(reverse("payroll:month", args=[NOV]))
         self.assertContains(page, "No one is paid in November 2026 yet. Add your employees first")

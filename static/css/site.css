@@ -1,4 +1,4 @@
-/* Mehnatana — one plain stylesheet. A neat ledger (bahi-khata): paper, ink, maroon rules. */
+/* PayCore — one plain stylesheet. A neat ledger (bahi-khata): paper, ink, maroon rules. */
 
 :root {
   --paper: #FFFDF5;
@@ -74,6 +74,11 @@ html:not(.js) .js-only { display: none !important; }
 .band-right { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
 .company-name { font-weight: bold; }
 .band .link-button { color: var(--paper); }
+.band .band-link { color: var(--paper); }
+div.week-days { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+div.week-days label { display: inline-flex; align-items: center; gap: 6px; font-weight: normal; margin: 0; }
+div.week-days input[type=checkbox] { width: 20px; height: 20px; min-width: 0; margin: 0; }
+.company-row.current td { background: var(--warn-bg); }
 
 .menu { padding-top: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--rule); line-height: 2; }
 .menu a { color: var(--ink); text-decoration: none; padding: 2px 2px; white-space: nowrap; }

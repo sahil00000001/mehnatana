@@ -8,12 +8,12 @@ from django.utils.translation import gettext_lazy
 
 from core.audit import audit
 
-from .forms import OwnerLoginForm
+from .forms import LoginForm
 
 
 class LoginView(auth_views.LoginView):
     template_name = "registration/login.html"
-    authentication_form = OwnerLoginForm
+    authentication_form = LoginForm
     redirect_authenticated_user = True
     extra_context = {"title": gettext_lazy("Login"),
                      "instruction": gettext_lazy("Type your username and password, then press Login.")}

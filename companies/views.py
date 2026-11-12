@@ -9,7 +9,7 @@ from django.utils.translation import gettext as _
 
 from core.audit import audit, diff, snapshot
 from core.formatting import month_label, tax_year_label, tax_year_of
-from core.tenancy import company_get, owner_required, page
+from core.tenancy import company_get, company_required, page
 from employees.models import Employee, OpeningBalance
 from excel_io import builders
 from excel_io.common import xlsx_response
@@ -26,12 +26,12 @@ OPENING_KIND = "opening"
 OPENING_FIELDS = ["ytd_gross", "ytd_tds", "ytd_pt", "prev_employer_income", "prev_employer_tds"]
 
 
-@owner_required
+@company_required
 def settings_index(request):
     return page(request, "companies/index.html", _("Settings"), _("Choose what you want to change."))
 
 
-@owner_required
+@company_required
 def company_details(request):
     company = request.company
     before = snapshot(company)
@@ -52,7 +52,7 @@ def _recalculate_drafts(request, company):
                          % {"month": label, "problem": problem})
 
 
-@owner_required
+@company_required
 def payroll_rules(request):
     company = request.company
     before = snapshot(company)
@@ -61,7 +61,7 @@ def payroll_rules(request):
     state = (request.POST.get("pt_state") if request.method == "POST" else None) or company.pt_state or company.state
     if not has_pt_slabs(state, timezone.localdate()):
         pt_warning = _("No professional tax slabs are set for your state, so PT will be 0. Many states (like Delhi) "
-                       "have no professional tax. If yours has, ask your administrator to add the slabs.")
+                       "have no professional tax. If yours has, add the slabs in Rates and tax tables (on All companies).")
     form = PayrollRulesForm(request.POST or None, instance=company, start_locked=started, pt_warning=pt_warning)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
@@ -74,7 +74,7 @@ def payroll_rules(request):
                 _("Each rule has a short explanation. Change what is needed and press Save."), form=form)
 
 
-@owner_required
+@company_required
 def payslip_design(request):
     from reports import payslip as designs
 
@@ -112,7 +112,7 @@ def _opening_upload_form(*args):
     return form
 
 
-@owner_required
+@company_required
 def opening_balances(request):
     company = request.company
     year = _tax_year(request)
@@ -129,7 +129,7 @@ def opening_balances(request):
                 upload_form=_opening_upload_form(), start_label=month_label(company.payroll_start_month))
 
 
-@owner_required
+@company_required
 def opening_balance_edit(request, emp_id):
     company = request.company
     emp = company_get(request, Employee, pk=emp_id)
@@ -152,7 +152,7 @@ def opening_balance_edit(request, emp_id):
                 _("Type the amounts and press Save. Leave a box empty for zero."), form=form, emp=emp, year=year)
 
 
-@owner_required
+@company_required
 def opening_sample(request):
     company = request.company
     year = _tax_year(request)
@@ -161,7 +161,7 @@ def opening_sample(request):
     return xlsx_response(builders.opening_workbook(company, employees, year, balances), "opening_balances_sample.xlsx")
 
 
-@owner_required
+@company_required
 def opening_upload(request):
     company = request.company
     if request.method != "POST":
@@ -197,6 +197,6 @@ def opening_upload(request):
                 file_errors=file_errors, errors_file=bool(data is not None and errors), year=year)
 
 
-@owner_required
+@company_required
 def opening_errors(request):
     return marked_file_response(request, OPENING_KIND, "opening_balances_mistakes.xlsx")

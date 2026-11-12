@@ -1,0 +1,39 @@
+{% extends "print_base.html" %}{% load i18n mtn %}
+{% block toolbar %}{% if run.is_final %}<a href="{% url 'reports:attendance_xlsx' run.month %}">{% translate "Download Excel" %}</a>{% endif %}{% endblock %}
+{% block content %}
+<div class="sheet landscape">
+  {% if draft %}<div class="watermark">{% translate "DRAFT — not final" %}</div>{% endif %}
+  <h1 class="doc-title">{{ title }}{% if revised %} <span class="revised">{% translate "Revised" %}</span>{% endif %}</h1>
+  <p class="lh-sub">{{ company.legal_name }}, {{ company.address }}{% if company.lin %} · LIN {{ company.lin }}{% endif %}</p>
+  <p class="lh-sub">{% blocktranslate with dim=days_in_month wd=month_working week=company.working_week_label %}Days in the month: {{ dim }} · Working days: {{ wd }} · {{ week }}{% endblocktranslate %}</p>
+  <table class="print small register">
+    <thead>
+      <tr><th>{% translate "Sl" %}</th><th>{% translate "Emp No." %}</th><th>{% translate "Name" %}</th><th>{% translate "Designation" %}</th>
+        <th>{% translate "Date of joining" %}</th><th>{% translate "PAN" %}</th><th>{% translate "UAN (PF No.)" %}</th><th>{% translate "ESI No." %}</th>
+        <th class="num">{% translate "Working days" %}</th><th class="num">{% translate "Present" %}</th><th class="num">{% translate "Paid leave" %}</th>
+        <th class="num">{% translate "Weekly off + holidays" %}</th><th class="num">{% translate "LOP" %}</th><th class="num">{% translate "Paid days" %}</th>
+        <th class="num">{% translate "OT hours" %}</th><th class="sign">{% translate "Signature / Thumb" %}</th></tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr><td>{{ forloop.counter }}</td><td>{{ row.code }}</td>
+        <td>{{ row.name }}{% if row.line.remarks %}<br><em>{{ row.line.remarks }}</em>{% endif %}</td>
+        <td>{{ row.designation }}</td><td>{{ row.doj|dmy }}</td>
+        <td>{{ row.pan|default:"—" }}</td><td>{{ row.uan|default:"—" }}</td><td>{{ row.esi|default:"—" }}</td>
+        <td class="num">{{ row.working_days }}</td>
+        {% for v in row.days %}<td class="num">{{ v|num }}</td>{% endfor %}
+        <td class="sign"></td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td></td><td></td><td>{% translate "Total" %}</td><td></td><td></td><td></td><td></td><td></td>
+        <td class="num">{{ totals.working_days|num }}</td>
+        {% for v in total_days %}<td class="num">{{ v|num }}</td>{% endfor %}<td></td></tr>
+    </tfoot>
+  </table>
+  <div class="register-foot">
+    <span>{% blocktranslate with date=today|dmy %}Prepared on {{ date }}{% endblocktranslate %} · {{ APP_NAME }}</span>
+    <span class="signature-line">{% translate "Signature of employer" %}</span>
+  </div>
+</div>
+{% endblock %}

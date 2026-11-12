@@ -1,9 +1,6 @@
 # Manual only (GitHub → Actions → Demo businesses → Run workflow):
 # create, reset or delete the two demo businesses (Shri Ram Kirana Stores and Annapurna Sweets)
-# on the live database. This repository is public, so no password is ever printed in the log:
-# - with a DEMO_PASSWORD secret, both demo owners get that password;
-# - without it, they get random passwords that are not shown. Give them one from
-#   /admin/ → Logins → tick 9876500001 and 9876500002 → Reset password.
+# on the live database. There are no business logins: the one login opens them from All companies.
 name: Demo businesses
 
 on:
@@ -36,13 +33,12 @@ jobs:
           DEBUG: "False"
           SECRET_KEY: demo-only-not-used-for-requests
           FILE_STORAGE: database
-          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
           ACTION: ${{ inputs.action }}
         run: |
           if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret is not set."; exit 1; fi
           case "$ACTION" in
-            create) python manage.py seed_demo --hide-passwords ;;
-            reset)  python manage.py seed_demo --reset --hide-passwords ;;
+            create) python manage.py seed_demo ;;
+            reset)  python manage.py seed_demo --reset ;;
             delete) python manage.py seed_demo --delete ;;
             *) echo "Unknown action: $ACTION"; exit 1 ;;
           esac

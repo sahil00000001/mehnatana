@@ -2,11 +2,14 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import IndianDatesMixin, whole_rupees
+from core.validators import upper_no_spaces
 
-from .models import Company, validate_logo
+from .models import WEEKDAYS, Company, validate_logo
 
 PAYROLL_HELP = {
-    "salary_divisor": _("Salary for absent days is cut as monthly salary ÷ this number of days. Most shops use days in the month."),
+    "salary_divisor": _("Salary for absent days is cut as monthly salary ÷ this number of days. With working days, "
+                        "February, March and April each use their own count (for a six-day week: days in the month "
+                        "minus Sundays)."),
     "pf_enabled": _("PF is compulsory once you have 20 or more workers (you may join earlier)."),
     "pf_employee_rate": _("Use 10% only if EPFO has notified your establishment for 10%."),
     "pf_restrict_to_ceiling": _("Usual practice: PF only on wages up to the ceiling (₹25,000 from October 2026)."),
@@ -23,6 +26,68 @@ PAYROLL_HELP = {
     "higher_wages_avenue": _("Printed in the appointment letter's particulars (how a person can earn more)."),
     "payroll_start_month": _("The first month you pay salary with this app. It can be changed only before the first upload."),
 }
+
+
+class WeeklyOffMixin:
+    """Weekly off days as tick boxes (stored as digits, Monday = 0). At least one working day."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["weekly_off_days"] = forms.MultipleChoiceField(
+            label=_("Weekly off days"), choices=WEEKDAYS, required=False,
+            widget=forms.CheckboxSelectMultiple(attrs={"class": "week-days"}),
+            help_text=_("Tick the days the business is closed. Six-day week (Monday to Saturday): tick only Sunday. "
+                        "Working days of each month are worked out from this."))
+        if not self.is_bound:
+            self.initial["weekly_off_days"] = list(self.instance.weekly_off_days if self.instance.pk
+                                                   else self.initial.get("weekly_off_days", "6"))
+
+    def clean_weekly_off_days(self):
+        days = sorted(set(self.cleaned_data.get("weekly_off_days") or []))
+        if len(days) >= 7:
+            raise forms.ValidationError(_("At least one day of the week must be a working day."))
+        return "".join(days)
+
+
+class CompanyCreateForm(WeeklyOffMixin, IndianDatesMixin, forms.ModelForm):
+    """All companies → Add a company. Everything else can be changed later in Settings."""
+
+    class Meta:
+        model = Company
+        fields = [
+            "code", "trade_name", "legal_name", "address_line1", "address_line2", "city", "state", "pincode",
+            "phone", "email", "pan", "tan", "gstin", "pf_establishment_code", "esic_employer_code", "lin",
+            "pt_registration_no", "signatory_name", "signatory_designation",
+            "payroll_start_month", "weekly_off_days", "salary_divisor", "pf_enabled", "esi_enabled", "pt_enabled",
+            "tds_enabled",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("initial", {}).update({"weekly_off_days": "6", "salary_divisor": Company.Divisor.WORKING})
+        super().__init__(*args, **kwargs)
+        for name in ("salary_divisor", "payroll_start_month", "pf_enabled", "esi_enabled", "pt_enabled",
+                     "tds_enabled"):
+            self.fields[name].help_text = PAYROLL_HELP[name]
+        self.fields["pt_enabled"].help_text = _("Professional tax is a state tax, worked out from the slabs of the "
+                                                "company's state.")
+        self.fields["code"].help_text = _("3 to 6 capital letters, like SRKS. Used in file names and letter numbers. "
+                                          "It cannot be changed later.")
+
+    def clean_code(self):
+        return upper_no_spaces(self.cleaned_data["code"])
+
+    def clean_pan(self):
+        return "".join(self.cleaned_data["pan"].split()).upper()
+
+    def clean_tan(self):
+        return "".join(self.cleaned_data["tan"].split()).upper()
+
+    def clean_gstin(self):
+        return "".join(self.cleaned_data["gstin"].split()).upper()
+
+    def clean_payroll_start_month(self):
+        value = self.cleaned_data["payroll_start_month"]
+        return value.replace(day=1) if value else value
 
 
 class CompanyDetailsForm(forms.ModelForm):
@@ -53,11 +118,11 @@ class CompanyDetailsForm(forms.ModelForm):
         return "".join(self.cleaned_data["gstin"].split()).upper()
 
 
-class PayrollRulesForm(IndianDatesMixin, forms.ModelForm):
+class PayrollRulesForm(WeeklyOffMixin, IndianDatesMixin, forms.ModelForm):
     class Meta:
         model = Company
         fields = [
-            "payroll_start_month", "salary_divisor", "pf_enabled", "pf_employee_rate", "pf_restrict_to_ceiling",
+            "payroll_start_month", "weekly_off_days", "salary_divisor", "pf_enabled", "pf_employee_rate", "pf_restrict_to_ceiling",
             "esi_enabled", "pt_enabled", "pt_state", "tds_enabled", "default_tax_regime", "ot_multiplier",
             "ot_days_divisor", "ot_hours_per_day", "notice_period_days", "probation_months", "higher_wages_avenue",
         ]

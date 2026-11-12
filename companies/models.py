@@ -23,6 +23,10 @@ def logo_path(instance, filename):
     return f"private/logos/{instance.code}/logo.{ext}"
 
 
+WEEKDAYS = [("0", _("Monday")), ("1", _("Tuesday")), ("2", _("Wednesday")), ("3", _("Thursday")),
+            ("4", _("Friday")), ("5", _("Saturday")), ("6", _("Sunday"))]
+
+
 def first_of_this_month():
     today = date.today()
     return date(today.year, today.month, 1)
@@ -30,6 +34,7 @@ def first_of_this_month():
 
 class Company(TimeStamped):
     class Divisor(models.TextChoices):
+        WORKING = "WORKING", _("Working days of the month (without weekly offs)")
         CALENDAR = "CALENDAR", _("Days in the month (28 to 31)")
         FIXED_30 = "FIXED_30", _("Always 30 days")
         FIXED_26 = "FIXED_26", _("Always 26 days")
@@ -72,9 +77,14 @@ class Company(TimeStamped):
                                       help_text=_("Person who signs payslips and letters."))
     signatory_designation = models.CharField(_("signatory designation"), max_length=120, blank=True)
     payroll_start_month = models.DateField(_("first salary month in this app"), default=first_of_this_month)
-    is_active = models.BooleanField(_("active"), default=True, help_text=_("Inactive companies cannot log in."))
+    is_active = models.BooleanField(_("active"), default=True,
+                                    help_text=_("A switched-off company is kept, but cannot be opened until it is switched on."))
 
-    # ---- payroll settings
+    # ---- working days and payroll settings
+    weekly_off_days = models.CharField(
+        _("weekly off days"), max_length=7, blank=True, default="6",
+        help_text=_("Days of the week the business is closed (0 = Monday … 6 = Sunday). "
+                    "Six-day week (Monday to Saturday): only Sunday."))
     salary_divisor = models.CharField(_("salary is divided by"), max_length=10, choices=Divisor.choices,
                                       default=Divisor.CALENDAR)
     pf_enabled = models.BooleanField(_("PF applies"), default=True)
@@ -136,6 +146,24 @@ class Company(TimeStamped):
         if self.payroll_start_month and self.payroll_start_month.day != 1:
             self.payroll_start_month = self.payroll_start_month.replace(day=1)
         super().save(*args, **kwargs)
+
+    @property
+    def weekly_off(self):
+        """Weekly off days as weekday numbers (Monday = 0), for example (6,) for a six-day week."""
+        return tuple(sorted({int(ch) for ch in self.weekly_off_days or "" if ch in "0123456"}))
+
+    @property
+    def working_week_label(self):
+        offs = self.weekly_off
+        if not offs:
+            return _("Seven days a week (no weekly off)")
+        if offs == (6,):
+            return _("Six days a week, Monday to Saturday (Sunday off)")
+        if offs == (5, 6):
+            return _("Five days a week, Monday to Friday (Saturday and Sunday off)")
+        names = dict(WEEKDAYS)
+        return _("%(n)s days a week (off: %(days)s)") % {
+            "n": 7 - len(offs), "days": ", ".join(str(names[str(d)]) for d in offs)}
 
     @property
     def address(self):

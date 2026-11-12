@@ -7,7 +7,7 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 
 from core.audit import audit
-from core.tenancy import company_get, owner_required, page
+from core.tenancy import company_get, company_required, page
 from employees.models import Employee
 
 from .defaults import DEFAULT_TEXT
@@ -40,7 +40,7 @@ def _employee(request, pk):
     return company_get(request, Employee.objects.select_related("designation", "department"), pk=pk)
 
 
-@owner_required
+@company_required
 def index(request):
     types = [{"slug": SLUG_OF[value], "label": label, "for_whom": FOR_WHOM[value]}
              for value, label in LetterType.choices]
@@ -50,7 +50,7 @@ def index(request):
                 types=types, letters=letters)
 
 
-@owner_required
+@company_required
 def new(request, letter_type):
     ltype = _letter_type(letter_type)
     company = request.company
@@ -98,7 +98,7 @@ def new(request, letter_type):
                 before_last_day=emp.date_of_leaving if early else None)
 
 
-@owner_required
+@company_required
 def detail(request, pk):
     letter = company_get(request, IssuedLetter.objects.select_related("employee"), pk=pk)
     two = request.GET.get("copies") == "2"
@@ -109,7 +109,7 @@ def detail(request, pk):
     })
 
 
-@owner_required
+@company_required
 def template_edit(request, letter_type):
     ltype = _letter_type(letter_type)
     template = get_template(request.company, ltype)

@@ -84,6 +84,8 @@ class PayrollLine(CompanyOwned):
 
     # ---- inputs (from the sheet)
     days_in_month = models.PositiveSmallIntegerField(default=30)
+    # Days in the month minus the company's weekly offs, when the month was worked out.
+    working_days = models.PositiveSmallIntegerField(null=True, blank=True)
     present = days()
     paid_leave = days()
     week_off_holiday = days()
@@ -140,6 +142,10 @@ class PayrollLine(CompanyOwned):
     warnings = models.JSONField(default=list, blank=True)
     engine_version = models.CharField(max_length=10, blank=True)
 
+    # ---- payment (marked on Salary payments after the month is finalised)
+    paid_amount = money()
+    paid_on = models.DateField(null=True, blank=True)
+
     class Meta:
         db_table = "mtn_payroll_line"
         ordering = ["employee__emp_code"]
@@ -163,6 +169,15 @@ class PayrollLine(CompanyOwned):
     @property
     def rate_gross(self):
         return self.rate_basic + self.rate_da + self.rate_allowances
+
+    @property
+    def pending(self):
+        """Net pay not yet marked as paid (never below zero)."""
+        return max(self.net_pay - self.paid_amount, Decimal("0"))
+
+    @property
+    def is_paid(self):
+        return self.paid_on is not None and self.pending == 0
 
     @property
     def employer_pf(self):

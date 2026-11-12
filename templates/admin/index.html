@@ -2,14 +2,12 @@
 {% block content %}
 <div class="module" style="padding: 12px 16px; margin-bottom: 20px; line-height: 1.6;">
   <h2 style="margin: -12px -16px 10px; padding: 8px 16px;">What to use here</h2>
-  <p><strong>To start a new business:</strong></p>
-  <ol>
-    <li><a href="{% url 'admin:companies_company_add' %}">Companies → Add</a>. Fill the boxes in the first part (code, names, address, state, PIN code) and the first salary month. Everything else can be left as it is and changed later.</li>
-    <li>In the Companies list, tick the business, choose <strong>Create owner login</strong> in the Action list and press Go. Copy the username and temporary password shown, and give them to the owner.</li>
-  </ol>
-  <p><strong>When an owner forgets the password or is locked out:</strong>
-    <a href="{% url 'admin:accounts_user_changelist' %}">Logins</a> → tick the login → <em>Reset password</em> or <em>Unlock</em>.</p>
-  <p><strong>Leave the rest alone:</strong> <em>Statutory tables</em> (PF and ESI rates, professional tax slabs, income tax slabs, due dates) are already filled in with the current government figures. Change them only when the law changes, by adding a new row from the date it applies. <em>Audit log</em> only shows a record of every change; nothing can be edited there.</p>
+  <p><strong>Companies, employees, salary and reports are not here.</strong> They are on the main site:
+    <a href="{% url 'portal:list' %}">All companies</a>. Add a company there, then press Open to work on it.</p>
+  <p><strong>Statutory tables</strong> (PF and ESI rates, professional tax slabs, income tax slabs, due dates) are
+    already filled in with the current government figures and are shared by every company. Change them only when the
+    law changes, by adding a new row from the date it applies. <em>Audit log</em> only shows a record of every change;
+    nothing can be edited there.</p>
 </div>
 {{ block.super }}
 {% endblock %}

@@ -11,7 +11,7 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 
 ## Code structure
 
-- Owner screens are function views with `@owner_required`. Every single-object fetch goes through `company_get()`, which always adds `company=request.company`. `CompanyScopedMixin` exists for class-based views; plain functions read more simply here.
+- Company screens are function views with `@company_required`. Every single-object fetch goes through `company_get()`, which always adds `company=request.company`. `CompanyScopedMixin` exists for class-based views; plain functions read more simply here.
 - `page()` renders every normal screen with its title and one-line instruction.
 
 ## Money and the engine
@@ -82,15 +82,50 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
   - Mobile numbers may be written with +91 or a leading 0.
 - **Excel downloads never contain live formulas.** Text that starts with "=" (in a name, a note and so on) is written as plain text.
 - **Logos are saved as .png or .jpg** according to the file's real content, not its name.
-- **Statutory table changes in the admin** are applied to every company's draft months at once. Admin edits to logins and bulk deletes are audit-logged. "Create owner login" finds a free username.
+- **Statutory table changes in the admin** are applied to every company's draft months at once. Admin edits and bulk deletes are audit-logged.
 - **Error pages.** A friendly page is shown for server errors and for an expired form (CSRF).
 
 ## Logins and admin
 
-- **Lockout everywhere.** The 5-wrong-passwords lockout sits in the authentication backend, so it also protects `/admin/`.
-- **Demo logins** created by `seed_demo` are not forced to change password, so the demo opens straight away. Logins made by the admin's "Create owner login" are forced to.
-- **Create owner login** uses the last 10 digits of the company's phone as the username, or the company code if there is no phone. The temporary password is shown once in the admin.
-- **Password-reset email** is offered only when `EMAIL_HOST` is set. Otherwise the page says to call the administrator.
+- **One login, many companies** (changed after the fourth review). The separate platform-admin and business-owner
+  logins were replaced by one login that sees every company. The company being worked on is chosen on **All
+  companies** and kept in the session (`core.tenancy.SESSION_COMPANY`); `TenantMiddleware` turns it into
+  `request.company`, so every existing screen and every `company_get()` check works unchanged. A screen opened with
+  no company chosen goes to All companies and comes back after **Open** (`?next=`, checked to be on this site).
+- **Old business logins** are switched off (not deleted) by migration `accounts 0002`, so the audit log keeps their
+  names. `User.company` and `User.role` were removed.
+- **Companies are added and switched off on the main site**, not in the admin. Switching off keeps every record and
+  closes the company if it was open.
+- **The admin screens** keep only the statutory tables and the read-only audit log, behind the same login: `/admin/login/`
+  redirects to the one login page. Companies, logins and groups are not registered there.
+- **Lockout everywhere.** The 5-wrong-passwords lockout sits in the authentication backend.
+- **Password-reset email** is offered only when `EMAIL_HOST` is set. Otherwise the page gives the help phone number.
+
+## Working days, attendance register and annual report
+
+- **Weekly off days per company** (`Company.weekly_off_days`, digits Monday = 0 … Sunday = 6; default Sunday = a
+  six-day week). At least one working day is required.
+- **Salary per working day** is a new choice of divisor (`WORKING`): absent days are cut at monthly salary ÷ (days in
+  the month − weekly offs), so each month has its own count. Days before joining or after leaving count only their
+  working days, whether or not the Sundays before joining were written as weekly offs. Existing companies keep their
+  divisor; a new company starts with working days. Engine version 1.1.
+- **The attendance sheet** fills in date of joining, PAN, UAN, ESI number and working days (grey, never read back, so
+  older sheets without them still upload) and pre-fills *Weekly Off + Holidays* with the weekly offs while employed.
+  Days present are never guessed. A row with only weekly offs is still "empty", so an untouched sheet is refused.
+- **Each salary line stores the month's working days** (`PayrollLine.working_days`); older lines were filled with
+  days minus Sundays by the migration.
+- **Attendance register** reads PAN, UAN, ESI and date of joining from the employee record (falling back to the
+  month's snapshot), so details added later appear without re-uploading. Excel only after finalising, like the
+  salary register.
+- **Salary payments** (`PayrollLine.paid_amount`, `paid_on`) can be marked only on finalised months and never change
+  the salary. Pending = net pay − paid.
+- **Annual salary report** covers April–March and includes draft months (marked), because their salary is payable
+  too. "TSI number" in the request was read as the UAN (PF number); ESI is shown separately.
+
+## Name
+
+- The product is called **PayCore** (`APP_NAME`). The database schema `mehnatana`, the `mtn_` table prefix, the
+  repository and the live address are unchanged, so nothing had to be moved.
 - **Language.** Only English is listed in `LANGUAGES`, and `LocaleMiddleware` is not on yet. Otherwise the Django admin would switch to Hindi from the browser language before our own strings are translated. All UI strings are wrapped in gettext and ready for Hindi.
 
 ## Settings
@@ -151,7 +186,7 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 - **Files.** Vercel has no lasting disk, so uploaded files are kept in the database (`FILE_STORAGE=database`, table `mtn_stored_file`). Static files are served by WhiteNoise straight from the app folders (`WHITENOISE_USE_FINDERS`), with no collectstatic step.
 - **Upload limit.** Vercel accepts requests up to 4.5 MB, so the upload limit there is 4 MB (`MAX_UPLOAD_MB`).
 - **Migrations** run in GitHub Actions after the tests pass, never on Vercel itself. Database credentials live only in GitHub secrets and Vercel environment variables, never in the repository.
-- **The platform admin login** is created once from secrets (`ensure_admin`) and is never changed by later deployments.
+- **The one login** is created once from secrets (`ensure_admin`) and is never changed by later deployments.
 
 ## Security and deployment
 

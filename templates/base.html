@@ -11,11 +11,12 @@
 <body>
 <header class="band">
   <div class="page band-inner">
-    <div><a class="app-name" href="{% url 'home' %}">{{ APP_NAME }}</a><span class="tagline">{{ APP_TAGLINE }}</span></div>
-    {% if request.company %}
+    <div><a class="app-name" href="{% if request.company %}{% url 'home' %}{% elif user.is_authenticated %}{% url 'portal:list' %}{% else %}{% url 'login' %}{% endif %}">{{ APP_NAME }}</a><span class="tagline">{{ APP_TAGLINE }}</span></div>
+    {% if user.is_authenticated %}
     <div class="band-right">
-      <span class="today">{{ today|date:"l, j F Y" }}</span>
-      <span class="company-name">{{ request.company.trade_name }}</span>
+      {% if today %}<span class="today">{{ today|date:"l, j F Y" }}</span>{% endif %}
+      {% if request.company %}<span class="company-name">{{ request.company.trade_name }}</span>
+      <a class="band-link" href="{% url 'portal:list' %}">{% translate "Change company" %}</a>{% endif %}
       <form method="post" action="{% url 'logout' %}" class="inline">{% csrf_token %}<button type="submit" class="link-button">{% translate "Logout" %}</button></form>
     </div>
     {% endif %}

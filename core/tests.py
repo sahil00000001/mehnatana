@@ -72,9 +72,9 @@ class IsolationTest(DemoTestCase):
         self.assertFalse(response.context["form"].fields["employee"].queryset.filter(company=self.anps).exists())
 
     def test_other_company_sheet_rejected(self):
-        self.client.force_login(self.anps_user)
+        self.open_company(self.anps)
         anps_sheet = self.client.get(reverse("payroll:sheet", args=[NOV])).content
-        self.client.force_login(self.srks_user)
+        self.open_company(self.srks)
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         response = self.client.post(reverse("payroll:upload", args=[NOV]),

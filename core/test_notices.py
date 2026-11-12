@@ -67,7 +67,8 @@ class NoticesTest(DemoTestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_menu_and_breadcrumbs(self):
-        response = self.client.get(reverse("employees:detail", args=[self.employee("E002").pk]))
+        with self.today_is(date(2026, 11, 5)):
+            response = self.client.get(reverse("employees:detail", args=[self.employee("E002").pk]))
         self.assertContains(response, 'class="crumbs no-print"')
         self.assertContains(response, ">Employees</a> › <span>Sunita Devi</span>")
         self.assertContains(response, "Thursday, 5 November 2026")

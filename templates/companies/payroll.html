@@ -3,8 +3,9 @@
 <form method="post" class="form" novalidate>
   {% csrf_token %}
   {% include "includes/form_errors.html" %}
-  <fieldset><legend>{% translate "Salary" %}</legend>
-    {% include "includes/field.html" with field=form.payroll_start_month %}{% include "includes/field.html" with field=form.salary_divisor %}
+  <fieldset><legend>{% translate "Working days and salary" %}</legend>
+    {% include "includes/field.html" with field=form.payroll_start_month %}{% include "includes/field.html" with field=form.weekly_off_days %}
+    {% include "includes/field.html" with field=form.salary_divisor %}
   </fieldset>
   <fieldset><legend>{% translate "Provident Fund (PF)" %}</legend>
     {% include "includes/field.html" with field=form.pf_enabled %}{% include "includes/field.html" with field=form.pf_employee_rate %}

@@ -8,14 +8,26 @@ MONTHLY_COLUMNS = [
     ("emp_code", "Emp Code", True, "text", "Do not change.", "इसे न बदलें।"),
     ("name", "Employee Name", False, "text", "For reading only.", "केवल पढ़ने के लिए।"),
     ("designation", "Designation", False, "text", "For reading only.", "केवल पढ़ने के लिए।"),
+    ("doj", "Date of Joining", False, "date", "From the employee record. For reading only.",
+     "कर्मचारी रिकॉर्ड से। केवल पढ़ने के लिए।"),
+    ("pan", "PAN", False, "text", "From the employee record. For reading only.", "कर्मचारी रिकॉर्ड से। केवल पढ़ने के लिए।"),
+    ("uan", "UAN (PF No.)", False, "text", "From the employee record. For reading only.",
+     "कर्मचारी रिकॉर्ड से। केवल पढ़ने के लिए।"),
+    ("esic_ip_no", "ESI No.", False, "text", "ESIC IP number from the employee record. For reading only.",
+     "कर्मचारी रिकॉर्ड से ESIC नंबर। केवल पढ़ने के लिए।"),
     ("days_in_month", "Days in Month", False, "number", "Days in this month. Do not change.",
      "महीने के कुल दिन। इसे न बदलें।"),
+    ("working_days", "Working Days", False, "number",
+     "Working days of this person this month: days employed minus the weekly offs set in Payroll rules. "
+     "For reading only.",
+     "इस महीने कर्मचारी के काम के दिन (साप्ताहिक छुट्टी घटाकर)। केवल पढ़ने के लिए।"),
     ("present", "Days Present", False, "days", "Days the person came to work. Half days allowed, like 25.5.",
      "काम पर आए दिन। आधा दिन भी लिख सकते हैं, जैसे 25.5।"),
     ("paid_leave", "Paid Leave Days", False, "days", "Leave with pay. Half days allowed.",
      "वेतन सहित छुट्टी के दिन। आधा दिन भी लिख सकते हैं।"),
-    ("week_off_holiday", "Weekly Off + Holidays", False, "days", "Paid weekly offs and paid holidays.",
-     "वेतन सहित साप्ताहिक छुट्टी और त्योहार की छुट्टी।"),
+    ("week_off_holiday", "Weekly Off + Holidays", False, "days",
+     "Paid weekly offs and paid holidays. The weekly offs of this month are already filled in; add paid holidays.",
+     "वेतन सहित साप्ताहिक छुट्टी और त्योहार की छुट्टी। साप्ताहिक छुट्टियाँ पहले से भरी हैं; त्योहार की छुट्टी जोड़ें।"),
     ("lop", "Absent / LOP Days", False, "days",
      "Days without pay. Leave empty and it is worked out: Days in Month minus the three columns before.",
      "बिना वेतन के दिन। खाली छोड़ें तो अपने आप गिना जाएगा।"),
@@ -42,7 +54,10 @@ MONTHLY_COLUMNS = [
     ("remarks", "Remarks", False, "text", "Any note. It is shown in the salary register.",
      "कोई टिप्पणी। वेतन रजिस्टर में दिखेगी।"),
 ]
-MONTHLY_PREFILLED_GREY = {"emp_code", "name", "designation", "days_in_month"}
+MONTHLY_PREFILLED_GREY = {"emp_code", "name", "designation", "doj", "pan", "uan", "esic_ip_no", "days_in_month",
+                          "working_days"}
+# Filled in from the records, never read back: a sheet without these columns still uploads.
+MONTHLY_READ_ONLY = {"name", "designation", "doj", "pan", "uan", "esic_ip_no", "working_days"}
 
 EMPLOYEE_COLUMNS = [
     ("emp_code", "Emp Code", True, "text", "A different code for each person, like E001.",

@@ -5,9 +5,9 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 
-class OwnerLoginForm(AuthenticationForm):
+class LoginForm(AuthenticationForm):
     username = forms.CharField(
-        label=_("Username (mobile number or email)"), max_length=150,
+        label=_("Username"), max_length=150,
         widget=forms.TextInput(attrs={"autofocus": True, "autocomplete": "username", "autocapitalize": "none"}),
     )
     password = forms.CharField(label=_("Password"), strip=False,
@@ -15,7 +15,7 @@ class OwnerLoginForm(AuthenticationForm):
 
     error_messages = {
         "invalid_login": _("The username or password is wrong. Please check and try again."),
-        "inactive": _("This login is switched off. Please call your administrator."),
+        "inactive": _("This login is switched off."),
     }
 
     def clean(self):
@@ -31,9 +31,3 @@ class OwnerLoginForm(AuthenticationForm):
                     code="locked",
                 )
             raise
-
-    def confirm_login_allowed(self, user):
-        super().confirm_login_allowed(user)
-        if not user.is_superuser and (user.company is None or not user.company.is_active):
-            raise ValidationError(_("This business account is switched off. Please call your administrator."),
-                                  code="company_inactive")

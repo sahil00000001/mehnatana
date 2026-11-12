@@ -238,7 +238,7 @@ class IsolationTest(DemoTestCase):
                 self.assertNotIn(b"2234567801", body)
 
     def test_anps_sees_own_figures(self):
-        self.client.force_login(self.anps_user)
+        self.open_company(self.anps)
         response = self.client.get(reverse("reports:register", args=[NOV]))
         self.assertContains(response, "Seema Patil")
         self.assertNotContains(response, "Sunita Devi")
@@ -304,12 +304,11 @@ class PayslipDesignTest(DemoTestCase):
         self.assertContains(self.slip(), "payslip modern")
 
     def test_preview_before_any_month_uses_sample(self):
-        from accounts.models import User
         from companies.models import Company
 
         shop = Company.objects.create(code="NEWS", legal_name="New Shop", trade_name="New Shop",
                                       address_line1="1 Road", city="Pune", state="MH", pincode="411001")
-        self.client.force_login(User.objects.create_user(username="9000000002", password="x-pass-123", company=shop))
+        self.open_company(shop)
         response = self.client.get(reverse("companies:payslip_design"))
         self.assertContains(response, "sample employee")
         self.assertContains(response, "Sunita Devi")

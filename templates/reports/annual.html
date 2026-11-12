@@ -1,0 +1,96 @@
+{% extends "base.html" %}{% load i18n mtn %}
+{% block content %}
+{% include "reports/_actions.html" with excel=True %}
+<p class="no-print">{% translate "Other financial years" %}:
+  {% for y in tax_years %}{% if y == tax_year %}<strong>{{ y|tax_year_label }}</strong>{% else %}<a href="{% url 'reports:annual' y %}">{{ y|tax_year_label }}</a>{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+
+{% if rows %}
+<div class="box">
+  <h2>{% blocktranslate with name=request.company.trade_name %}{{ name }} — whole year{% endblocktranslate %}</h2>
+  <table class="ledger form">
+    <tbody>
+      <tr><td>{% translate "Salary payable (in-hand, all months)" %}</td><td class="num"><strong>₹{{ totals.net_pay|inr }}</strong></td></tr>
+      <tr><td>{% translate "Paid to date" %}</td><td class="num">₹{{ totals.paid_amount|inr }}</td></tr>
+      <tr><td>{% translate "Pending" %}</td><td class="num"><strong>₹{{ totals.pending|inr }}</strong></td></tr>
+      <tr><td>{% translate "Gross salary" %}</td><td class="num">₹{{ totals.gross|inr }}</td></tr>
+      <tr><td>{% translate "Total cost to the company (with employer PF and ESI)" %}</td><td class="num">₹{{ totals.company_cost|inr }}</td></tr>
+      <tr><td>{% translate "Salary months in this year" %}</td><td class="num">{{ month_rows|length }}</td></tr>
+    </tbody>
+  </table>
+  {% if draft_months %}<p class="msg msg-warning">{% translate "Draft months are included and can still change:" %} {% for m in drafts %}{{ m|month_label }}{% if not forloop.last %}, {% endif %}{% endfor %}. {% translate "Their salary can be marked paid after finalising." %}</p>{% endif %}
+</div>
+
+<h2>{% translate "Each employee for the year" %}</h2>
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Emp No." %}</th><th>{% translate "Name" %}</th><th>{% translate "Date of joining" %}</th>
+    <th class="num">{% translate "Months" %}</th><th class="num">{% translate "Working days" %}</th><th class="num">{% translate "Present" %}</th>
+    <th class="num">{% translate "Paid days" %}</th><th class="num">{% translate "LOP" %}</th>
+    <th class="num">{% translate "Gross ₹" %}</th><th class="num">{% translate "Deductions ₹" %}</th><th class="num">{% translate "Net payable ₹" %}</th>
+    <th class="num">{% translate "Paid ₹" %}</th><th class="num">{% translate "Pending ₹" %}</th></tr></thead>
+  <tbody>
+  {% for p in rows %}
+    <tr><td>{{ p.code }}</td><td>{{ p.name }}</td><td>{{ p.doj|dmy }}</td><td class="num">{{ p.months_count }}</td>
+      <td class="num">{{ p.working_days }}</td><td class="num">{{ p.present|num }}</td><td class="num">{{ p.paid_days|num }}</td><td class="num">{{ p.lop|num }}</td>
+      <td class="num">{{ p.gross|inr }}</td><td class="num">{{ p.total_deductions|inr }}</td><td class="num"><strong>{{ p.net_pay|inr }}</strong></td>
+      <td class="num">{{ p.paid_amount|inr }}</td><td class="num">{% if p.pending %}<strong>{{ p.pending|inr }}</strong>{% else %}—{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td></td><td>{% translate "Total" %}</td><td></td><td></td><td class="num">{{ person_totals.working_days }}</td>
+    <td class="num">{{ person_totals.present|num }}</td><td class="num">{{ person_totals.paid_days|num }}</td><td class="num">{{ person_totals.lop|num }}</td>
+    <td class="num">{{ person_totals.gross|inr }}</td><td class="num">{{ person_totals.total_deductions|inr }}</td><td class="num">{{ person_totals.net_pay|inr }}</td>
+    <td class="num">{{ person_totals.paid_amount|inr }}</td><td class="num">{{ person_totals.pending|dash_inr }}</td></tr></tfoot>
+</table>
+</div>
+
+<h2>{% translate "Month by month" %}</h2>
+<form method="get" class="no-print inline-fields">
+  <div class="field"><label for="id_show">{% translate "Show" %}</label>
+    <select name="show" id="id_show" data-autosubmit>
+      {% for key, label in show_choices %}<option value="{{ key }}"{% if key == show %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></div>
+  <button type="submit" class="btn">{% translate "Show" %}</button>
+</form>
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Emp No." %}</th><th>{% translate "Name" %}</th>
+    {% for m in months %}<th class="num">{{ m|date:"M" }}{% if m in draft_months %}*{% endif %}</th>{% endfor %}
+    <th class="num">{% translate "Total" %}</th></tr></thead>
+  <tbody>
+  {% for p in rows %}
+    <tr><td>{{ p.code }}</td><td>{{ p.name }}</td>
+      {% for c in p.cells %}<td class="num">{% if c is None %}<span class="muted">·</span>{% elif show == "days" %}{{ c|num }}{% else %}{{ c|inr }}{% endif %}</td>{% endfor %}
+      <td class="num"><strong>{% if show == "days" %}{{ p.cells_total|num }}{% else %}{{ p.cells_total|inr }}{% endif %}</strong></td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td></td><td>{% translate "Total" %}</td>
+    {% for t in month_totals %}<td class="num">{% if show == "days" %}{{ t|num }}{% else %}{{ t|dash_inr }}{% endif %}</td>{% endfor %}
+    <td class="num">{% if show == "days" %}{{ month_totals_sum|num }}{% else %}{{ month_totals_sum|inr }}{% endif %}</td></tr></tfoot>
+</table>
+</div>
+<p class="muted small">{% translate "A dot means no salary in that month. * = draft month." %}</p>
+
+<h2>{% translate "Company month by month" %}</h2>
+<div class="table-wrap">
+<table class="ledger compact">
+  <thead><tr><th>{% translate "Month" %}</th><th class="num">{% translate "Staff" %}</th><th class="num">{% translate "Working days" %}</th>
+    <th class="num">{% translate "Gross ₹" %}</th><th class="num">{% translate "Deductions ₹" %}</th><th class="num">{% translate "Net payable ₹" %}</th>
+    <th class="num">{% translate "Paid ₹" %}</th><th class="num">{% translate "Pending ₹" %}</th><th class="num">{% translate "Company cost ₹" %}</th><th></th></tr></thead>
+  <tbody>
+  {% for r in month_rows %}
+    <tr><td><a href="{% url 'payroll:month' r.month %}">{{ r.month|month_label }}</a> <span class="badge {% if r.run.is_final %}badge-final{% else %}badge-draft{% endif %}">{{ r.run.get_status_display }}</span></td>
+      <td class="num">{{ r.staff }}</td><td class="num">{{ r.working_days }}</td>
+      <td class="num">{{ r.gross|inr }}</td><td class="num">{{ r.total_deductions|inr }}</td><td class="num">{{ r.net_pay|inr }}</td>
+      <td class="num">{{ r.paid_amount|inr }}</td><td class="num">{{ r.pending|dash_inr }}</td><td class="num">{{ r.company_cost|inr }}</td>
+      <td class="no-print">{% if r.run.is_final %}<a href="{% url 'payroll:payments' r.month %}">{% translate "Payments" %}</a>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr><td>{% translate "Total" %}</td><td></td><td class="num">{{ totals.working_days }}</td>
+    <td class="num">{{ totals.gross|inr }}</td><td class="num">{{ totals.total_deductions|inr }}</td><td class="num">{{ totals.net_pay|inr }}</td>
+    <td class="num">{{ totals.paid_amount|inr }}</td><td class="num">{{ totals.pending|dash_inr }}</td><td class="num">{{ totals.company_cost|inr }}</td><td></td></tr></tfoot>
+</table>
+</div>
+{% else %}
+<p class="muted">{% translate "No salary month in this financial year yet." %}</p>
+{% endif %}
+{% endblock %}

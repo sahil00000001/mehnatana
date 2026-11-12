@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import calendar
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal as D, ROUND_HALF_UP, ROUND_CEILING, ROUND_FLOOR
 from typing import Optional
 
-ENGINE_VERSION = "1.0"
+ENGINE_VERSION = "1.1"  # 1.1: salary per working day (weekly offs) as a divisor
 
 ZERO = D("0")
 HUNDRED = D("100")
@@ -66,7 +66,7 @@ class Rates:
 
 @dataclass
 class Settings:
-    salary_divisor: str = "CALENDAR"    # CALENDAR | FIXED_30 | FIXED_26
+    salary_divisor: str = "CALENDAR"    # CALENDAR | FIXED_30 | FIXED_26 | WORKING
     pf_enabled: bool = True
     pf_ee_rate: D = D("12")
     pf_restrict_to_ceiling: bool = True
@@ -77,6 +77,7 @@ class Settings:
     ot_multiplier: D = D("2")
     ot_days_divisor: D = D("26")
     ot_hours_per_day: D = D("8")
+    weekly_off: tuple = (6,)            # weekday numbers the business is closed (Monday = 0); (6,) = six-day week
 
 
 @dataclass
@@ -140,6 +141,40 @@ class YTD:
 # ---------------------------------------------------------------- helpers
 def days_in_month(y: int, m: int) -> int:
     return calendar.monthrange(y, m)[1]
+
+
+def weekly_offs_between(start: date, end: date, weekly_off) -> int:
+    """How many weekly off days fall from `start` to `end` (both included)."""
+    if end < start:
+        return 0
+    count = 0
+    for weekday in set(weekly_off):
+        first = start + timedelta(days=(weekday - start.weekday()) % 7)
+        if first <= end:
+            count += (end - first).days // 7 + 1
+    return count
+
+
+def working_days(y: int, m: int, weekly_off) -> int:
+    """Days in the month minus weekly offs: February, March and April each have their own count."""
+    dim = days_in_month(y, m)
+    return dim - weekly_offs_between(date(y, m, 1), date(y, m, dim), weekly_off)
+
+
+def employed_span(y: int, m: int, doj: date, dol: Optional[date]):
+    """First and last day of the month the person is employed (None, None if not at all)."""
+    first, last = date(y, m, 1), date(y, m, days_in_month(y, m))
+    start = max(first, doj)
+    end = min(last, dol) if dol else last
+    return (start, end) if start <= end else (None, None)
+
+
+def working_days_employed(y: int, m: int, doj: date, dol: Optional[date], weekly_off) -> int:
+    """Working days of the month on which the person was employed (joiners and leavers get fewer)."""
+    start, end = employed_span(y, m, doj, dol)
+    if start is None:
+        return 0
+    return (end - start).days + 1 - weekly_offs_between(start, end, weekly_off)
 
 
 def age_on(dob: date, on: date) -> int:
@@ -311,15 +346,26 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
         raise ValueError(f"{emp.code}: days do not add up to {dim}")
     L.lop = lop
     L.paid_days = D(dim) - lop
-    divisor = {"CALENDAR": D(dim), "FIXED_30": D(30), "FIXED_26": D(26)}[settings.salary_divisor]
-    factor = max(ZERO, 1 - lop / divisor)
 
-    # days outside employment are not NCP days for EPFO
+    # days outside employment (before joining, after leaving)
     not_employed = 0
     if emp.doj > month_start:
         not_employed += (emp.doj - month_start).days
     if emp.dol and emp.dol < month_end:
         not_employed += (month_end - emp.dol).days
+
+    if settings.salary_divisor == "WORKING":
+        # Salary per working day of this month. Unpaid days while employed are working days;
+        # before joining / after leaving only the working days count (weekly offs are not cut twice).
+        wd = working_days(year, month, settings.weekly_off)
+        outside = wd - working_days_employed(year, month, emp.doj, emp.dol, settings.weekly_off)
+        lop_working = min(D(wd), max(ZERO, lop - not_employed) + outside)
+        factor = max(ZERO, 1 - lop_working / D(wd)) if wd else ZERO
+    else:
+        divisor = {"CALENDAR": D(dim), "FIXED_30": D(30), "FIXED_26": D(26)}[settings.salary_divisor]
+        factor = max(ZERO, 1 - lop / divisor)
+
+    # days outside employment are not NCP days for EPFO
     L.ncp_days = int(max(ZERO, lop - not_employed).to_integral_value(rounding=ROUND_FLOOR))
 
     # 3. earnings

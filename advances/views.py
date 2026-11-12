@@ -11,7 +11,7 @@ from django.utils.translation import gettext as _
 
 from core.audit import audit
 from core.formatting import indian_format, month_end, month_label, month_start
-from core.tenancy import company_get, owner_required, page
+from core.tenancy import company_get, company_required, page
 from employees.models import Employee
 from payroll import service
 from payroll.models import PayrollLine, PayrollRun
@@ -46,7 +46,7 @@ def _advances(request):
             .annotate(recovered_sum=Coalesce(Sum("recoveries__amount"), Decimal("0"))))
 
 
-@owner_required
+@company_required
 def advance_list(request):
     qs = _advances(request).order_by("-date_given", "-id")
     status = request.GET.get("status", "OPEN")
@@ -68,7 +68,7 @@ def advance_list(request):
                 rows=rows, status=status, total=total, fix=fix, fix_label=fix_label)
 
 
-@owner_required
+@company_required
 def advance_add(request):
     initial = {"date_given": timezone.localdate()}
     if request.GET.get("employee", "").isdigit():
@@ -89,7 +89,7 @@ def advance_add(request):
                 _("Fill this form and press Save."), form=form)
 
 
-@owner_required
+@company_required
 def advance_detail(request, pk):
     adv = company_get(request, Advance.objects.select_related("employee"), pk=pk)
     form = InstalmentForm(request.POST or None, initial={"monthly_installment": adv.monthly_installment})

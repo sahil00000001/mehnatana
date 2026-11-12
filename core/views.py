@@ -1,10 +1,11 @@
 import mimetypes
 
+from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404
 from django.shortcuts import render
 from django.utils.translation import gettext as _
 
-from .tenancy import company_get, owner_required, page
+from .tenancy import company_get, company_required, page
 
 
 def not_found(request, exception=None):
@@ -30,7 +31,7 @@ def forbidden(request, exception=None):
     return render(request, "403.html", {"title": _("Not allowed")}, status=403)
 
 
-@owner_required
+@company_required
 def notices(request):
     from .notices import notices_for
 
@@ -46,7 +47,7 @@ def notices(request):
                 groups=[(title, rows) for title, rows in groups if rows])
 
 
-@owner_required
+@login_required
 def help_page(request):
     return page(request, "core/help.html", _("Help"),
                 _("Short answers to common questions. Call us if you are stuck."))
@@ -66,13 +67,13 @@ def _send_private_file(fieldfile, download_name=None):
     return response
 
 
-@owner_required
+@company_required
 def files_logo(request):
     """The company's own logo. Never served from a public URL."""
     return _send_private_file(request.company.logo)
 
 
-@owner_required
+@company_required
 def files_upload(request, run_id):
     """The monthly sheet that was uploaded for one of this company's months."""
     from payroll.models import PayrollRun

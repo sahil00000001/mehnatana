@@ -1,4 +1,7 @@
-# Running Mehnatana
+# Running PayCore
+
+PayCore (earlier called Mehnatana) is a payroll and salary app for many companies with one login. The
+database schema is still called `mehnatana` and the live address is unchanged.
 
 `README.md` is the product specification. This file explains how to run the app, connect it to Supabase, deploy it and back it up.
 
@@ -14,8 +17,8 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env          # then open .env and set DEBUG=True
 python manage.py migrate        # creates the tables and the statutory rates
-python manage.py seed_demo      # two demo businesses; prints their logins once
-python manage.py createsuperuser
+python manage.py seed_demo      # two demo businesses with staff and a draft November 2026
+python manage.py createsuperuser # the one login that opens every company
 python manage.py runserver
 ```
 
@@ -23,12 +26,14 @@ python manage.py runserver
 
 Then open:
 
-- http://127.0.0.1:8000/ to log in as a demo owner. Shri Ram Kirana Stores' login is printed by `seed_demo`.
-- http://127.0.0.1:8000/admin/ to log in as the platform admin.
+- http://127.0.0.1:8000/ and log in with the login made by `createsuperuser`. You land on **All companies**:
+  press **Open** on a company to work on it, or **Add a company**. **Change company** at the top goes back.
+- The government rate tables (PF/ESI rates, PT and income tax slabs, due dates) are under **All companies →
+  Rates and tax tables** (the `/admin/` screens), with the same login.
 
 If `DATABASE_URL` and `POSTGRES_HOST` are empty, the data is kept in a local `db.sqlite3` file.
 
-Run the tests (225 tests, including all README §17 numbers):
+Run the tests (256 tests, including all README §17 numbers):
 
 ```
 python manage.py test
@@ -49,7 +54,7 @@ The app connects straight to Supabase's PostgreSQL database, so it needs the **d
    POSTGRES_SCHEMA=mehnatana
    ```
    If the password contains `@`, `:`, `/` or `#`, write it URL-encoded: `@` becomes `%40`, `#` becomes `%23`.
-4. Create the tables, then a platform admin:
+4. Create the tables, then the one login:
    ```
    python manage.py migrate
    python manage.py createsuperuser
@@ -58,27 +63,47 @@ The app connects straight to Supabase's PostgreSQL database, so it needs the **d
 **How the tables stay separate from your other tables:**
 
 - Everything goes into its own schema, `mehnatana`, which is created automatically on the first connection.
-- Every Mehnatana table name also starts with `mtn_`.
+- Every table name of the app also starts with `mtn_`.
 - Nothing is created or changed in `public`, or in any other schema.
 - In the Supabase Table Editor, pick the `mehnatana` schema to see the tables.
 - **Do not** add `mehnatana` to *API → Exposed schemas*. Keeping it unexposed means the payroll data cannot be read through Supabase's REST API.
 
 **Demo businesses on the live site.** GitHub → Actions → *Demo businesses* → Run workflow, then choose
-`create`, `reset` or `delete`. It adds Shri Ram Kirana Stores (login `9876500001`) and Annapurna Sweets
-(login `9876500002`) with a draft November 2026. The repository is public, so the job never prints a password:
-give the two logins a password from `/admin/` → Logins → tick them → *Reset password*. Only businesses
+`create`, `reset` or `delete`. It adds Shri Ram Kirana Stores and Annapurna Sweets with a draft November
+2026; they are opened from All companies with the one login (there are no business logins). Only businesses
 whose LIN starts with `DEMO-LIN-` are ever reset or deleted, so a real business is never touched.
 Delete the demo businesses before real use.
 
-## 3. Starting a new business (platform admin)
+## 3. One login, many companies
 
-1. Go to `/admin/` → **Companies → Add**. Fill the code (3–6 capital letters), names, address and state, and the first salary month.
-2. Tick the company in the list, then choose the action **Create owner login**. The username and a temporary password are shown once; give them to the owner. The owner must choose a new password at the first login.
-3. The owner then works from Settings → Payroll rules, Employees → Upload from Excel, and Monthly Salary.
+There is one login for the whole portal; it sees every company. (The old separate admin and business logins
+were removed; business logins made before were switched off by migration `accounts 0002`.)
 
-To reset a forgotten password or unlock a login, open **Logins**, tick it, and use the action **Reset password** or **Unlock**.
+1. **All companies → Add a company.** Fill the code (3–6 capital letters), names, address and state, the first
+   salary month and the **weekly off days** (six-day week, Monday to Saturday: tick only Sunday). The new company
+   opens straight away.
+2. Then work as before: Employees → Upload from Excel, Monthly Salary (download the attendance sheet, upload it,
+   finalise), Reports. Everything is for the company shown at the top; **Change company** switches.
+3. **Switch off** on All companies hides a company without deleting anything; **Switch on** brings it back.
 
-Statutory rates, PT slabs, tax slabs and due dates are under **Statutory tables**. When the law changes, add a new row with its "effective from" date; do not edit the old row. Every admin change is written to the **Audit log**.
+**Working days.** Each company has its own weekly off days (Settings → Payroll rules). The attendance sheet fills
+in each person's working days and weekly offs for the month (joiners and leavers get only their days). With
+*Salary is divided by → Working days in the month*, absent days are cut at monthly salary ÷ that month's working
+days, so February, March and April each use their own count (for a six-day week in 2026: 24, 26 and 26).
+
+**Attendance register** (month page or Reports): employee number, PAN, UAN (PF No.), ESI number and date of joining
+from the employee records, with working days, present, leave, weekly offs, LOP and paid days. Print, or Excel after
+finalising.
+
+**Salary payments and the annual report.** After finalising a month, *Mark who has been paid* records who was paid
+and when. Reports → *Annual salary report* shows, for a financial year (April to March), salary payable, paid to date
+and pending per employee, attendance totals, a month-by-month breakdown and the company's consolidated figures; it
+downloads as an Excel file with one sheet per view.
+
+**Forgotten password or locked login** (5 wrong passwords lock it for 15 minutes): wait 15 minutes, or reset it on the
+server with `python manage.py changepassword <username>`.
+
+Statutory rates, PT slabs, tax slabs and due dates are under **Rates and tax tables**. When the law changes, add a new row with its "effective from" date; do not edit the old row. Every change is written to the **Audit log**.
 
 ## 4. Vercel (live now)
 
@@ -88,7 +113,7 @@ next to the Supabase database in `ap-south-1`).
 - **Deploys:** every push to `main` on GitHub deploys to production automatically (`vercel.json`).
 - **Database:** every push to `main` also runs the GitHub Actions job *Tests and database*
   (`.github/workflows/database.yml`): all tests on SQLite, then `migrate` on Supabase and, once, the
-  platform admin login (`ensure_admin`). It can also be started by hand: GitHub → Actions → Run workflow.
+  one login (`ensure_admin`). It can also be started by hand: GitHub → Actions → Run workflow.
 - **GitHub secrets:** `DATABASE_URL`, `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_PASSWORD`.
 - **Vercel environment variables (Production):** `DEBUG=False`, `SECRET_KEY`, `ALLOWED_HOSTS=.vercel.app`,
   `DATABASE_URL` (Supabase Session pooler), `POSTGRES_SCHEMA=mehnatana`, `CONN_MAX_AGE=0`,

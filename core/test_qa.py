@@ -279,7 +279,7 @@ class OddRequestsTest(DemoTestCase):
         self.assertEqual(IssuedLetter.objects.filter(company=self.srks).count(), 1)
 
     def test_no_pf_buttons_for_a_shop_without_pf(self):
-        self.client.force_login(self.anps_user)
+        self.open_company(self.anps)
         self.finalise_november(self.anps)
         page = self.client.get(reverse("payroll:month", args=[NOV]))
         self.assertNotContains(page, "PF statement")
@@ -308,20 +308,3 @@ class OddRequestsTest(DemoTestCase):
     def test_devanagari_name_as_per_uan(self):
         self.assertEqual(Employee.uan_name_from("रमेश कुमार"), "रमेश कुमार")
 
-    def test_owner_login_when_usernames_are_taken(self):
-        from accounts.models import User
-        from companies.admin import CompanyAdmin
-        from companies.models import Company
-        from django.contrib import admin as django_admin
-        from django.contrib.messages.storage.fallback import FallbackStorage
-        from django.test import RequestFactory
-
-        shop = Company.objects.create(code="TAKEN", legal_name="T", trade_name="T", address_line1="1", city="P",
-                                      state="MH", pincode="411001", phone="9876500001")
-        User.objects.create_user(username="taken", password="x-pass-123")
-        request = RequestFactory().post("/admin/")
-        request.user = User.objects.create_superuser("platform", password="admin-pass-1")
-        request.session = {}
-        request._messages = FallbackStorage(request)
-        CompanyAdmin(Company, django_admin.site).create_owner_login(request, Company.objects.filter(pk=shop.pk))
-        self.assertEqual(shop.users.get().username, "taken2")
