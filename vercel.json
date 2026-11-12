@@ -6,5 +6,5 @@
   "routes": [
     { "src": "/(.*)", "dest": "config/wsgi.py" }
   ],
-  "regions": ["bom1"]
+  "regions": ["hnd1"]
 }

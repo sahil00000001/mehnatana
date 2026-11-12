@@ -191,7 +191,9 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 
 ## Vercel deployment
 
-- **Region.** The app runs on Vercel in the Mumbai region (`bom1`), next to Supabase in `ap-south-1`.
+- **Region.** The app runs on Vercel in the Tokyo region (`hnd1`), next to the Supabase database in
+  `ap-northeast-1`. A page makes many small database calls, so the app must sit next to the database;
+  the one trip from the browser to Tokyo costs far less. (Until 12-11-2026 both were in Mumbai.)
 - **Database connections** go through the Supabase **Session pooler**, which works over IPv4. The direct `db.…` host is IPv6-only. Each request opens and closes its own connection (`CONN_MAX_AGE=0`), so serverless instances never hold pooler slots.
 - **Files.** Vercel has no lasting disk, so uploaded files are kept in the database (`FILE_STORAGE=database`, table `mtn_stored_file`). Static files are served by WhiteNoise straight from the app folders (`WHITENOISE_USE_FINDERS`), with no collectstatic step.
 - **Upload limit.** Vercel accepts requests up to 4.5 MB, so the upload limit there is 4 MB (`MAX_UPLOAD_MB`).

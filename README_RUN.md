@@ -107,8 +107,9 @@ Statutory rates, PT slabs, tax slabs and due dates are under **Rates and tax tab
 
 ## 4. Vercel (live now)
 
-The app runs at **https://mehnatana.vercel.app** (Vercel project `mehnatana`, region Mumbai `bom1`,
-next to the Supabase database in `ap-south-1`).
+The app runs at **https://mehnatana.vercel.app** (Vercel project `mehnatana`, region Tokyo `hnd1`,
+next to the Supabase database in `ap-northeast-1`). If the database ever moves to another region, move
+`regions` in `vercel.json` with it.
 
 - **Deploys:** every push to `main` on GitHub deploys to production automatically (`vercel.json`).
 - **Database:** every push to `main` also runs the GitHub Actions job *Tests and database*
