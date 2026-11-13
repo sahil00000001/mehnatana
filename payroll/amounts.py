@@ -1,9 +1,9 @@
-"""Gross salaries page (company setting 'Gross salary split' on), filled from the owner's monthly list.
+"""Take-home page (Payroll rules: take-home matching on), filled from the owner's monthly list.
 
-For each person: the paid days and the gross salary for the month. The gross is paid exactly as given: Basic is
-the minimum wage for the paid days (days are reduced if that would be more than the gross), the rest is
-incentive, ESI and PF are worked out on Basic, and the take-home pay is what remains. A changed gross is kept as
-the person's salary from this month on. No attendance sheet is needed.
+For each person: the paid days and the amount the owner pays in hand that month. The take-home pay is made
+exactly that amount: Basic is the minimum wage for the paid days (fewer days are shown if needed), ESI and PF are
+worked out on Basic, and the incentive makes up the rest. The amount can differ every month; the people's
+salaries are not changed. No attendance sheet is needed.
 """
 from decimal import Decimal
 
@@ -39,13 +39,13 @@ def _days(raw):
 
 
 def _read(post, people):
-    """{employee id: (paid days or None, gross or None)} and {employee id: [errors]} from the form."""
+    """{employee id: (paid days or None, take-home or None)} and {employee id: [errors]} from the form."""
     field = WholeRupeesField(required=False)
     values, errors = {}, {}
     for emp in people:
-        problems, gross, paid = [], None, None
+        problems, pay, paid = [], None, None
         try:
-            gross = field.clean(post.get(f"gross_{emp.pk}", ""))
+            pay = field.clean(post.get(f"pay_{emp.pk}", ""))
         except ValidationError as exc:
             problems += exc.messages
         try:
@@ -54,7 +54,7 @@ def _read(post, people):
             problems += exc.messages
         if problems:
             errors[emp.pk] = problems
-        values[emp.pk] = (paid, gross)
+        values[emp.pk] = (paid, pay)
     return values, errors
 
 
@@ -65,7 +65,7 @@ def amounts(request, month):
         return redirect("payroll:months")
     back = reverse("payroll:month", args=[month])
     if company.amount_paid_mode != Company.AmountPaid.GROSS:
-        messages.info(request, _("Turn on 'Gross salary split' in Settings → Payroll rules first."))
+        messages.info(request, _("Turn on 'Take-home matching' in Settings → Payroll rules first."))
         return redirect("companies:payroll")
     run = PayrollRun.objects.filter(company=company, month=month).first()
     if run is not None and run.is_final:
@@ -81,17 +81,14 @@ def amounts(request, month):
     try:
         if request.method == "POST" and not typing_errors:
             try:
-                _run, changed = service.save_gross_page(company, month, typed, request.user, request=request)
+                service.save_gross_page(company, month, typed, request.user, request=request)
             except service.PayrollError as exc:
                 if "Correct the rows" not in str(exc):  # row mistakes are shown row by row below
                     messages.error(request, str(exc))
                     return redirect(back)
             else:
-                text = _("Saved. %(month)s is worked out from the gross salaries.") % {"month": month_label(month)}
-                if changed:
-                    text += " " + _("%(count)s gross salaries changed from %(month)s on.") % {
-                        "count": changed, "month": month_label(month)}
-                messages.success(request, text)
+                messages.success(request, _("Saved. In %(month)s each take-home pay is the amount written.")
+                                 % {"month": month_label(month)})
                 return redirect(back + "#review")
         rows, errors, started = service.gross_page(
             company, month, {k: v for k, v in typed.items() if k not in typing_errors})
@@ -108,16 +105,19 @@ def amounts(request, month):
         result = item["result"]
         if result is not None and "DAYS_REDUCED" in item["warnings"]:
             item["notes"] = [_("Paid days shown as %(paid)s (not %(given)s): at the minimum wage, %(given)s days "
-                               "would be more than the gross salary.") % {
+                               "would pay more than the take-home amount.") % {
                 "paid": plain_number(result.paid_days), "given": plain_number(item["row"].days_given)}]
+        if "TAKE_HOME_NOT_EXACT" in item["warnings"]:
+            item["notes"].append(_("The take-home could not be made exactly the amount (a deduction changes in "
+                                   "steps). Please check."))
         if request.method == "POST":
-            item["gross_value"] = request.POST.get(f"gross_{emp.pk}", "")
+            item["pay_value"] = request.POST.get(f"pay_{emp.pk}", "")
             item["days_input"] = request.POST.get(f"days_{emp.pk}", "")
         else:
-            item["gross_value"] = "" if item["current"] is None else f"{item['current']:.0f}"
+            item["pay_value"] = "" if item["pay"] is None else f"{item['pay']:.0f}"
             item["days_input"] = plain_number(item["days_value"])
-    return page(request, "payroll/amounts.html", _("Gross salaries — %(month)s") % {"month": month_label(month)},
-                _("Write each person's paid days and gross salary from the owner's list and press Save. PayCore "
-                  "works out Basic, incentive, ESI, PF and the take-home pay."),
+    return page(request, "payroll/amounts.html", _("Paid days and take-home — %(month)s") % {"month": month_label(month)},
+                _("Write each person's paid days and the amount the owner pays in hand, from the owner's list, and "
+                  "press Save. The take-home pay becomes exactly that amount."),
                 run=run, month=month, rows=rows, has_errors=bool(errors), started=started,
                 minimum_wages=MinimumWage.in_force(company.state, month))

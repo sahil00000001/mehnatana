@@ -18,7 +18,7 @@
   </li>
 
   <li class="step{% if has_lines %} done{% endif %}">
-    <h2>{% if splits_gross %}{% translate "Fill it in Excel and upload it — or just write paid days and gross salaries" %}{% else %}{% translate "Fill it in Excel and upload it" %}{% endif %}</h2>
+    <h2>{% if splits_gross %}{% translate "Fill it in Excel and upload it — or just write paid days and take-home amounts" %}{% else %}{% translate "Fill it in Excel and upload it" %}{% endif %}</h2>
     {% if is_final %}
       <p>{% translate "This month is finalised. To change anything, reopen it (step 5)." %}</p>
     {% elif blocker %}
@@ -41,8 +41,8 @@
       {% if splits_gross and not has_lines %}
       <p class="or-line">{% translate "Or skip Excel:" %}</p>
       <div class="actions">
-        <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% translate "Paid days and gross salaries" %}</a>
-        <span class="muted">{% translate "Copy each person's paid days and gross salary from the owner's list. PayCore pays the gross exactly: Basic at the minimum wage, the rest incentive, ESI and PF on Basic." %}</span>
+        <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% translate "Paid days and take-home" %}</a>
+        <span class="muted">{% translate "Copy each person's paid days and the amount paid in hand from the owner's list. The take-home becomes exactly that amount: Basic at the minimum wage, ESI and PF on Basic, the rest incentive." %}</span>
       </div>
       {% endif %}
     {% endif %}
@@ -69,8 +69,8 @@
     {% if has_lines %}
       {% if splits_gross and not is_final %}
       <div class="actions">
-        <a class="btn" href="{% url 'payroll:amounts' month %}">{% translate "Change paid days and gross salaries" %}</a>
-        <span class="muted">{% translate "The gross is paid exactly: Basic at the minimum wage for the paid days, the rest incentive." %}</span>
+        <a class="btn" href="{% url 'payroll:amounts' month %}">{% translate "Change paid days and take-home" %}</a>
+        <span class="muted">{% translate "Each take-home is the amount written: Basic at the minimum wage for the paid days, the rest incentive." %}</span>
       </div>
       {% endif %}
       <p class="table-tools">

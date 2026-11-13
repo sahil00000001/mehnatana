@@ -23,7 +23,6 @@ from core.formatting import (
     add_months, fmt_date, indian_format, month_end, month_label, month_start, plain_number, tax_year_of,
 )
 from employees.models import Employee, OpeningBalance, SalaryRevision
-from employees.rules import first_revision_month
 from statutory.rates import MissingRate, rates_for_month
 
 from . import checks, engine
@@ -59,7 +58,8 @@ class RowInput:
     other_reason: str = ""
     tds_override: Optional[D] = None
     remarks: str = ""
-    days_given: Optional[D] = None  # gross split: paid days as written, before PayCore reduced them
+    days_given: Optional[D] = None  # take-home matching: paid days as written, before PayCore reduced them
+    take_home: Optional[D] = None  # take-home matching: the amount to pay in hand this month, when written
 
     def to_engine(self):
         return engine.MonthInput(
@@ -80,6 +80,7 @@ class RowInput:
             incentive=D(line.incentive), increment=D(line.increment), advance=D(line.advance_deduction),
             other_deduction=D(line.other_deduction), other_reason=line.other_deduction_reason,
             tds_override=dec(line.tds_override), remarks=line.remarks, days_given=dec(line.days_given),
+            take_home=dec(line.take_home),
         )
 
     def as_dict(self):
@@ -299,9 +300,12 @@ def minimum_for_days(ctx, emp, result):
     return engine.rupee(D(wage) * factor)
 
 
-def monthly_gross(ctx, emp, increment=ZERO, gross=None):
-    """The person's gross salary for the month: the one written on the Gross salaries page, else their salary."""
-    return (gross if gross is not None else structure_for_month(emp, ctx.month).gross()) + (increment or ZERO)
+def target_take_home(ctx, emp, row):
+    """The take-home pay to match this month: the amount written for the month, else the person's usual monthly
+    salary (their salary structure) plus any raise or one-time incentive written in the sheet."""
+    if row.take_home is not None:
+        return row.take_home
+    return structure_for_month(emp, ctx.month).gross() + (row.increment or ZERO) + (row.incentive or ZERO)
 
 
 def _take_days_off(row, count):
@@ -316,62 +320,79 @@ def _take_days_off(row, count):
     return out
 
 
-def split_gross(ctx, emp, row, gross=None):
-    """Gross salary split (Payroll rules): the gross salary for the month is paid exactly as given.
+def match_take_home(ctx, emp, row):
+    """Take-home matching (Payroll rules): the take-home pay is exactly the amount the owner pays.
 
-    Basic is the minimum wage for the person's skill, for the paid days. If that would be more than the gross,
-    paid days are taken off one at a time (days present first) until Basic fits; the days shown on the payslip
-    and registers are then the reduced days, and the days as written are kept in days_given. The rest of the
-    gross is incentive. ESI and PF are worked out on Basic (the incentive is not "wages").
-    Returns (engine.Line, structure used, the row actually used, days were reduced).
+    Basic is the minimum wage for the person's skill, for the paid days. If Basic less ESI, PF and the other
+    deductions would already be more than the amount, paid days are taken off one at a time (days present first)
+    and the payslip and registers show the reduced days (the days as written are kept in days_given). Then the
+    incentive is set so that the take-home is exactly the amount: take-home rises by at most Rs 1 for each Rs 1
+    of incentive, so stepping by the gap lands on it. ESI and PF are worked out on Basic, as for anyone.
+    Returns (engine.Line, structure used, the row actually used, days were reduced, exact).
     """
     wage = ctx.minimum_wage(emp)
     if not wage:
         raise PayrollError(ctx.no_minimum_wage_message(emp))
-    wage, monthly = D(wage), monthly_gross(ctx, emp, row.increment, gross)
+    wage, target = D(wage), target_take_home(ctx, emp, row)
     y, m = ctx.month.year, ctx.month.month
     dim = D(engine.days_in_month(y, m))
     counted = row.present + row.paid_leave + row.week_off_holiday
     lop = row.lop if row.lop is not None else max(ZERO, dim - counted)
     if dim - lop <= 0:
-        monthly = ZERO  # no paid days: nothing is paid this month, whatever the person's gross salary
+        target = ZERO  # no paid days: nothing is paid this month
     person = engine_employee(emp)
 
-    def basic_for(lop_days):
-        factor, _outside = engine.pay_factor(y, m, person, lop_days, ctx.settings)
-        return engine.rupee(wage * factor), factor
+    def run(days_off, incentive):
+        """(engine line or None if the deductions do not fit, row used, structure) for these days and incentive."""
+        used = _take_days_off(row, days_off) if days_off else replace(row)
+        factor, _outside = engine.pay_factor(y, m, person, lop + days_off, ctx.settings)
+        # The structure carries this month's incentive as a monthly figure, for ESI coverage and the tax
+        # projection; the month's input makes the incentive paid exactly `incentive`.
+        structure = engine.Structure(basic=wage, incentive=(incentive / factor) if factor else ZERO)
+        inp = used.to_engine()
+        inp.increment = ZERO
+        inp.incentive = incentive - engine.rupee(structure.incentive * factor)
+        try:
+            return _engine_line(ctx, emp, structure, structure, inp), used, structure
+        except ValueError as exc:
+            if "deductions are more than earnings" in str(exc):
+                return None, used, structure
+            raise
 
-    reduce = ZERO
-    while basic_for(lop + reduce)[0] > monthly and lop + reduce + 1 <= dim and counted - reduce >= 1:
-        reduce += 1
-    if basic_for(lop + reduce)[0] > monthly:  # less than a day of minimum wage: nothing paid as Basic
-        reduce = counted
-    used_row = _take_days_off(row, reduce) if reduce else replace(row)
-    if used_row.days_given is None and reduce:
-        used_row.days_given = dim - lop
-    basic, factor = basic_for(lop + reduce)
-    # Structure for ESI coverage and the tax projection: Basic at the minimum wage, the rest of the gross as a
-    # monthly incentive. This month's incentive is set so that the gross is exactly the gross as given.
-    structure = engine.Structure(basic=wage, incentive=max(ZERO, monthly - wage))
-    inp = used_row.to_engine()
-    inp.increment = ZERO  # already in the monthly gross
-    inp.incentive = (monthly - basic) - engine.rupee(structure.incentive * factor) + row.incentive
-    result = _engine_line(ctx, emp, structure, structure, inp)
-    return result, structure, used_row, bool(reduce)
+    days_off = ZERO
+    line, used, structure = run(days_off, ZERO)
+    while line is not None and line.net_pay > target and counted - days_off >= 1:
+        days_off += 1
+        line, used, structure = run(days_off, ZERO)
+    if line is None or line.net_pay < target:
+        incentive = target - (line.net_pay if line is not None else ZERO)
+        for _step in range(80):
+            line, used, structure = run(days_off, incentive)
+            gap = target - (line.net_pay if line is not None else ZERO)
+            if gap == 0:
+                break
+            incentive = max(ZERO, incentive + gap)
+        if line is None:
+            raise ValueError(f"{emp.emp_code}: deductions are more than earnings")
+    if days_off and used.days_given is None:
+        used.days_given = dim - lop
+    return line, structure, used, bool(days_off), line.net_pay == target
 
 
-def compute(ctx, emp, row, gross=None):
+def compute(ctx, emp, row):
     """Run the engine for one employee. Returns (engine.Line, structure used, warnings). Raises ValueError.
 
-    With the gross salary split the row actually used (days reduced, if they had to be) is result.row_used.
+    With take-home matching the row actually used (days reduced, if they had to be) is result.row_used.
     """
     if ctx.splits:
-        result, used, used_row, reduced = split_gross(ctx, emp, row, gross)
+        result, used, used_row, reduced, exact = match_take_home(ctx, emp, row)
         result.row_used = used_row
-        base_gross = monthly_gross(ctx, emp, row.increment, gross)
+        base_gross = used.gross()
         warnings = list(result.warnings)
         if reduced or (used_row.days_given is not None and used_row.days_given != result.paid_days):
             warnings.append("DAYS_REDUCED")
+        if not exact:
+            warnings.append("TAKE_HOME_NOT_EXACT")
     else:
         structure = structure_for_month(emp, ctx.month)
         result = _engine_line(ctx, emp, structure, esi_structure(emp, ctx.month, row.increment), row.to_engine())
@@ -567,7 +588,7 @@ def fill_line(line, ctx, emp, row, result, used, warnings):
     line.advance_deduction, line.other_deduction = row.advance, row.other_deduction
     line.other_deduction_reason = row.other_reason.strip()
     line.tds_override, line.remarks = row.tds_override, row.remarks.strip()
-    line.days_given = row.days_given
+    line.days_given, line.take_home = row.days_given, row.take_home
     line.rate_basic, line.rate_da, line.rate_hra = used.basic, used.da, used.hra
     line.rate_conveyance, line.rate_other = used.conveyance, used.other
     for field_name, attr in LINE_RESULT_FIELDS.items():
@@ -694,33 +715,12 @@ def days_row(ctx, emp, paid_days, base=None):
     return row
 
 
-def set_monthly_gross(company, emp, month, gross, user, request=None):
-    """New monthly gross salary for a person from `month` (a draft month), written on the Gross salaries page.
-
-    Kept as a salary structure (Basic = the gross; the company splits it into minimum wage + incentive).
-    A salary already set for that same month is replaced instead of adding a second one.
-    """
-    month = max(month_start(month), first_revision_month(company, emp.date_of_joining))
-    rev = (SalaryRevision.objects.filter(employee=emp, effective_from=month, payroll_run__isnull=True)
-           .order_by("-id").first())
-    old = rev.gross if rev else None
-    if rev is None:
-        rev = SalaryRevision(company=company, employee=emp, effective_from=month, created_by=user,
-                             source=SalaryRevision.Source.MANUAL)
-    rev.basic, rev.da, rev.hra, rev.conveyance, rev.other_allowance = gross, ZERO, ZERO, ZERO, ZERO
-    rev.reason = _("Gross salary written on the Gross salaries page")
-    rev.save()
-    audit(request, "salary.revise", rev, {"employee": emp.emp_code, "from": str(month), "source": "gross page",
-                                          "old_gross": old, "new_gross": gross}, company=company)
-    return rev
-
-
 def gross_page(company, month, entries=None):
-    """Rows of the Gross salaries page: everyone paid in the month, their paid days and gross for the month.
+    """Rows of the take-home page: everyone paid in the month, their paid days and the take-home to pay.
 
-    entries: {employee id: (paid days or None, gross or None)} as typed. Paid days default to the days written
-    before (or the days employed in the month); the gross defaults to the person's salary.
-    Returns (rows, errors {employee id: [messages]}, started).
+    entries: {employee id: (paid days or None, take-home or None)} as typed. Paid days default to the days written
+    before (or the days employed in the month); the take-home to the amount written before for this month, else
+    the person's usual monthly salary. Returns (rows, errors {employee id: [messages]}, started).
     """
     month = month_start(month)
     ctx = RunContext(company, month)
@@ -729,7 +729,7 @@ def gross_page(company, month, entries=None):
     entries = entries or {}
     rows, errors = [], {}
     for emp in ctx.employees:
-        typed_days, typed_gross = entries.get(emp.pk, (None, None))
+        typed_days, typed_pay = entries.get(emp.pk, (None, None))
         line = lines.get(emp.pk)
         employed = D(days_employed(emp, month))
         given = (line.days_given if line is not None and line.days_given is not None
@@ -739,17 +739,19 @@ def gross_page(company, month, entries=None):
             row = RowInput.from_line(line)  # keep the days as uploaded (paid leave, holidays ...)
         else:
             row = days_row(ctx, emp, days, RowInput.from_line(line) if line is not None else None)
-        row.incentive = ZERO  # the gross written here is the whole month's pay: its incentive is worked out
+        row.incentive = ZERO  # the take-home written here is the whole month's pay: its incentive is worked out
         try:
-            current = structure_for_month(emp, month).gross()
+            usual = structure_for_month(emp, month).gross()
         except PayrollError:
-            current = None
-        gross = typed_gross if typed_gross is not None else current
-        item = {"emp": emp, "row": row, "line": line, "days_value": days, "employed": employed, "current": current,
-                "gross": gross, "minimum": ctx.minimum_wage(emp), "result": None, "warnings": []}
+            usual = None
+        pay = typed_pay if typed_pay is not None else (
+            line.take_home if line is not None and line.take_home is not None else usual)
+        row.take_home = pay
+        item = {"emp": emp, "row": row, "line": line, "days_value": days, "employed": employed, "pay": pay,
+                "minimum": ctx.minimum_wage(emp), "result": None, "warnings": []}
         problems = []
-        if gross is None:
-            problems = [_("Write the gross salary.")]
+        if pay is None:
+            problems = [_("Write the take-home amount.")]
         elif days > employed:
             problems = [_("Paid days (%(d)s) cannot be more than the %(e)s days employed in %(month)s.")
                         % {"d": plain_number(days), "e": plain_number(employed), "month": month_label(month)}]
@@ -757,7 +759,7 @@ def gross_page(company, month, entries=None):
             problems = [m for _k, m in check_row(ctx, emp, row, strict=True)]
         if not problems:
             try:
-                item["result"], _used, item["warnings"] = compute(ctx, emp, row, gross=gross)
+                item["result"], _used, item["warnings"] = compute(ctx, emp, row)
                 item["row"] = getattr(item["result"], "row_used", row)
             except PayrollError as exc:
                 problems = [str(exc)]
@@ -770,8 +772,8 @@ def gross_page(company, month, entries=None):
 
 
 def save_gross_page(company, month, entries, user, request=None):
-    """Save the Gross salaries page: changed gross salaries from this month, then start (or work out again) the
-    month with the days shown. All or nothing. Returns (run, number of gross salaries changed)."""
+    """Save the take-home page: start (or work out again) the month with the days and take-home amounts written.
+    All or nothing. The people's salaries are not changed. Returns (run, 0)."""
     with transaction.atomic():
         blocker = upload_blocker(company, month)
         if blocker:
@@ -780,10 +782,6 @@ def save_gross_page(company, month, entries, user, request=None):
         if errors:
             raise PayrollError(_("Nothing was saved. Correct the rows marked in red."))
         changed = 0
-        for item in rows:
-            if item["gross"] != item["current"]:
-                set_monthly_gross(company, item["emp"], month, item["gross"], user, request=request)
-                changed += 1
         run = save_inputs(company, month, {item["emp"].pk: item["row"] for item in rows}, user, request=request)
     return run, changed
 

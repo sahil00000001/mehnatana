@@ -138,27 +138,25 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
   cannot be checked), and income tax uses the normal (under 60) slabs. The turning-58 list skips them.
 - The one-off import of the old data is not part of this repository: it holds clients' private details.
 
-## Gross salary split (13-11-2026, replaces 'salary from the amount paid')
+## Take-home matching (14-11-2026)
 
-- The person running payroll gives each employee **one gross salary a month** (the same every month); attendance
-  decides how much of it is earned. `Company.amount_paid_mode` = GROSS (default) or OFF.
-- With GROSS, the month's structure is **Basic = minimum wage** for the person's skill (`MinimumWage.in_force`,
-  state of the company) and **incentive = gross − minimum wage** (`engine.Structure.incentive`: part of the salary,
-  cut for unpaid days like Basic, not "wages", so ESI and PF are on Basic). Absent days therefore cut the gross;
-  the take-home pay is what remains after ESI, PF and other deductions. ESI coverage is judged on that structure.
-- A gross below the minimum wage is paid at the minimum wage with a note (GROSS_BELOW_MINIMUM); the optional
-  'minimum wage' sheet check stops it instead.
-- The gross is kept as the person's salary structure (Basic = the gross). With GROSS on, Add employee and Revise
-  salary ask for one "Gross salary per month". An increment in the sheet raises the person's own structure at
-  finalise (not the minimum wage split of that month's line).
-- The first version (13-11-2026 morning) treated a typed amount as that month's pay, so absent days did not
-  reduce it, and offered a take-home basis. Both were wrong for this business and were removed
-  (`PayrollLine.amount_paid_input` dropped; take-home companies moved to GROSS).
-- **Gross salaries page** (month page step 2 "Gross salaries and absent days", or step 3 later): everyone paid
-  in the month with their gross. Before the month is started there is no sheet: everyone counts as present on
-  every working day of the days employed, weekly offs as the sheet pre-fills them, minus absent days written
-  there. A changed gross is saved as a salary from that month on (a salary already set for that month is
-  replaced). Saving starts or works out the draft month with the same checks as an upload.
+- The owner gives a monthly list: paid days and the amount each person gets **in hand**. That amount must be the
+  payslip's **take-home pay**; deductions are made and the incentive makes up the rest. Amounts change from
+  person to person and month to month. `Company.amount_paid_mode` = GROSS (on, default; the code value is
+  historical) or OFF.
+- Per line: Basic = minimum wage for the person's skill (`MinimumWage.in_force`, state of the company) for the
+  paid days. If Basic less ESI, PF and the other deductions would already be more than the amount, paid days are
+  taken off one at a time (present days first) and the payslip and registers show the reduced days
+  (`PayrollLine.days_given` keeps the days as written; note DAYS_REDUCED). Then the incentive is found by stepping
+  by the gap until take-home = amount (take-home rises by at most ₹1 per ₹1 of incentive). ESI and PF are on
+  Basic (Labour Code wages: the 50% rule still applies if the incentive exceeds Basic). An advance repaid that
+  month is covered by the incentive too: the amount is what reaches the person.
+- The amount is a month input (`PayrollLine.take_home`, written on the month page "Paid days and take-home");
+  without it (sheet upload) the person's usual monthly salary (salary structure, labelled "Usual monthly salary
+  in hand") plus any raise or one-time incentive in the sheet is matched. Writing an amount never changes the
+  person's salary. 0 paid days pays nothing.
+- History of this rule on 13-14 November: (1) typed amount matched as take-home or gross, (2) one fixed gross cut
+  for absent days, (3) gross paid exactly. The owner's October list settled it: take-home = the listed amount.
 - **Minimum wages** are entered per state and month (All companies → Minimum wages), not shipped with the app.
   Saving them works out every company's drafts in that state again.
 - With OFF, when minimum wages are entered, a line whose Basic + DA + other allowance is below the minimum for the

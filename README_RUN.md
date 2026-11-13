@@ -100,10 +100,10 @@ and when. Reports → *Annual salary report* shows, for a financial year (April 
 and pending per employee, attendance totals, a month-by-month breakdown and the company's consolidated figures; it
 downloads as an Excel file with one sheet per view.
 
-**Gross salary split.** Settings → Payroll rules → *Gross salary split* (on by default). Each person has one gross
-salary a month; Basic is paid at the minimum wage of their skill and the rest as incentive, both cut for absent days,
-with ESI and PF on Basic. Enter the state's minimum wages once on All companies → *Minimum wages*. Each month, upload
-the attendance sheet or use *Gross salaries and absent days* on the month page (no sheet: write only absent days).
+**Take-home matching.** Settings → Payroll rules → *Take-home matching* (on by default). Enter the state's
+minimum wages once on All companies → *Minimum wages*. Each month press *Paid days and take-home* on the month page and
+copy the owner's list: the payslip's take-home becomes exactly the amount; Basic is the minimum wage for the paid days
+(fewer days are shown if needed), ESI and PF are on Basic, and the incentive makes up the rest.
 
 **Attendance sheet checks.** Settings → *Attendance sheet checks* switches the optional checks of the monthly sheet on
 or off (overtime and paid-leave limits, days present not above working days, weekly offs filled in, minimum wage).

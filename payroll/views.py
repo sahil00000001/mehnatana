@@ -36,7 +36,7 @@ def _note_texts(line):
     for code in line.warnings:
         if code == "DAYS_REDUCED" and line.days_given is not None:
             texts.append(_("Paid days reduced from %(given)s to %(paid)s so that Basic (minimum wage for the days) "
-                           "stays within the gross salary.") % {"given": plain_number(line.days_given),
+                           "stays within the take-home amount.") % {"given": plain_number(line.days_given),
                                                                  "paid": plain_number(line.paid_days)})
         else:
             texts.append(str(message_for(code)))

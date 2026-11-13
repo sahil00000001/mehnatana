@@ -297,9 +297,9 @@ def one_gross_salary(form, company):
         return
     for name in SALARY_FIELDS[1:]:
         form.fields.pop(name, None)
-    form.fields["basic"].label = _("Gross salary per month ₹")
-    form.fields["basic"].help_text = _("The whole monthly salary. PayCore pays Basic at the minimum wage for the "
-                                       "paid days and the rest as incentive (Settings → Payroll rules).")
+    form.fields["basic"].label = _("Usual monthly salary in hand ₹")
+    form.fields["basic"].help_text = _("What the owner usually pays this person in hand each month. Each month you "
+                                       "can write a different amount on the month page (Paid days and take-home).")
 
 
 class ReviseSalaryForm(forms.Form):

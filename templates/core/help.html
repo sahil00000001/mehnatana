@@ -23,9 +23,9 @@
     </ul>
   </dd>
 
-  <dt id="amount-paid">{% translate "Each person has one gross salary. How is the month worked out?" %}</dt>
+  <dt id="amount-paid">{% translate "The owner gives me a list of paid days and what each person gets in hand. How do I make the salary?" %}</dt>
   {% url 'portal:minimum_wages' as wages_url %}{% url 'companies:payroll' as rules_url %}
-  <dd>{% blocktranslate %}With <strong>Gross salary split</strong> on (<a href="{{ rules_url }}">Settings → Payroll rules</a>), each person's salary is one gross amount a month. Every month PayCore pays Basic at the minimum wage for the person's skill and the rest of the gross as incentive, cuts both for the days not worked, works out ESI and PF (for PF members) on Basic, and the take-home pay is what remains. Enter the <a href="{{ wages_url }}">minimum wages</a> of your state once. Each month, give the attendance: upload the sheet, or press <strong>Gross salaries and absent days</strong> on the month page and write only the absent days (everyone else counts as present on every working day). A gross salary changed on that page is kept from that month on; you can also change it with Revise salary on the employee page. If a gross salary is below the minimum wage, the minimum wage is paid and the line says so.{% endblocktranslate %}</dd>
+  <dd>{% blocktranslate %}With <strong>Take-home matching</strong> on (<a href="{{ rules_url }}">Settings → Payroll rules</a>) and the <a href="{{ wages_url }}">minimum wages</a> of your state entered once: open the month, press <strong>Paid days and take-home</strong> and copy each person's paid days and amount from the owner's list. The take-home pay on the payslip becomes exactly that amount. PayCore pays Basic at the minimum wage for the paid days, deducts ESI and PF (for PF members) on Basic, and adds the rest as incentive. If the minimum wage for the paid days would already pay more than the amount, PayCore shows fewer paid days, so that the minimum wage is always paid. The amounts can change every month; 0 paid days means the person is not paid that month.{% endblocktranslate %}</dd>
 
   <dt id="sheet-checks">{% translate "Can I change the checks made on the monthly sheet?" %}</dt>
   {% url 'companies:checks' as checks_url %}
