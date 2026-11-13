@@ -50,7 +50,7 @@ def _month_context(request, month, run, **extra):
     company = request.company
     blocker = service.upload_blocker(company, month)
     lines, totals, only_notes = [], None, request.GET.get("notes") == "1"
-    notes_count = amounts_count = 0
+    notes_count = 0
     if run is not None:
         lines = list(run.lines.select_related("employee").order_by("employee__emp_code"))
         if lines:
@@ -58,16 +58,14 @@ def _month_context(request, month, run, **extra):
         for line in lines:
             line.note_texts = _note_texts(line)
         notes_count = sum(1 for l in lines if l.warnings)
-        amounts_count = sum(1 for l in lines if l.amount_paid_input is not None)
         if only_notes:
             lines = [l for l in lines if l.warnings]
     has_lines = totals is not None
     context = {
         "month": month, "run": run, "label": month_label(month), "blocker": blocker, "lines": lines,
         "totals": totals, "has_lines": has_lines, "only_notes": only_notes, "notes_count": notes_count,
-        "full": request.GET.get("full") == "1", "amounts_count": amounts_count,
-        "amount_paid_on": company.amount_paid_mode != Company.AmountPaid.OFF,
-        "amount_paid_in_hand": company.amount_paid_mode == Company.AmountPaid.IN_HAND,
+        "full": request.GET.get("full") == "1",
+        "splits_gross": company.amount_paid_mode == Company.AmountPaid.GROSS,
         "is_final": bool(run and run.is_final), "upload_form": UploadForm(),
         "finalise_blockers": service.finalise_blockers(run) if run and has_lines and not run.is_final else [],
         "can_reopen": bool(run and run.is_final and not service.reopen_blockers(run)),
@@ -163,8 +161,7 @@ def line_edit(request, month, line_id):
     if run.is_final:
         messages.error(request, _("%(month)s is finalised. Reopen it to make changes.") % {"month": run.label})
         return redirect("payroll:month", month=month)
-    amount_paid_on = request.company.amount_paid_mode != Company.AmountPaid.OFF
-    form = LineForm(request.POST or None, initial=LineForm.initial_from(line), amount_paid_on=amount_paid_on)
+    form = LineForm(request.POST or None, initial=LineForm.initial_from(line))
     if request.method == "POST" and form.is_valid():
         row = form.row_input()
         try:

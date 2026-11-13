@@ -11,11 +11,6 @@
     {% include "includes/field.html" with field=form.present %}{% include "includes/field.html" with field=form.paid_leave %}
     {% include "includes/field.html" with field=form.week_off_holiday %}{% include "includes/field.html" with field=form.lop %}
   </fieldset>
-  {% if form.amount_paid %}
-  <fieldset><legend>{% translate "Salary from the amount paid" %}</legend>
-    {% include "includes/field.html" with field=form.amount_paid %}
-  </fieldset>
-  {% endif %}
   <details class="more"{% if more_open %} open{% endif %}>
     <summary>{% translate "More: overtime, incentive, deductions, remarks" %}</summary>
     <fieldset><legend>{% translate "Extra pay" %}</legend>

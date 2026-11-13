@@ -93,8 +93,6 @@ class PayrollLine(CompanyOwned):
     ot_hours = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     ot_amount_override = money(null=True, blank=True, default=None)
     incentive = money()
-    # What the owner actually paid (only when the company works salary out from the amount paid).
-    amount_paid_input = money(null=True, blank=True, default=None)
     increment = money()
     advance_deduction = money()
     other_deduction = money()

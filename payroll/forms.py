@@ -30,9 +30,6 @@ class LineForm(forms.Form):
     ot_hours = forms.DecimalField(label=_("OT hours"), required=False, min_value=0, max_digits=8,
                                   decimal_places=2, help_text=_("Overtime hours this month."))
     ot_amount = _money(_("OT amount ₹ (optional)"), _("If filled, used instead of OT hours."))
-    amount_paid = _money(_("Amount paid ₹"), _("What the owner actually paid this month. Basic becomes the minimum "
-                                               "wage and the incentive is worked out. Leave empty to use the "
-                                               "salary structure."))
     incentive = _money(_("Incentive / bonus ₹"), _("One-time extra pay this month."))
     increment = _money(_("Increment ₹ per month"), _("Raise added to Basic from this month."))
     advance = _money(_("Advance deduction ₹"))
@@ -43,12 +40,7 @@ class LineForm(forms.Form):
                               help_text=_("Shown in the salary register."))
 
     # Shown first, the rest under "More" (most changes are only the days).
-    MAIN = ["present", "paid_leave", "week_off_holiday", "lop", "amount_paid"]
-
-    def __init__(self, *args, amount_paid_on=False, **kwargs):
-        super().__init__(*args, **kwargs)
-        if not amount_paid_on:
-            del self.fields["amount_paid"]
+    MAIN = ["present", "paid_leave", "week_off_holiday", "lop"]
 
     @property
     def main_fields(self):
@@ -69,7 +61,6 @@ class LineForm(forms.Form):
             ot_amount=d["ot_amount"], incentive=d["incentive"] or zero, increment=d["increment"] or zero,
             advance=d["advance"] or zero, other_deduction=d["other_deduction"] or zero,
             other_reason=d["other_reason"], tds_override=d["tds_override"], remarks=d["remarks"],
-            amount_paid=d.get("amount_paid"),
         )
 
     @staticmethod
@@ -79,7 +70,7 @@ class LineForm(forms.Form):
             "lop": line.lop_days, "ot_hours": line.ot_hours, "ot_amount": line.ot_amount_override,
             "incentive": line.incentive, "increment": line.increment, "advance": line.advance_deduction,
             "other_deduction": line.other_deduction, "other_reason": line.other_deduction_reason,
-            "tds_override": line.tds_override, "remarks": line.remarks, "amount_paid": line.amount_paid_input,
+            "tds_override": line.tds_override, "remarks": line.remarks,
         }
 
 

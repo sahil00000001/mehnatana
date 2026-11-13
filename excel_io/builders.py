@@ -194,7 +194,7 @@ def monthly_workbook(ctx, existing_lines=None):
                 "advance": as_number(line.advance_deduction) or None,
                 "other_deduction": as_number(line.other_deduction) or None,
                 "other_reason": line.other_deduction_reason, "tds_override": as_number(line.tds_override),
-                "remarks": line.remarks, "amount_paid": as_number(line.amount_paid_input),
+                "remarks": line.remarks,
             })
         for c, (key, *_rest) in enumerate(columns, start=1):
             ws.cell(row=r, column=c, value=values.get(key))

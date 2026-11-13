@@ -20,13 +20,12 @@
       <li><strong>{% translate "Incentive / Bonus" %}</strong> — {% translate "one-time extra pay." %} <strong>{% translate "Increment" %}</strong> — {% translate "a raise added to Basic from this month." %}</li>
       <li><strong>{% translate "Advance Deduction" %}</strong> — {% translate "already filled with the instalment due." %} <strong>{% translate "Other Deduction" %}</strong> — {% translate "needs a reason." %}</li>
       <li><strong>{% translate "TDS Override" %}</strong> — {% translate "only if your CA gave you the tax figure." %}</li>
-      <li><strong>{% translate "Amount Paid" %}</strong> — {% translate "only when Salary from the amount paid is on (see below): what the owner actually paid the person." %}</li>
     </ul>
   </dd>
 
-  <dt id="amount-paid">{% translate "The owner tells me only the gross salary of each person. How do I make the salary?" %}</dt>
+  <dt id="amount-paid">{% translate "Each person has one gross salary. How is the month worked out?" %}</dt>
   {% url 'portal:minimum_wages' as wages_url %}{% url 'companies:payroll' as rules_url %}
-  <dd>{% blocktranslate %}Enter the <a href="{{ wages_url }}">minimum wages</a> of your state once. Then open the month and, in step 2, press <strong>Write each person's gross salary</strong> (no Excel needed). Write the gross salary of each person, and absent days only for someone who missed work. PayCore puts Basic at the minimum wage for the person's skill (less for absent days), works out ESI and PF (if the person is a PF member) on it, and shows the rest as incentive, so the gross salary matches exactly. If the amount is less than the minimum wage, the line says so. A box left empty is paid from that person's salary structure. You can also upload the attendance sheet first and then write the salaries, or use the <em>Amount Paid</em> column of the sheet. To write take-home pay instead of gross, or to switch this off, use <a href="{{ rules_url }}">Settings → Payroll rules</a>.{% endblocktranslate %}</dd>
+  <dd>{% blocktranslate %}With <strong>Gross salary split</strong> on (<a href="{{ rules_url }}">Settings → Payroll rules</a>), each person's salary is one gross amount a month. Every month PayCore pays Basic at the minimum wage for the person's skill and the rest of the gross as incentive, cuts both for the days not worked, works out ESI and PF (for PF members) on Basic, and the take-home pay is what remains. Enter the <a href="{{ wages_url }}">minimum wages</a> of your state once. Each month, give the attendance: upload the sheet, or press <strong>Gross salaries and absent days</strong> on the month page and write only the absent days (everyone else counts as present on every working day). A gross salary changed on that page is kept from that month on; you can also change it with Revise salary on the employee page. If a gross salary is below the minimum wage, the minimum wage is paid and the line says so.{% endblocktranslate %}</dd>
 
   <dt id="sheet-checks">{% translate "Can I change the checks made on the monthly sheet?" %}</dt>
   {% url 'companies:checks' as checks_url %}

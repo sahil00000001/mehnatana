@@ -44,9 +44,9 @@ class Company(TimeStamped):
         OLD = "OLD", _("Old regime")
 
     class AmountPaid(models.TextChoices):
-        GROSS = "GROSS", _("On: write each person's gross salary (before PF and ESI) — PayCore matches it")
-        IN_HAND = "IN_HAND", _("On: write each person's take-home pay (after PF and ESI) — PayCore matches it")
-        OFF = "OFF", _("Off: salary comes only from each person's salary structure")
+        GROSS = "GROSS", _("On: each person has one gross salary a month. Basic is paid at the minimum wage and the "
+                           "rest as incentive; absent days cut both; ESI and PF are worked out on Basic")
+        OFF = "OFF", _("Off: pay each salary head as entered (Basic, DA, HRA …)")
 
     class PayslipStyle(models.TextChoices):
         CLASSIC = "CLASSIC", _("Classic ledger")
@@ -93,10 +93,9 @@ class Company(TimeStamped):
     salary_divisor = models.CharField(_("salary is divided by"), max_length=10, choices=Divisor.choices,
                                       default=Divisor.CALENDAR)
     amount_paid_mode = models.CharField(
-        _("salary from the amount paid"), max_length=8, choices=AmountPaid.choices, default=AmountPaid.GROSS,
-        help_text=_("When on, you can write what the owner actually pays each person, with or without the "
-                    "attendance sheet. Basic becomes the minimum wage, ESI and PF (if applicable) are worked out on "
-                    "it, and the rest is shown as incentive, so the salary matches exactly."))
+        _("gross salary split"), max_length=8, choices=AmountPaid.choices, default=AmountPaid.GROSS,
+        help_text=_("Needs the minimum wages of your state (All companies → Minimum wages). Each month, the gross "
+                    "salary is cut for absent days, and the take-home pay is what remains after ESI and PF."))
     # Optional checks of the attendance sheet (see payroll/checks.py); empty = the defaults.
     sheet_checks = models.JSONField(_("attendance sheet checks"), default=dict, blank=True)
     pf_enabled = models.BooleanField(_("PF applies"), default=True)

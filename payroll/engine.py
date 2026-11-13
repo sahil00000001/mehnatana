@@ -18,7 +18,7 @@ from datetime import date, timedelta
 from decimal import Decimal as D, ROUND_HALF_UP, ROUND_CEILING, ROUND_FLOOR
 from typing import Optional
 
-ENGINE_VERSION = "1.1"  # 1.1: salary per working day (weekly offs) as a divisor
+ENGINE_VERSION = "1.2"  # 1.1: salary per working day (weekly offs) as a divisor; 1.2: incentive in the structure
 
 ZERO = D("0")
 HUNDRED = D("100")
@@ -87,15 +87,18 @@ class Structure:
     hra: D = ZERO
     conveyance: D = ZERO
     other: D = ZERO
+    # Monthly incentive that is part of the salary (cut for unpaid days like Basic) but not "wages":
+    # used when a company splits each gross salary into Basic at the minimum wage + incentive.
+    incentive: D = ZERO
 
     def wage_part(self) -> D:           # counts as "wages" under the Codes
         return self.basic + self.da + self.other
 
     def gross(self) -> D:
-        return self.basic + self.da + self.hra + self.conveyance + self.other
+        return self.basic + self.da + self.hra + self.conveyance + self.other + self.incentive
 
     def plus_increment(self, inc: D) -> "Structure":
-        return Structure(self.basic + inc, self.da, self.hra, self.conveyance, self.other)
+        return Structure(self.basic + inc, self.da, self.hra, self.conveyance, self.other, self.incentive)
 
 
 @dataclass
@@ -383,7 +386,7 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
     elif inp.ot_hours:
         hourly = s.wage_part() / settings.ot_days_divisor / settings.ot_hours_per_day
         L.ot_pay = rupee(hourly * settings.ot_multiplier * inp.ot_hours)
-    L.incentive = rupee(inp.incentive)
+    L.incentive = rupee(s.incentive * factor) + rupee(inp.incentive)
     wage_part = L.basic + L.da + L.other
     L.gross = wage_part + L.hra + L.conveyance + L.ot_pay + L.incentive
 

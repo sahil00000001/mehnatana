@@ -268,9 +268,11 @@ def revise_salary(request, pk):
     if current:
         initial = {"basic": current.basic, "da": current.da, "hra": current.hra, "conveyance": current.conveyance,
                    "other_allowance": current.other_allowance}
-    form = ReviseSalaryForm(request.POST or None, month_choices=choices, initial=initial)
+    form = ReviseSalaryForm(request.POST or None, month_choices=choices, initial=initial, company=request.company)
+    if current and "da" not in form.fields:  # one gross salary a month (Gross salary split)
+        form.initial["basic"] = current.gross
     if request.method == "POST" and form.is_valid():
-        values = {n: form.cleaned_data[n] or 0 for n in ("basic", "da", "hra", "conveyance", "other_allowance")}
+        values = {n: form.cleaned_data.get(n) or 0 for n in ("basic", "da", "hra", "conveyance", "other_allowance")}
         rev = SalaryRevision.objects.create(
             company=company, employee=emp, effective_from=form.cleaned_data["effective_month"],
             reason=form.cleaned_data["reason"], source=SalaryRevision.Source.MANUAL, created_by=request.user, **values)

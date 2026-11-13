@@ -36,10 +36,6 @@ MONTHLY_COLUMNS = [
     ("ot_amount", "OT Amount ₹ (optional)", False, "money",
      "Fill only to pay a fixed overtime amount. If filled, OT Hours are not used.",
      "तय ओवरटाइम राशि देनी हो तभी भरें। भरने पर घंटे नहीं गिने जाएंगे।"),
-    ("amount_paid", "Amount Paid ₹", False, "money",
-     "Optional. What the owner actually paid this person this month. PayCore sets Basic to the minimum wage "
-     "and works out the incentive so the pay comes to this amount. Leave Incentive and Increment empty.",
-     "वैकल्पिक। मालिक ने इस महीने वास्तव में कितना दिया। बेसिक न्यूनतम वेतन होगा और बाकी इंसेंटिव।"),
     ("incentive", "Incentive / Bonus ₹", False, "money", "One-time extra pay this month.",
      "इस महीने एक बार की अतिरिक्त राशि।"),
     ("increment", "Increment ₹ per month", False, "money",
@@ -62,14 +58,10 @@ MONTHLY_PREFILLED_GREY = {"emp_code", "name", "designation", "doj", "pan", "uan"
                           "working_days"}
 # Filled in from the records, never read back: a sheet without these columns still uploads.
 MONTHLY_READ_ONLY = {"name", "designation", "doj", "pan", "uan", "esic_ip_no", "working_days"}
-# Only in the sheet of a company that works salary out from the amount paid; never required.
-MONTHLY_OPTIONAL = {"amount_paid"}
 
 
 def monthly_columns(company):
-    """The columns of this company's attendance sheet."""
-    if company.amount_paid_mode == "OFF":
-        return [c for c in MONTHLY_COLUMNS if c[0] != "amount_paid"]
+    """The columns of this company's attendance sheet (the same for every company today)."""
     return list(MONTHLY_COLUMNS)
 
 EMPLOYEE_COLUMNS = [

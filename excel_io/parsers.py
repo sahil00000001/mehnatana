@@ -25,7 +25,7 @@ from core.forms import MAX_AMOUNT
 
 from .builders import EMPLOYEES, MONTHLY, OPENING
 from .columns import (
-    CHOICES, EMPLOYEE_COLUMNS, MONTHLY_COLUMNS, MONTHLY_OPTIONAL, MONTHLY_READ_ONLY, OPENING_COLUMNS, header_of,
+    CHOICES, EMPLOYEE_COLUMNS, MONTHLY_COLUMNS, MONTHLY_READ_ONLY, OPENING_COLUMNS, header_of,
 )
 
 TEMPLATE_NAMES = {
@@ -283,7 +283,7 @@ def _no_code(errors, number, name, columns):
 
 # ---------------------------------------------------------------- monthly attendance sheet
 MONTHLY_NUMBER_KEYS = ["days_in_month", "present", "paid_leave", "week_off_holiday", "lop", "ot_hours", "ot_amount",
-                       "incentive", "increment", "advance", "other_deduction", "tds_override", "amount_paid"]
+                       "incentive", "increment", "advance", "other_deduction", "tds_override"]
 MONTHLY_KINDS = {c[0]: c[3] for c in MONTHLY_COLUMNS}
 
 
@@ -300,7 +300,7 @@ def parse_monthly(data, ctx):
         ws = wb.worksheets[0]
         # Every column of our sheet must be there: a deleted column would silently become 0.
         index = header_index(ws, MONTHLY_COLUMNS, must=[c[0] for c in MONTHLY_COLUMNS
-                                                         if c[0] not in MONTHLY_READ_ONLY | MONTHLY_OPTIONAL])
+                                                         if c[0] not in MONTHLY_READ_ONLY])
         days_must_be_filled = ctx.check_on("days_filled")
         expected = {e.emp_code.upper(): e for e in ctx.employees}
         known = {c.upper() for c in Employee.objects.filter(company=ctx.company).values_list("emp_code", flat=True)}
@@ -357,7 +357,6 @@ def parse_monthly(data, ctx):
                 advance=parsed["advance"] or zero, other_deduction=parsed["other_deduction"] or zero,
                 other_reason=to_text(_cell(values, index, "other_reason")),
                 tds_override=parsed["tds_override"], remarks=to_text(_cell(values, index, "remarks"))[:200],
-                amount_paid=parsed["amount_paid"],
             )
             for key, message in check_row(ctx, emp, row, parsed["days_in_month"], strict=True):
                 err(key, message)

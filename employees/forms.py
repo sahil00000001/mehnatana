@@ -105,6 +105,8 @@ class EmployeeForm(ModelErrorsOnPage, IndianDatesMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.company, self.adding = company, adding
         self.instance.company = company
+        if adding:
+            one_gross_salary(self, company)
         for name in TIDIED_FIELDS:  # people type spaces; the saved value is checked after tidying
             field = self.fields[name]
             field.max_length = None
@@ -286,6 +288,20 @@ def revision_month_choices(company, employee, first_open):
     return [(f"{m:%Y-%m}", month_label(m)) for m in (add_months(start, i) for i in range(13))]
 
 
+def one_gross_salary(form, company):
+    """With 'Gross salary split' on, a salary is one gross amount a month (kept in Basic): Basic is paid at the
+    minimum wage and the rest as incentive, so the other heads are not asked for."""
+    from companies.models import Company
+
+    if company.amount_paid_mode != Company.AmountPaid.GROSS:
+        return
+    for name in SALARY_FIELDS[1:]:
+        form.fields.pop(name, None)
+    form.fields["basic"].label = _("Gross salary per month ₹")
+    form.fields["basic"].help_text = _("The whole monthly salary. PayCore pays Basic at the minimum wage and the "
+                                       "rest as incentive, and cuts it for absent days (Settings → Payroll rules).")
+
+
 class ReviseSalaryForm(forms.Form):
     effective_month = forms.ChoiceField(label=_("New salary from"),
                                         help_text=_("A finalised month cannot be changed, so it is not in the list."))
@@ -296,9 +312,11 @@ class ReviseSalaryForm(forms.Form):
     other_allowance = whole_rupees(_("Other allowance ₹"))
     reason = forms.CharField(label=_("Reason"), max_length=200, help_text=_("For example: yearly increment."))
 
-    def __init__(self, *args, month_choices, **kwargs):
+    def __init__(self, *args, month_choices, company=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["effective_month"].choices = month_choices
+        if company is not None:
+            one_gross_salary(self, company)
 
     def clean_effective_month(self):
         year, month = self.cleaned_data["effective_month"].split("-")

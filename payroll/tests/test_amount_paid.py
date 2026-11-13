@@ -1,4 +1,5 @@
-"""Salary from the amount paid (minimum wage + incentive), minimum wages, and the switchable sheet checks."""
+"""Gross salary split (Basic at the minimum wage + incentive, both cut for absent days), the Gross salaries page,
+minimum wages, and the switchable sheet checks."""
 from datetime import date
 from decimal import Decimal as D
 from io import BytesIO
@@ -7,167 +8,163 @@ from django.urls import reverse
 from openpyxl import load_workbook
 
 from companies.models import MinimumWage
-from core.test_qa import sheet_with
+from core.test_qa import same_form_back, sheet_with
 from core.testing import NOV, DemoTestCase
+from employees.models import SalaryRevision
 from payroll import service
+from payroll.models import PayrollRun
 
 RATES = dict(unskilled=D(14000), semi_skilled=D(15500), skilled=D(17000), highly_skilled=D(19000))
+DEC = date(2026, 12, 1)
 
 
-class AmountPaidCase(DemoTestCase):
+class SplitCase(DemoTestCase):
+    """SRKS with 'Gross salary split' on and Karnataka minimum wages (sample figures)."""
+
     def setUp(self):
         super().setUp()
-        self.srks.amount_paid_mode = "IN_HAND"
-        self.srks.save()
-        MinimumWage.objects.create(state=self.srks.state, effective_from=date(2026, 4, 1), **RATES)
-        self.run_for().lines.filter(employee__emp_code="E001").update(increment=0)  # the demo has a ₹500 raise
-        service.recompute_run(self.run_for())
-
-    def amounts_url(self):
-        return reverse("payroll:amounts", args=[NOV])
-
-    def post_amounts(self, **by_code):
-        lines = {l.code: l for l in self.run_for().lines.all()}
-        data = {f"amount_{l.pk}": "" for l in lines.values()}
-        for code, amount in by_code.items():
-            data[f"amount_{lines[code].pk}"] = amount
-        return self.client.post(self.amounts_url(), data)
-
-    def line(self, code):
-        return self.run_for().lines.get(employee__emp_code=code)
-
-
-class FitToAmountTest(AmountPaidCase):
-    def test_take_home_is_exactly_the_amount_paid(self):
-        response = self.post_amounts(E001="25000", E002="18000")
-        self.assertRedirects(response, self.amounts_url(), fetch_redirect_response=False)
-        e1, e2 = self.line("E001"), self.line("E002")
-        self.assertEqual((e1.net_pay, e2.net_pay), (D(25000), D(18000)))
-        self.assertEqual(e1.rate_basic, D(14000))  # unskilled minimum wage
-        self.assertEqual((e1.rate_hra, e1.rate_other), (D(0), D(0)))
-        self.assertEqual(e1.earned_basic + e1.ot_pay + e1.incentive_pay, e1.gross)
-        self.assertGreater(e1.incentive_pay, 0)
-        self.assertEqual(e1.ee_esi, D(105))  # 0.75% of the minimum wage, not of the incentive
-        self.assertEqual(e1.amount_paid_input, D(25000))
-        self.assertEqual(e1.incentive, D(0))  # the input stays empty; the worked-out one is incentive_pay
-        self.assertLess(e2.earned_basic, D(15500))  # semi-skilled, cut for the absent days
-        self.assertEqual(self.line("E004").amount_paid_input, None)  # left empty: salary structure as before
-
-    def test_gross_basis(self):
         self.srks.amount_paid_mode = "GROSS"
         self.srks.save()
-        self.post_amounts(E001="30000")
-        self.assertEqual(self.line("E001").gross, D(30000))
-
-    def test_paid_less_than_the_minimum_wage(self):
-        self.post_amounts(E003="9000")
-        e3 = self.line("E003")
-        self.assertEqual(e3.incentive_pay, D(0))
-        self.assertGreater(e3.net_pay, D(9000))
-        self.assertIn("PAID_BELOW_MINIMUM", e3.warnings)
-        page = self.client.get(self.amounts_url())
-        self.assertContains(page, "the owner must pay the difference")
-
-    def test_amounts_are_kept_when_the_month_is_worked_out_again(self):
-        self.post_amounts(E001="25000")
+        MinimumWage.objects.create(state=self.srks.state, effective_from=date(2026, 4, 1), **RATES)
         service.recompute_run(self.run_for())
-        self.assertEqual(self.line("E001").net_pay, D(25000))
 
-    def test_switching_the_feature_off_goes_back_to_the_salary_structure(self):
-        self.post_amounts(E001="25000")
-        url = reverse("companies:payroll")
-        from core.test_qa import same_form_back
-
-        data = same_form_back(self.client.get(url))
-        data["amount_paid_mode"] = "OFF"
-        self.client.post(url, data)
-        e1 = self.line("E001")
-        self.assertIsNone(e1.amount_paid_input)
-        self.assertNotEqual(e1.net_pay, D(25000))
-
-    def test_new_minimum_wages_work_drafts_out_again(self):
-        self.post_amounts(E001="25000")
-        before = self.line("E001").earned_basic
-        self.client.post(reverse("portal:minimum_wages"), {
-            "state": self.srks.state, "effective_from": "01-04-2026", "unskilled": "15000", "semi_skilled": "15500",
-            "skilled": "17000", "highly_skilled": "19000"})
-        e1 = self.line("E001")
-        self.assertEqual((before, e1.earned_basic, e1.net_pay), (D(14000), D(15000), D(25000)))
+    def line(self, code, month=NOV):
+        return self.run_for(month=month).lines.get(employee__emp_code=code)
 
 
-class AmountsPageTest(AmountPaidCase):
-    def test_mistakes_save_nothing(self):
-        page = self.post_amounts(E001="25,000.50", E002="abc")
-        self.assertContains(page, "Use whole rupees, without paise.")
-        self.assertContains(page, "Write an amount in rupees")
-        self.assertContains(page, "Nothing was saved.")
-        self.assertIsNone(self.line("E001").amount_paid_input)
+class GrossSplitTest(SplitCase):
+    def test_gross_is_split_and_cut_for_absent_days(self):
+        e2 = self.line("E002")  # gross 18,000, semi-skilled 15,500, 27 of 30 days paid
+        self.assertEqual((e2.earned_basic, e2.incentive_pay, e2.gross), (D(13950), D(2250), D(16200)))
+        self.assertEqual((e2.rate_basic, e2.rate_hra, e2.rate_other), (D(15500), D(0), D(0)))
+        self.assertEqual(e2.ee_esi, D(105))  # 0.75% of Basic, not of the incentive
+        self.assertEqual(e2.ee_pf, D(1674))  # 12% of Basic
+        self.assertEqual(e2.net_pay, e2.gross - e2.total_deductions)
+        e5 = self.line("E005")  # gross 20,000, skilled 17,000, full month
+        self.assertEqual((e5.earned_basic, e5.incentive_pay, e5.gross), (D(17000), D(3000), D(20000)))
 
-    def test_incentive_and_amount_together_are_refused(self):
-        line = self.line("E001")
-        url = reverse("payroll:line_edit", args=[NOV, line.pk])
-        from core.test_qa import same_form_back
+    def test_gross_below_the_minimum_wage_is_paid_the_minimum_wage(self):
+        e1 = self.line("E001")  # gross 12,000 + 500 increment, unskilled minimum 14,000
+        self.assertIn("GROSS_BELOW_MINIMUM", e1.warnings)
+        self.assertEqual((e1.earned_basic, e1.incentive_pay), (D(14000), D(0)))
+        page = self.client.get(reverse("payroll:month", args=[NOV]))
+        self.assertContains(page, "The gross salary is below the minimum wage")
 
-        data = same_form_back(self.client.get(url))
-        data.update(amount_paid="25000", incentive="500")
-        self.assertContains(self.client.post(url, data), "Leave Incentive empty when Amount Paid is written")
-        data.update(incentive="")
-        self.client.post(url, data)
-        self.assertEqual(self.line("E001").net_pay, D(25000))
-
-    def test_an_increment_is_refused_and_an_incentive_replaced(self):
-        self.run_for().lines.filter(employee__emp_code="E002").update(increment=700)
-        self.run_for().lines.filter(employee__emp_code="E004").update(incentive=900)
-        page = self.post_amounts(E002="18000", E004="90000")
-        self.assertContains(page, "An increment of ₹700 is written for this month.")
-        self.assertIsNone(self.line("E004").amount_paid_input)  # nothing saved
-        self.run_for().lines.filter(employee__emp_code="E002").update(increment=0)
-        self.post_amounts(E002="18000", E004="90000")
-        e4 = self.line("E004")
-        self.assertEqual((e4.incentive, e4.net_pay), (D(0), D(90000)))
-
-    def test_no_minimum_wage_for_the_state(self):
+    def test_minimum_wage_needed(self):
         MinimumWage.objects.all().delete()
-        page = self.post_amounts(E001="25000")
-        self.assertContains(page, "There is no minimum wage for unskilled staff")
-        self.assertIsNone(self.line("E001").amount_paid_input)
+        page = self.client.post(reverse("payroll:upload", args=[NOV]), {"file": sheet_with(self.client, {})})
+        self.assertContains(page, "There is no minimum wage for")
 
-    def test_page_needs_the_feature_on_and_a_draft_month(self):
+    def test_switching_off_pays_the_salary_heads_again(self):
         self.srks.amount_paid_mode = "OFF"
         self.srks.save()
-        self.assertRedirects(self.client.get(self.amounts_url()), reverse("companies:payroll"),
-                             fetch_redirect_response=False)
-        self.srks.amount_paid_mode = "IN_HAND"
-        self.srks.save()
+        service.recompute_run(self.run_for())
+        e2 = self.line("E002")
+        self.assertEqual(e2.incentive_pay, D(0))
+        self.assertNotEqual(e2.earned_basic, D(13950))
+
+    def test_an_increment_raises_the_persons_own_salary(self):
         with self.today_is(date(2026, 11, 30)):
             self.finalise_november()
-        self.assertRedirects(self.client.get(self.amounts_url()), reverse("payroll:month", args=[NOV]),
-                             fetch_redirect_response=False)
+        raised = SalaryRevision.objects.get(employee=self.employee("E001"), payroll_run=self.run_for())
+        self.assertEqual(raised.gross, D(12500))  # 12,000 + 500, not the minimum wage split
 
-    def test_month_page_button_and_tag(self):
-        self.post_amounts(E001="25000")
-        page = self.client.get(reverse("payroll:month", args=[NOV]))
-        self.assertContains(page, "Write or change take-home pay")
-        self.assertContains(page, "From amount paid ₹25,000")
-        self.assertContains(page, "1 person is worked out from the amount paid.")
+    def test_new_minimum_wages_work_drafts_out_again(self):
+        self.client.post(reverse("portal:minimum_wages"), dict(
+            state=self.srks.state, effective_from="01-04-2026", unskilled="14000", semi_skilled="16000",
+            skilled="17000", highly_skilled="19000"))
+        e2 = self.line("E002")
+        self.assertEqual((e2.earned_basic, e2.gross), (D(14400), D(16200)))  # same gross, more of it Basic
 
-
-class SheetWithAmountTest(AmountPaidCase):
-    def test_column_only_when_the_feature_is_on(self):
-        headers = [c.value for c in load_workbook(BytesIO(self.client.get(
-            reverse("payroll:sheet", args=[NOV])).content)).worksheets[0][1]]
-        self.assertIn("Amount Paid ₹", headers)
-        self.srks.amount_paid_mode = "OFF"
-        self.srks.save()
+    def test_sheet_has_no_amount_column_and_absent_days_cut_the_gross(self):
         headers = [c.value for c in load_workbook(BytesIO(self.client.get(
             reverse("payroll:sheet", args=[NOV])).content)).worksheets[0][1]]
         self.assertNotIn("Amount Paid ₹", headers)
+        self.client.post(reverse("payroll:upload", args=[NOV]), {"file": sheet_with(
+            self.client, {"E005": {"Days Present": 21, "Absent / LOP Days": 5}})})
+        self.assertEqual(self.line("E005").gross, D(16667))  # 20,000 x 25/30
 
-    def test_upload_with_amount_paid(self):
-        response = self.client.post(reverse("payroll:upload", args=[NOV]),
-                                    {"file": sheet_with(self.client, {"E001": {"Amount Paid ₹": 26000}})})
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(self.line("E001").net_pay, D(26000))
+
+class GrossSalariesPageTest(SplitCase):
+    def url(self, month=NOV):
+        return reverse("payroll:amounts", args=[month])
+
+    def post(self, month=NOV, **fields):
+        people = service.employees_for_month(self.srks, month)
+        data = {}
+        for e in people:
+            current = e.structure_on(month)
+            data[f"gross_{e.pk}"] = f"{current.gross:.0f}" if current else ""
+            data[f"absent_{e.pk}"] = ""
+        for name, value in fields.items():
+            kind, code = name.split("_", 1)
+            data[f"{kind}_{self.employee(code).pk}"] = value
+        return self.client.post(self.url(month), data)
+
+    def test_started_month_change_a_gross(self):
+        page = self.client.get(self.url())
+        self.assertContains(page, "Gross salaries — November 2026")
+        self.assertContains(page, "Save and work out")
+        self.assertContains(page, 'value="20000"')  # E005's gross, from the salary structure
+        response = self.post(gross_E005="22000")
+        self.assertRedirects(response, reverse("payroll:month", args=[NOV]) + "#review",
+                             fetch_redirect_response=False)
+        self.assertEqual(self.line("E005").gross, D(22000))
+        self.assertEqual(self.employee("E005").structure_on(NOV).gross, D(22000))
+
+    def test_start_a_month_without_the_sheet(self):
+        with self.today_is(date(2026, 11, 30)):
+            self.finalise_november()
+        page = self.client.get(self.url(DEC))
+        self.assertContains(page, "Save and start the month")
+        month_page = self.client.get(reverse("payroll:month", args=[DEC]))
+        self.assertContains(month_page, "Gross salaries and absent days")
+        response = self.post(DEC, absent_E002="2", gross_E005="21000")
+        self.assertRedirects(response, reverse("payroll:month", args=[DEC]) + "#review",
+                             fetch_redirect_response=False)
+        run = self.run_for(month=DEC)
+        self.assertEqual(run.lines.count(), 7)
+        self.assertIsNone(run.uploaded_file.name or None)
+        e5 = self.line("E005", DEC)
+        self.assertEqual((e5.paid_days, e5.gross), (D(31), D(21000)))
+        self.assertEqual(SalaryRevision.objects.get(employee=self.employee("E005"), effective_from=DEC).gross,
+                         D(21000))
+        e2 = self.line("E002", DEC)
+        self.assertEqual(e2.lop, D(2))
+        self.assertEqual(e2.gross, D(16839))  # 18,000 x 29/31
+
+    def test_mistakes_save_nothing(self):
+        page = self.post(gross_E005="abc")
+        self.assertContains(page, "Write an amount in rupees")
+        self.assertContains(page, "Nothing was saved.")
+        with self.today_is(date(2026, 11, 30)):
+            self.finalise_november()
+        page = self.post(DEC, absent_E001="1.3", absent_E002="99")
+        self.assertContains(page, "Use whole or half days only")
+        self.assertContains(page, "cannot be more than the 27 working days")
+        self.assertFalse(PayrollRun.objects.filter(company=self.srks, month=DEC).exists())
+
+    def test_page_needs_the_split_on_and_months_in_order(self):
+        response = self.client.get(self.url(DEC))
+        self.assertRedirects(response, reverse("payroll:month", args=[DEC]), fetch_redirect_response=False)
+        self.srks.amount_paid_mode = "OFF"
+        self.srks.save()
+        self.assertRedirects(self.client.get(self.url()), reverse("companies:payroll"),
+                             fetch_redirect_response=False)
+
+    def test_employee_forms_ask_one_gross_salary(self):
+        page = self.client.get(reverse("employees:add"))
+        self.assertContains(page, "Gross salary per month ₹")
+        self.assertNotContains(page, 'name="hra"')
+        url = reverse("employees:revise", args=[self.employee("E005").pk])
+        form_page = self.client.get(url)
+        self.assertContains(form_page, "Gross salary per month ₹")
+        data = same_form_back(form_page)
+        self.assertEqual(data["basic"], "20000")
+        data.update(basic="24000", reason="Yearly raise", effective_month="2026-12")
+        self.client.post(url, data)
+        rev = SalaryRevision.objects.filter(employee=self.employee("E005")).order_by("-id").first()
+        self.assertEqual((rev.basic, rev.hra, rev.gross), (D(24000), D(0), D(24000)))
 
 
 class MinimumWagesPageTest(DemoTestCase):
@@ -268,65 +265,3 @@ class SimplerScreensTest(DemoTestCase):
         self.assertNotContains(page, ">Notices</a>")
         self.assertContains(page, reverse("advances:list"))
         self.assertContains(page, reverse("letters:index"))
-
-
-class SalariesWithoutSheetTest(AmountPaidCase):
-    """'Or skip Excel': start a month from the gross salaries alone."""
-
-    DEC = date(2026, 12, 1)
-
-    def setUp(self):
-        super().setUp()
-        self.srks.amount_paid_mode = "GROSS"
-        self.srks.save()
-        self.url = reverse("payroll:amounts", args=[self.DEC])
-
-    def finalise_nov(self):
-        with self.today_is(date(2026, 11, 30)):
-            self.finalise_november()
-
-    def post_fresh(self, **fields):
-        people = service.employees_for_month(self.srks, self.DEC)
-        data = {f"amount_{e.pk}": "" for e in people} | {f"absent_{e.pk}": "" for e in people}
-        for name, value in fields.items():
-            kind, code = name.split("_", 1)
-            data[f"{kind}_{self.employee(code).pk}"] = value
-        return self.client.post(self.url, data)
-
-    def test_months_are_still_done_in_order(self):
-        response = self.client.get(self.url)
-        self.assertRedirects(response, reverse("payroll:month", args=[self.DEC]), fetch_redirect_response=False)
-        page = self.client.get(reverse("payroll:month", args=[self.DEC]))
-        self.assertContains(page, "Finalise November 2026 first.")
-
-    def test_start_the_month_from_gross_salaries(self):
-        self.finalise_nov()
-        page = self.client.get(self.url)
-        self.assertContains(page, "Save and start the month")
-        self.assertContains(page, "No attendance sheet is needed")
-        month_page = self.client.get(reverse("payroll:month", args=[self.DEC]))
-        self.assertContains(month_page, "Write each person's gross salary")
-        response = self.post_fresh(amount_E001="30000", amount_E002="20000", absent_E002="2")
-        self.assertRedirects(response, self.url, fetch_redirect_response=False)
-        run = self.run_for(month=self.DEC)
-        e1 = run.lines.get(employee__emp_code="E001")
-        e2 = run.lines.get(employee__emp_code="E002")
-        e4 = run.lines.get(employee__emp_code="E004")
-        self.assertEqual((e1.gross, e2.gross), (D(30000), D(20000)))
-        self.assertEqual(e1.rate_basic, D(14000))  # minimum wage, full month
-        self.assertEqual(e1.paid_days, D(31))
-        self.assertEqual(e2.lop, D(2))
-        self.assertLess(e2.earned_basic, D(15500))  # semi-skilled minimum, less 2 absent days
-        self.assertIsNone(e4.amount_paid_input)  # left empty: paid from the salary structure, full month
-        self.assertEqual(e4.paid_days, D(31))
-        self.assertIsNone(run.uploaded_file.name or None)
-        page = self.client.get(self.url)  # the month exists now: change the amounts there
-        self.assertContains(page, "Save and work out")
-
-    def test_mistakes_save_nothing(self):
-        self.finalise_nov()
-        page = self.post_fresh(amount_E001="30000", absent_E001="1.3", absent_E002="99")
-        self.assertContains(page, "Use whole or half days only")
-        page = self.post_fresh(amount_E001="30000", absent_E002="99")
-        self.assertContains(page, "cannot be more than the 27 working days")
-        self.assertFalse(service.PayrollRun.objects.filter(company=self.srks, month=self.DEC).exists())

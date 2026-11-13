@@ -130,6 +130,7 @@ def create_demo():
         payroll_start_month=NOV_2026, pf_enabled=True, pf_employee_rate=D("12.00"), pf_restrict_to_ceiling=True,
         esi_enabled=True, pt_enabled=True, pt_state="KA", tds_enabled=True, salary_divisor="CALENDAR",
         ot_multiplier=D(2), ot_days_divisor=26, ot_hours_per_day=D(8),
+        amount_paid_mode="OFF",  # the README demo pays each salary head as entered
     )
     srks_people = _staff(srks, SRKS_STAFF, "1012345678", "12345678", SRKS_ESI_COVERED, pf_on=True)
     for code, (gross, tds, pt) in SRKS_OPENING.items():
@@ -144,7 +145,7 @@ def create_demo():
         phone="020 2543 9876", email="annapurna@example.com", lin="DEMO-LIN-0002",
         signatory_name="Sushila Kulkarni", signatory_designation="Partner",
         payroll_start_month=NOV_2026, pf_enabled=False, esi_enabled=True, pt_enabled=True, pt_state="MH",
-        tds_enabled=True,
+        tds_enabled=True, amount_paid_mode="OFF",
     )
     anps_people = _staff(anps, ANPS_STAFF, "", "22345678", {"A001", "A002"}, pf_on=False)
 

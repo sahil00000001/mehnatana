@@ -18,7 +18,7 @@
   </li>
 
   <li class="step{% if has_lines %} done{% endif %}">
-    <h2>{% if amount_paid_on %}{% translate "Fill it in Excel and upload it — or just write the salaries" %}{% else %}{% translate "Fill it in Excel and upload it" %}{% endif %}</h2>
+    <h2>{% if splits_gross %}{% translate "Fill it in Excel and upload it — or just write absent days" %}{% else %}{% translate "Fill it in Excel and upload it" %}{% endif %}</h2>
     {% if is_final %}
       <p>{% translate "This month is finalised. To change anything, reopen it (step 5)." %}</p>
     {% elif blocker %}
@@ -38,11 +38,11 @@
         </div>
       </form>
       {% if has_lines and not upload_errors and not file_errors and not upload_form.errors %}</details>{% endif %}
-      {% if amount_paid_on and not has_lines %}
+      {% if splits_gross and not has_lines %}
       <p class="or-line">{% translate "Or skip Excel:" %}</p>
       <div class="actions">
-        <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% if amount_paid_in_hand %}{% translate "Write each person's take-home pay" %}{% else %}{% translate "Write each person's gross salary" %}{% endif %}</a>
-        <span class="muted">{% translate "PayCore works out Basic (minimum wage), ESI, PF and incentive so the salary matches. Everyone counts as present unless you write absent days." %}</span>
+        <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% translate "Gross salaries and absent days" %}</a>
+        <span class="muted">{% translate "Everyone counts as present on every working day unless you write absent days. The gross salary is cut for absent days; ESI, PF and take-home are worked out." %}</span>
       </div>
       {% endif %}
     {% endif %}
@@ -67,10 +67,10 @@
   <li class="step{% if is_final %} done{% elif has_lines %} current{% endif %}" id="review">
     <h2>{% translate "Look at the salary table" %}</h2>
     {% if has_lines %}
-      {% if amount_paid_on and not is_final %}
+      {% if splits_gross and not is_final %}
       <div class="actions">
-        <a class="btn" href="{% url 'payroll:amounts' month %}">{% if amount_paid_in_hand %}{% translate "Write or change take-home pay" %}{% else %}{% translate "Write or change gross salaries" %}{% endif %}</a>
-        <span class="muted">{% if amounts_count %}{% blocktranslate count n=amounts_count %}{{ n }} person is worked out from the amount paid.{% plural %}{{ n }} people are worked out from the amount paid.{% endblocktranslate %}{% else %}{% translate "Write what the owner pays; Basic becomes the minimum wage, the rest incentive." %}{% endif %}</span>
+        <a class="btn" href="{% url 'payroll:amounts' month %}">{% translate "See or change gross salaries" %}</a>
+        <span class="muted">{% translate "Basic at the minimum wage, the rest of the gross as incentive, both cut for absent days." %}</span>
       </div>
       {% endif %}
       <p class="table-tools">
@@ -102,7 +102,7 @@
             {% else %}<td class="num">{{ l.total_deductions|inr }}</td>{% endif %}
             <td class="num strong">{{ l.net_pay|inr }}</td>
             {% if full %}<td class="num">{{ l.employer_pf|inr }}</td><td class="num">{{ l.er_esi|inr }}</td><td class="num">{{ l.employer_cost|inr }}</td>{% endif %}
-            <td class="notes">{% if l.amount_paid_input is not None %}<span class="tag">{% blocktranslate with amount=l.amount_paid_input|inr %}From amount paid ₹{{ amount }}{% endblocktranslate %}</span>{% if l.note_texts or l.remarks %}<br>{% endif %}{% endif %}{% for t in l.note_texts %}{{ t }}{% if not forloop.last %}<br>{% endif %}{% endfor %}{% if l.remarks %}{% if l.note_texts %}<br>{% endif %}<em>{{ l.remarks }}</em>{% endif %}</td>
+            <td class="notes">{% for t in l.note_texts %}{{ t }}{% if not forloop.last %}<br>{% endif %}{% endfor %}{% if l.remarks %}{% if l.note_texts %}<br>{% endif %}<em>{{ l.remarks }}</em>{% endif %}</td>
             {% if not is_final %}<td><a href="{% url 'payroll:line_edit' month l.pk %}">{% translate "Edit" %}</a></td>{% endif %}
           </tr>
         {% empty %}
