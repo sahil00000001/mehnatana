@@ -7,6 +7,7 @@ from datetime import date, datetime
 from urllib.parse import urlencode
 from decimal import ROUND_FLOOR, Decimal as D
 
+from django.conf import settings
 from django.contrib import messages
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
@@ -149,7 +150,7 @@ def dashboard(request):
         active_count=Employee.objects.filter(company=company, status=Employee.Status.ACTIVE).count(),
         last=last, last_totals=last_totals, year_so_far=year_so_far,
         view=view, views=queries.COST_VIEWS, cost_rows=cost_rows, largest=largest,
-        home_notices=notices_for(company, today), fixes=fixes, today=today,
+        home_notices=notices_for(company, today) if settings.SHOW_NOTICES else [], fixes=fixes, today=today,
     )
 
 

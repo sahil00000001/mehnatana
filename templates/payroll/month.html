@@ -18,7 +18,7 @@
   </li>
 
   <li class="step{% if has_lines %} done{% endif %}">
-    <h2>{% translate "Fill it in Excel and upload it" %}</h2>
+    <h2>{% if amount_paid_on %}{% translate "Fill it in Excel and upload it — or just write the salaries" %}{% else %}{% translate "Fill it in Excel and upload it" %}{% endif %}</h2>
     {% if is_final %}
       <p>{% translate "This month is finalised. To change anything, reopen it (step 5)." %}</p>
     {% elif blocker %}
@@ -38,6 +38,13 @@
         </div>
       </form>
       {% if has_lines and not upload_errors and not file_errors and not upload_form.errors %}</details>{% endif %}
+      {% if amount_paid_on and not has_lines %}
+      <p class="or-line">{% translate "Or skip Excel:" %}</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% if amount_paid_in_hand %}{% translate "Write each person's take-home pay" %}{% else %}{% translate "Write each person's gross salary" %}{% endif %}</a>
+        <span class="muted">{% translate "PayCore works out Basic (minimum wage), ESI, PF and incentive so the salary matches. Everyone counts as present unless you write absent days." %}</span>
+      </div>
+      {% endif %}
     {% endif %}
 
     {% if file_errors or upload_errors %}
@@ -62,8 +69,8 @@
     {% if has_lines %}
       {% if amount_paid_on and not is_final %}
       <div class="actions">
-        <a class="btn" href="{% url 'payroll:amounts' month %}">{% translate "Salary from the amount paid" %}</a>
-        <span class="muted">{% if amounts_count %}{% blocktranslate count n=amounts_count %}{{ n }} person is worked out from the amount paid.{% plural %}{{ n }} people are worked out from the amount paid.{% endblocktranslate %}{% else %}{% translate "Write what the owner paid; Basic becomes the minimum wage and the rest incentive." %}{% endif %}</span>
+        <a class="btn" href="{% url 'payroll:amounts' month %}">{% if amount_paid_in_hand %}{% translate "Write or change take-home pay" %}{% else %}{% translate "Write or change gross salaries" %}{% endif %}</a>
+        <span class="muted">{% if amounts_count %}{% blocktranslate count n=amounts_count %}{{ n }} person is worked out from the amount paid.{% plural %}{{ n }} people are worked out from the amount paid.{% endblocktranslate %}{% else %}{% translate "Write what the owner pays; Basic becomes the minimum wage, the rest incentive." %}{% endif %}</span>
       </div>
       {% endif %}
       <p class="table-tools">

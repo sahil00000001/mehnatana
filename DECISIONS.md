@@ -160,6 +160,18 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 - When minimum wages are entered, any line whose Basic + DA + other allowance is below the minimum for the days
   paid gets a note (and, if the company switches the check on, the upload is stopped).
 
+- **Gross salary is the default (13-11-2026).** The person running payroll matches the gross salary the owner
+  gives; `amount_paid_mode` defaults to GROSS, and the month page offers "Or skip Excel: write each person's gross
+  salary". Without a sheet, everyone counts as present on every working day of the days employed, weekly offs as
+  the sheet pre-fills them, minus any absent days written on the page; the advance instalment due is cut as with
+  the sheet. Saving starts the draft month (`service.save_salaries`), with the same checks as an upload.
+
+## Notice board switched off (13-11-2026)
+
+- At the owner's request the notice board is hidden everywhere (Home, the yellow strip, the count in the menu and
+  the column on All companies). `SHOW_NOTICES=True` in the environment brings it all back; the code and its tests
+  stay.
+
 ## Attendance sheet checks (added 13-11-2026)
 
 - Settings → Attendance sheet checks (`Company.sheet_checks`, catalogue in `payroll/checks.py`). Switchable:

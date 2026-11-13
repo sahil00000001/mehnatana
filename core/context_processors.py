@@ -60,6 +60,7 @@ def app(request):
         "APP_TAGLINE": settings.APP_TAGLINE,
         "SUPPORT_PHONE": settings.SUPPORT_PHONE,
         "SUPPORT_EMAIL": settings.SUPPORT_EMAIL,
+        "SHOW_NOTICES": settings.SHOW_NOTICES,
     }
     company = getattr(request, "company", None)
     user = getattr(request, "user", None)
@@ -71,7 +72,7 @@ def app(request):
             "menu_current": current,
             "menu_section": next(((label, url) for key, label, url in menu if key == current), None),
             "today": timezone.localdate(),
-            "notice_strip": _attention(company),
+            "notice_strip": _attention(company) if settings.SHOW_NOTICES else [],
         })
     elif user is not None and user.is_authenticated and not user.must_change_password:
         current = _current(request.path, PORTAL_MENU)

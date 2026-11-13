@@ -278,7 +278,7 @@ tr.current-month td { background: var(--warn-bg) !important; font-weight: bold; 
 tr.row-error td { background: var(--err-bg); }
 tr.has-notes.row-note td, tr.row-note td { color: var(--warn-ink); font-size: 15px; border-top: 0; }
 tr.row-error.row-note td { color: var(--err-ink); }
-input.amount-input { width: 9em; text-align: right; padding: 6px 8px; font-size: 17px; }
+input.amount-input { width: 6.5em; text-align: right; padding: 6px 8px; font-size: 17px; }
 details.more { border: 1px solid var(--rule-dark); background: var(--white); padding: 8px 14px; margin: 0 0 18px; }
 details.more > summary { cursor: pointer; font-weight: bold; padding: 6px 0; }
 details.more[open] > summary { margin-bottom: 8px; }
@@ -290,3 +290,6 @@ table.checks input[type="checkbox"] { width: 22px; height: 22px; }
 ul.plain-list { margin: 4px 0 4px; padding-left: 20px; }
 ul.plain-list li { margin: 4px 0; }
 input[type="radio"] { width: 20px; height: 20px; vertical-align: -4px; }
+input.days-input { width: 3.2em; text-align: right; padding: 6px 6px; font-size: 17px; }
+.or-line { margin: 14px 0 6px; font-weight: bold; }
+table.amounts-table th { white-space: normal; vertical-align: bottom; }

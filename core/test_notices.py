@@ -2,12 +2,14 @@
 from datetime import date
 from unittest import mock
 
+from django.test import override_settings
 from django.urls import reverse
 
 from core.notices import needs_attention, notices_for
 from core.testing import DemoTestCase
 
 
+@override_settings(SHOW_NOTICES=True)  # switched off on the live site for now; it must still work
 class NoticesTest(DemoTestCase):
     def test_pf_due_soon_shows_everywhere(self):
         self.finalise_november()
@@ -74,3 +76,18 @@ class NoticesTest(DemoTestCase):
         self.assertContains(response, ">Employees</a> › <span>Sunita Devi</span>")
         self.assertContains(response, "Thursday, 5 November 2026")
         self.assertContains(response, '</a> <span class="sep" aria-hidden="true">·</span> <a')  # menu can wrap
+
+
+class NoticesSwitchedOffTest(DemoTestCase):
+    """SHOW_NOTICES is off by default: no notice board, strip, count or column anywhere."""
+
+    def test_nothing_about_notices_is_shown(self):
+        with self.today_is(date(2026, 12, 13)):
+            home = self.client.get(reverse("home"))
+            employees = self.client.get(reverse("employees:list"))
+            companies = self.client.get(reverse("portal:list"))
+        self.assertNotContains(home, "Notice board")
+        self.assertNotContains(employees, "notice-strip")
+        self.assertNotContains(employees, '<span class="count"')
+        self.assertNotContains(companies, ">Notices</th>")
+

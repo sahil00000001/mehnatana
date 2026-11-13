@@ -67,6 +67,7 @@ def _month_context(request, month, run, **extra):
         "totals": totals, "has_lines": has_lines, "only_notes": only_notes, "notes_count": notes_count,
         "full": request.GET.get("full") == "1", "amounts_count": amounts_count,
         "amount_paid_on": company.amount_paid_mode != Company.AmountPaid.OFF,
+        "amount_paid_in_hand": company.amount_paid_mode == Company.AmountPaid.IN_HAND,
         "is_final": bool(run and run.is_final), "upload_form": UploadForm(),
         "finalise_blockers": service.finalise_blockers(run) if run and has_lines and not run.is_final else [],
         "can_reopen": bool(run and run.is_final and not service.reopen_blockers(run)),

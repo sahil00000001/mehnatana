@@ -11,7 +11,7 @@
   <thead><tr>
     <th class="num">{% translate "Sl." %}</th><th>{% translate "Company" %}</th><th>{% translate "Code" %}</th><th>{% translate "City" %}</th>
     <th>{% translate "Working week" %}</th><th class="num">{% translate "Staff" %}</th><th>{% translate "Latest salary month" %}</th>
-    <th class="num">{% translate "Notices" %}</th><th></th>
+    {% if SHOW_NOTICES %}<th class="num">{% translate "Notices" %}</th>{% endif %}<th></th>
   </tr></thead>
   <tbody>
   {% for row in active %}{% with c=row.company %}
@@ -23,7 +23,7 @@
       <td>{{ c.working_week_label }}</td>
       <td class="num">{{ row.staff }}</td>
       <td>{% if row.latest %}{{ row.latest.label }} <span class="badge {% if row.latest.is_final %}badge-final{% else %}badge-draft{% endif %}">{{ row.latest.get_status_display }}</span>{% else %}<span class="muted">{% blocktranslate with month=c.payroll_start_month|month_label %}None yet (starts {{ month }}){% endblocktranslate %}</span>{% endif %}</td>
-      <td class="num">{% if row.attention %}<strong>{{ row.attention }}</strong>{% else %}0{% endif %}</td>
+      {% if SHOW_NOTICES %}<td class="num">{% if row.attention %}<strong>{{ row.attention }}</strong>{% else %}0{% endif %}</td>{% endif %}
       <td>
         <form method="post" action="{% url 'portal:open' c.pk %}" class="inline">{% csrf_token %}
           {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}

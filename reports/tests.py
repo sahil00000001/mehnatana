@@ -177,8 +177,9 @@ class DraftMonthTest(DemoTestCase):
         self.assertContains(response, "This month: November 2026")
         self.assertContains(response, "Check and finalise November 2026")
         self.assertContains(response, "No month is finalised yet")
-        self.assertContains(response, "Pay November 2026 salary")
         self.assertContains(response, "fix=no_appointment_letter")
+        with self.settings(SHOW_NOTICES=True):
+            self.assertContains(self.client.get(reverse("home")), "Pay November 2026 salary")
 
     def test_things_to_fix(self):
         fixes = fix_querysets(self.srks, today=date(2026, 11, 5))

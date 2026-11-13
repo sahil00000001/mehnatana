@@ -710,6 +710,54 @@ def amounts_preview(run, amounts):
     return rows, errors
 
 
+def full_month_row(ctx, emp, absent=ZERO):
+    """Attendance when no sheet is used: every working day worked except `absent`, weekly offs as the sheet
+    pre-fills them (only the offs inside the days employed), the advance instalment due as usual."""
+    y, m, offs_days = ctx.month.year, ctx.month.month, ctx.settings.weekly_off
+    start, end = engine.employed_span(y, m, emp.date_of_joining, emp.date_of_leaving)
+    offs = engine.weekly_offs_between(start, end, offs_days) if start else 0
+    working = engine.working_days_employed(y, m, emp.date_of_joining, emp.date_of_leaving, offs_days)
+    return RowInput(present=D(working) - absent, week_off_holiday=D(offs),
+                    advance=ctx.suggested_advance(emp)), working
+
+
+def salaries_preview(company, month, entries):
+    """The month worked out from salaries alone (no attendance sheet), without saving.
+
+    entries: {employee id: (absent days, amount or None)}. Returns (rows, errors {employee id: [messages]}).
+    """
+    ctx = RunContext(company, month)
+    rows, errors = [], {}
+    for emp in ctx.employees:
+        absent, amount = entries.get(emp.pk, (ZERO, None))
+        row, working = full_month_row(ctx, emp, absent or ZERO)
+        row.amount_paid = amount
+        item = {"emp": emp, "row": row, "working": working, "minimum": ctx.minimum_wage(emp), "result": None,
+                "warnings": []}
+        problems = []
+        if absent and absent > working:
+            problems = [("present", _("Absent days (%(a)s) cannot be more than the %(w)s working days.")
+                         % {"a": plain_number(absent), "w": working})]
+        problems = problems or check_row(ctx, emp, row, strict=True)
+        if problems:
+            errors[emp.pk] = [m for _k, m in problems]
+        else:
+            item["result"], _used, item["warnings"] = compute(ctx, emp, row)
+        rows.append(item)
+    return rows, errors
+
+
+def save_salaries(company, month, entries, user, request=None):
+    """Start a draft month from salaries alone (instead of uploading the attendance sheet). All or nothing."""
+    blocker = upload_blocker(company, month)
+    if blocker:
+        raise PayrollError(blocker)
+    rows, errors = salaries_preview(company, month, entries)
+    if errors:
+        raise PayrollError(_("Nothing was saved. Correct the rows marked in red."))
+    return save_inputs(company, month, {item["emp"].pk: item["row"] for item in rows}, user, request=request)
+
+
 def save_amounts(run, amounts, user, request=None):
     """Store the amounts paid of a draft month and work those lines out again (all or nothing)."""
     with transaction.atomic():

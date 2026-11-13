@@ -79,9 +79,11 @@
 {% endif %}
 {% endwith %}
 
+{% if SHOW_NOTICES %}
 <h2>{% translate "Notice board" %}</h2>
 {% include "includes/notice_list.html" with notices=home_notices %}
 <p><a href="{% url 'notices' %}">{% translate "See all notices" %}</a></p>
+{% endif %}
 
 <h2>{% translate "Things to fix" %}</h2>
 {% if fixes %}

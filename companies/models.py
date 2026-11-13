@@ -44,9 +44,9 @@ class Company(TimeStamped):
         OLD = "OLD", _("Old regime")
 
     class AmountPaid(models.TextChoices):
-        OFF = "OFF", _("Off: salary comes from each person's salary structure")
-        IN_HAND = "IN_HAND", _("On: the amount is the take-home pay (after PF and ESI)")
-        GROSS = "GROSS", _("On: the amount is the salary before PF and ESI")
+        GROSS = "GROSS", _("On: write each person's gross salary (before PF and ESI) — PayCore matches it")
+        IN_HAND = "IN_HAND", _("On: write each person's take-home pay (after PF and ESI) — PayCore matches it")
+        OFF = "OFF", _("Off: salary comes only from each person's salary structure")
 
     class PayslipStyle(models.TextChoices):
         CLASSIC = "CLASSIC", _("Classic ledger")
@@ -93,9 +93,10 @@ class Company(TimeStamped):
     salary_divisor = models.CharField(_("salary is divided by"), max_length=10, choices=Divisor.choices,
                                       default=Divisor.CALENDAR)
     amount_paid_mode = models.CharField(
-        _("salary from the amount paid"), max_length=8, choices=AmountPaid.choices, default=AmountPaid.OFF,
-        help_text=_("When on, you can write what the owner actually paid each person. Basic becomes the minimum "
-                    "wage, PF and ESI are worked out on it, and the rest is shown as incentive."))
+        _("salary from the amount paid"), max_length=8, choices=AmountPaid.choices, default=AmountPaid.GROSS,
+        help_text=_("When on, you can write what the owner actually pays each person, with or without the "
+                    "attendance sheet. Basic becomes the minimum wage, ESI and PF (if applicable) are worked out on "
+                    "it, and the rest is shown as incentive, so the salary matches exactly."))
     # Optional checks of the attendance sheet (see payroll/checks.py); empty = the defaults.
     sheet_checks = models.JSONField(_("attendance sheet checks"), default=dict, blank=True)
     pf_enabled = models.BooleanField(_("PF applies"), default=True)

@@ -37,6 +37,9 @@ APP_NAME = env("APP_NAME", "PayCore")
 APP_TAGLINE = env("APP_TAGLINE", "Payroll and salary management")
 SUPPORT_PHONE = env("SUPPORT_PHONE", "+91 98765 43210")
 SUPPORT_EMAIL = env("SUPPORT_EMAIL", "")
+# Notice board (due dates of PF, ESI, TDS ...): on Home, the yellow strip, the count in the menu and on
+# All companies. Switched off for now at the owner's request; SHOW_NOTICES=True brings all of it back.
+SHOW_NOTICES = env_bool("SHOW_NOTICES", False)
 
 # ------------------------------------------------------------ core
 DEBUG = env_bool("DEBUG", False)

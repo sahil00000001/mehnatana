@@ -5,6 +5,7 @@ screen works only on that company (request.company, set by core.middleware).
 """
 import logging
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
@@ -55,7 +56,7 @@ def company_list(request):
     for run in PayrollRun.objects.order_by("company_id", "-month"):
         latest.setdefault(run.company_id, run)
     rows = [{"company": c, "staff": staff.get(c.pk, 0), "latest": latest.get(c.pk),
-             "attention": _attention_count(c) if c.is_active else 0,
+             "attention": _attention_count(c) if c.is_active and settings.SHOW_NOTICES else 0,
              "current": request.company is not None and request.company.pk == c.pk}
             for c in companies]
     active = [r for r in rows if r["company"].is_active]

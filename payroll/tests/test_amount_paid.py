@@ -147,7 +147,7 @@ class AmountsPageTest(AmountPaidCase):
     def test_month_page_button_and_tag(self):
         self.post_amounts(E001="25000")
         page = self.client.get(reverse("payroll:month", args=[NOV]))
-        self.assertContains(page, "Salary from the amount paid")
+        self.assertContains(page, "Write or change take-home pay")
         self.assertContains(page, "From amount paid ₹25,000")
         self.assertContains(page, "1 person is worked out from the amount paid.")
 
@@ -268,3 +268,65 @@ class SimplerScreensTest(DemoTestCase):
         self.assertNotContains(page, ">Notices</a>")
         self.assertContains(page, reverse("advances:list"))
         self.assertContains(page, reverse("letters:index"))
+
+
+class SalariesWithoutSheetTest(AmountPaidCase):
+    """'Or skip Excel': start a month from the gross salaries alone."""
+
+    DEC = date(2026, 12, 1)
+
+    def setUp(self):
+        super().setUp()
+        self.srks.amount_paid_mode = "GROSS"
+        self.srks.save()
+        self.url = reverse("payroll:amounts", args=[self.DEC])
+
+    def finalise_nov(self):
+        with self.today_is(date(2026, 11, 30)):
+            self.finalise_november()
+
+    def post_fresh(self, **fields):
+        people = service.employees_for_month(self.srks, self.DEC)
+        data = {f"amount_{e.pk}": "" for e in people} | {f"absent_{e.pk}": "" for e in people}
+        for name, value in fields.items():
+            kind, code = name.split("_", 1)
+            data[f"{kind}_{self.employee(code).pk}"] = value
+        return self.client.post(self.url, data)
+
+    def test_months_are_still_done_in_order(self):
+        response = self.client.get(self.url)
+        self.assertRedirects(response, reverse("payroll:month", args=[self.DEC]), fetch_redirect_response=False)
+        page = self.client.get(reverse("payroll:month", args=[self.DEC]))
+        self.assertContains(page, "Finalise November 2026 first.")
+
+    def test_start_the_month_from_gross_salaries(self):
+        self.finalise_nov()
+        page = self.client.get(self.url)
+        self.assertContains(page, "Save and start the month")
+        self.assertContains(page, "No attendance sheet is needed")
+        month_page = self.client.get(reverse("payroll:month", args=[self.DEC]))
+        self.assertContains(month_page, "Write each person's gross salary")
+        response = self.post_fresh(amount_E001="30000", amount_E002="20000", absent_E002="2")
+        self.assertRedirects(response, self.url, fetch_redirect_response=False)
+        run = self.run_for(month=self.DEC)
+        e1 = run.lines.get(employee__emp_code="E001")
+        e2 = run.lines.get(employee__emp_code="E002")
+        e4 = run.lines.get(employee__emp_code="E004")
+        self.assertEqual((e1.gross, e2.gross), (D(30000), D(20000)))
+        self.assertEqual(e1.rate_basic, D(14000))  # minimum wage, full month
+        self.assertEqual(e1.paid_days, D(31))
+        self.assertEqual(e2.lop, D(2))
+        self.assertLess(e2.earned_basic, D(15500))  # semi-skilled minimum, less 2 absent days
+        self.assertIsNone(e4.amount_paid_input)  # left empty: paid from the salary structure, full month
+        self.assertEqual(e4.paid_days, D(31))
+        self.assertIsNone(run.uploaded_file.name or None)
+        page = self.client.get(self.url)  # the month exists now: change the amounts there
+        self.assertContains(page, "Save and work out")
+
+    def test_mistakes_save_nothing(self):
+        self.finalise_nov()
+        page = self.post_fresh(amount_E001="30000", absent_E001="1.3", absent_E002="99")
+        self.assertContains(page, "Use whole or half days only")
+        page = self.post_fresh(amount_E001="30000", absent_E002="99")
+        self.assertContains(page, "cannot be more than the 27 working days")
+        self.assertFalse(service.PayrollRun.objects.filter(company=self.srks, month=self.DEC).exists())
