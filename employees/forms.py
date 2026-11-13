@@ -289,7 +289,7 @@ def revision_month_choices(company, employee, first_open):
 
 
 def one_gross_salary(form, company):
-    """With 'Gross salary split' on, a salary is one gross amount a month (kept in Basic): Basic is paid at the
+    """With the minimum-wage split on, a salary is one amount a month (kept in Basic): Basic is paid at the
     minimum wage and the rest as incentive, so the other heads are not asked for."""
     from companies.models import Company
 
@@ -297,9 +297,10 @@ def one_gross_salary(form, company):
         return
     for name in SALARY_FIELDS[1:]:
         form.fields.pop(name, None)
-    form.fields["basic"].label = _("Usual monthly salary in hand ₹")
-    form.fields["basic"].help_text = _("What the owner usually pays this person in hand each month. Each month you "
-                                       "can write a different amount on the month page (Paid days and take-home).")
+    form.fields["basic"].label = _("Monthly salary ₹")
+    form.fields["basic"].help_text = _("The salary for a full month. A month worked out by days present pays it for "
+                                       "the days: Basic at the minimum wage, the rest incentive. A month worked out "
+                                       "by take-home uses the amounts written for that month instead.")
 
 
 class ReviseSalaryForm(forms.Form):

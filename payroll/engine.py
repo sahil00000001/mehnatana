@@ -18,7 +18,8 @@ from datetime import date, timedelta
 from decimal import Decimal as D, ROUND_HALF_UP, ROUND_CEILING, ROUND_FLOOR
 from typing import Optional
 
-ENGINE_VERSION = "1.2"  # 1.1: salary per working day (weekly offs) as a divisor; 1.2: incentive in the structure
+ENGINE_VERSION = "1.3"  # 1.1: salary per working day (weekly offs) as a divisor; 1.2: incentive in the structure;
+# 1.3: a fixed employee ESI amount (take-home method)
 
 ZERO = D("0")
 HUNDRED = D("100")
@@ -131,6 +132,7 @@ class MonthInput:
     advance: D = ZERO
     other_deduction: D = ZERO
     tds_override: Optional[D] = None
+    ee_esi: Optional[D] = None  # a fixed employee ESI amount instead of 0.75% (company setting, take-home method)
 
 
 @dataclass
@@ -422,7 +424,7 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
             if L.esi_wage > 0 and daily <= rates.esi_ee_exempt_daily:
                 L.warnings.append("ESI_EMPLOYEE_SHARE_WAIVED")
             elif L.esi_wage > 0:
-                L.ee_esi = rupee_up(pct(L.esi_wage, rates.esi_ee_rate))
+                L.ee_esi = rupee(inp.ee_esi) if inp.ee_esi is not None else rupee_up(pct(L.esi_wage, rates.esi_ee_rate))
 
     # 7. Professional tax (on gross earned this month)
     if settings.pt_enabled and not emp.pt_exempt:

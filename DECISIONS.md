@@ -138,29 +138,42 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
   cannot be checked), and income tax uses the normal (under 60) slabs. The turning-58 list skips them.
 - The one-off import of the old data is not part of this repository: it holds clients' private details.
 
-## Take-home matching (14-11-2026)
+## Minimum-wage split: by days present or by take-home (14-11-2026)
 
-- The owner gives a monthly list: paid days and the amount each person gets **in hand**. That amount must be the
-  payslip's **take-home pay**; deductions are made and the incentive makes up the rest. Amounts change from
-  person to person and month to month. `Company.amount_paid_mode` = GROSS (on, default; the code value is
-  historical) or OFF.
-- Per line: Basic = minimum wage for the person's skill (`MinimumWage.in_force`, state of the company) for the
-  paid days. If Basic less ESI, PF and the other deductions would already be more than the amount, paid days are
-  taken off one at a time (present days first) and the payslip and registers show the reduced days
-  (`PayrollLine.days_given` keeps the days as written; note DAYS_REDUCED). Then the incentive is found by stepping
-  by the gap until take-home = amount (take-home rises by at most ₹1 per ₹1 of incentive). ESI and PF are on
-  Basic (Labour Code wages: the 50% rule still applies if the incentive exceeds Basic). An advance repaid that
-  month is covered by the incentive too: the amount is what reaches the person.
-- The amount is a month input (`PayrollLine.take_home`, written on the month page "Paid days and take-home");
-  without it (sheet upload) the person's usual monthly salary (salary structure, labelled "Usual monthly salary
-  in hand") plus any raise or one-time incentive in the sheet is matched. Writing an amount never changes the
-  person's salary. 0 paid days pays nothing.
-- History of this rule on 13-14 November: (1) typed amount matched as take-home or gross, (2) one fixed gross cut
-  for absent days, (3) gross paid exactly. The owner's October list settled it: take-home = the listed amount.
+- `Company.amount_paid_mode` = GROSS ("minimum-wage split" on, default; the code value is historical) or OFF.
+  Each month is worked out one of two ways, chosen on the month page. They never mix: each page writes every line
+  of the month, and a line's `take_home` decides how it is worked out (empty = by days).
+- **By days present** (page "By days present", or the attendance sheet): the monthly salary in the profile (one
+  amount, kept in Basic of the salary structure, plus a raise written for the month) is paid for the paid days.
+  Basic = the minimum wage for the person's skill (`MinimumWage.in_force`, state of the company) for those days;
+  the rest is incentive. A profile salary below the minimum wage still gets Basic at the minimum wage (note
+  SALARY_BELOW_MINIMUM_WAGE). ESI (0.75%) and PF are on Basic (Labour Code wages: the 50% rule applies).
+- **By take-home** (page "By take-home"): the owner's list gives paid days and the amount paid in hand. The
+  payslip's take-home is exactly that amount. Basic = the minimum wage for the paid days; employee ESI is the
+  company's fixed amount (`Company.take_home_esi`, ₹158 as the owner asked on 14-11-2026; empty = 0.75% of Basic;
+  the employer share stays 3.25% of ESI wages); PF on Basic. If Basic less the deductions would already be more
+  than the amount, paid days are taken off one at a time (present days first) and the payslip shows the reduced
+  days (`PayrollLine.days_given` keeps the days as written; note DAYS_REDUCED). The owner chose this over keeping
+  Basic at a full month with an extra deduction. Then the incentive is found by stepping by the gap until take-home
+  = amount. An advance repaid that month is covered by the incentive too. The page starts from last month's
+  amounts; an amount is needed for everyone with paid days.
+- Both pages work the figures out again as you type (`payroll:preview`, JSON, nothing saved; `static/js/entry.js`
+  counts the changed figures up or down and makes them glow). The server does the arithmetic, so the preview is
+  what Save stores.
+- History of the rule on 13-14 November: (1) typed amount matched as take-home or gross, (2) one fixed gross cut
+  for absent days, (3) gross paid exactly, (4) take-home = the listed amount. (5) The two ways above, with fixed
+  ESI by take-home.
 - **Minimum wages** are entered per state and month (All companies → Minimum wages), not shipped with the app.
   Saving them works out every company's drafts in that state again.
 - With OFF, when minimum wages are entered, a line whose Basic + DA + other allowance is below the minimum for the
-  days paid gets a note (and the optional check can stop the upload).
+  days paid gets a note (and the optional check can stop the upload). The by-days page still works (salary heads).
+
+## Inactive staff (14-11-2026)
+
+- `Employee.Status.INACTIVE` with `inactive_from` (the 1st of a month not finalised yet): left out of
+  `employees_for_month` (attendance sheet, entry pages, registers, salary) from that month on. Not the same as
+  relieving: no last working day, no letters. Draft months drop their lines when worked out again; making the
+  person active again brings them back into every month not finalised (a started draft then asks for their days).
 
 ## Notice board switched off (13-11-2026)
 

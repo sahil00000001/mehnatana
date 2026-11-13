@@ -1,25 +1,50 @@
-{% extends "base.html" %}{% load i18n mtn %}
+{% extends "base.html" %}{% load i18n static mtn %}
+{% block head %}<script src="{% static 'js/entry.js' %}" defer></script>{% endblock %}
 {% block content %}
 <div class="box">
-  <p>{% translate "Write the paid days and the amount the owner pays in hand to each person, as on the owner's list. The take-home pay on the payslip becomes exactly that amount: PayCore pays Basic at the minimum wage for the paid days, deducts ESI and PF (for PF members) on Basic, and adds the rest as incentive." %}</p>
-  <p>{% translate "If the minimum wage for the paid days would already pay more than the amount, PayCore shows fewer paid days, so that Basic stays at the minimum wage. The amount can be different every month. 0 paid days means the person is not paid this month." %}</p>
-  <p class="muted">{% if minimum_wages %}{% blocktranslate with state=minimum_wages.get_state_display from=minimum_wages.effective_from|month_label %}Minimum wages used: {{ state }}, from {{ from }}.{% endblocktranslate %}{% endif %}
-    <a href="{% url 'portal:minimum_wages' %}">{% translate "See or change minimum wages" %}</a></p>
+  {% if by_take_home %}
+  <p>{% translate "Write the paid days and the amount the owner pays in hand to each person, as on the owner's list. The take-home pay on the payslip becomes exactly that amount." %}</p>
+  <ul class="plain-list">
+    <li>{% translate "Basic is the minimum wage for the paid days." %}</li>
+    <li>{% if take_home_esi is not None %}{% blocktranslate with esi=take_home_esi|inr %}ESI is ₹{{ esi }} for each ESI-covered person{% endblocktranslate %}{% else %}{% translate "ESI is 0.75% of Basic" %}{% endif %}{% translate ", and PF (for PF members) is on Basic." %}</li>
+    <li>{% translate "The incentive makes up the rest, so that the take-home is exactly the amount." %}</li>
+    <li>{% translate "If the minimum wage for the paid days would already pay more than the amount, fewer paid days are shown." %}</li>
+  </ul>
+  <p class="muted">{% translate "The amount can be different every month. 0 paid days means the person is not paid this month." %}
+    <a href="{% url 'payroll:by_days' month %}">{% translate "Work out by days present instead" %}</a></p>
+  {% else %}
+  <p>{% translate "Write the days each person was present (paid days), out of the days in the month. The monthly salary in each person's profile is paid for those days." %}</p>
+  {% if splits %}<ul class="plain-list">
+    <li>{% translate "Basic is the minimum wage for the days present." %}</li>
+    <li>{% translate "The rest of the salary for those days is incentive." %}</li>
+    <li>{% translate "ESI and PF (for PF members) are on Basic." %}</li>
+  </ul>{% endif %}
+  <p class="muted">{% translate "To change a monthly salary, use Revise salary on the person's page. 0 days means the person is not paid this month." %}
+    {% if splits %}<a href="{% url 'payroll:amounts' month %}">{% translate "Work out by take-home instead" %}</a>{% endif %}</p>
+  {% endif %}
+  {% if splits and minimum_wages %}<p class="muted small">{% blocktranslate with state=minimum_wages.get_state_display from=minimum_wages.effective_from|month_label %}Minimum wages used: {{ state }}, from {{ from }}{% endblocktranslate %}:
+    {% if minimum_wages.unskilled %}{% translate "Unskilled" %} ₹{{ minimum_wages.unskilled|inr }}{% endif %}{% if minimum_wages.semi_skilled %} · {% translate "Semi-skilled" %} ₹{{ minimum_wages.semi_skilled|inr }}{% endif %}{% if minimum_wages.skilled %} · {% translate "Skilled" %} ₹{{ minimum_wages.skilled|inr }}{% endif %}{% if minimum_wages.highly_skilled %} · {% translate "Highly skilled" %} ₹{{ minimum_wages.highly_skilled|inr }}{% endif %}.
+    <a href="{% url 'portal:minimum_wages' %}">{% translate "See or change" %}</a></p>{% endif %}
 </div>
-{% if not minimum_wages %}<div class="msg msg-warning" role="alert"><strong>{% translate "Enter the minimum wages of your state first" %}</strong> — <a href="{% url 'portal:minimum_wages' %}">{% translate "Minimum wages" %}</a>. {% translate "Basic is paid at the minimum wage, so nothing can be worked out without them." %}</div>{% endif %}
+{% if splits and not minimum_wages %}<div class="msg msg-warning" role="alert"><strong>{% translate "Enter the minimum wages of your state first" %}</strong> — <a href="{% url 'portal:minimum_wages' %}">{% translate "Minimum wages" %}</a>. {% translate "Basic is paid at the minimum wage, so nothing can be worked out without them." %}</div>{% endif %}
 
 {% if has_errors %}<div class="msg msg-error" role="alert">{% translate "Nothing was saved. Correct the rows marked in red and press Save again." %}</div>{% endif %}
 
 <form method="post" class="form form-wide" novalidate>
   {% csrf_token %}
+  <p class="live-hint js-only" aria-live="polite"><span class="live-dot"></span> {% translate "Live: the figures change as you type. Nothing is saved until you press Save." %}</p>
   <div class="table-wrap">
-  <table class="ledger compact amounts-table">
+  <table class="ledger compact amounts-table live" data-live="{% url 'payroll:preview' month %}" data-method="{{ method }}">
     <thead><tr>
       <th>{% translate "Code" %}</th><th>{% translate "Name" %}</th>
+      {% if by_take_home %}
       <th class="num">{% translate "Paid days" %}</th>
       <th class="num">{% translate "Take-home to pay ₹" %}</th>
-      <th class="num">{% translate "Minimum wage / month" %}</th>
       <th class="num">{% translate "Days shown" %}</th>
+      {% else %}
+      <th class="num">{% translate "Days present" %}</th>
+      <th class="num">{% translate "Monthly salary (profile)" %}</th>
+      {% endif %}
       <th class="num">{% translate "Basic" %}</th><th class="num">{% translate "Incentive" %}</th>
       <th class="num">{% translate "Gross" %}</th>
       <th class="num">{% translate "ESI (emp)" %}</th><th class="num">{% translate "PF (emp)" %}</th>
@@ -27,32 +52,42 @@
     </tr></thead>
     <tbody>
     {% for r in rows %}
-      <tr class="{% if r.errors %}row-error{% elif r.notes %}has-notes{% endif %}">
+      <tr class="entry-row{% if r.errors %} row-error{% elif r.notes %} has-notes{% endif %}" data-emp="{{ r.emp.pk }}">
         <td>{{ r.emp.emp_code }}</td>
-        <td class="nowrap"><a href="{% url 'employees:detail' r.emp.pk %}">{{ r.emp.full_name }}</a></td>
-        <td class="num"><input type="text" inputmode="decimal" name="days_{{ r.emp.pk }}" value="{{ r.days_input }}" class="days-input" aria-label="{% blocktranslate with name=r.emp.full_name %}Paid days of {{ name }}{% endblocktranslate %}"></td>
-        <td class="num"><input type="text" inputmode="numeric" name="pay_{{ r.emp.pk }}" value="{{ r.pay_value }}" class="amount-input" aria-label="{% blocktranslate with name=r.emp.full_name %}Take-home of {{ name }}{% endblocktranslate %}"></td>
-        <td class="num">{% if r.minimum %}{{ r.minimum|inr }}{% else %}—{% endif %}<div class="muted small">{{ r.emp.get_skill_category_display }}</div></td>
-        {% if r.result %}
-        <td class="num{% if r.notes %} strong{% endif %}">{{ r.result.paid_days|num }}</td>
-        <td class="num">{{ r.result.basic|inr }}</td><td class="num">{{ r.result.incentive|inr }}</td>
-        <td class="num">{{ r.result.gross|inr }}</td>
-        <td class="num">{{ r.result.ee_esi|inr }}</td><td class="num">{{ r.result.ee_pf|inr }}</td>
-        <td class="num strong">{{ r.result.net_pay|inr }}</td>
+        <td class="nowrap"><a href="{% url 'employees:detail' r.emp.pk %}">{{ r.emp.full_name }}</a><div class="muted small">{{ r.emp.get_skill_category_display }}</div></td>
+        <td class="num"><input type="text" inputmode="decimal" name="days_{{ r.emp.pk }}" value="{{ r.days_input }}" class="days-input" data-col="days" autocomplete="off" aria-label="{% blocktranslate with name=r.emp.full_name %}Paid days of {{ name }}{% endblocktranslate %}"><div class="muted small">{% blocktranslate with n=r.employed|num %}of {{ n }}{% endblocktranslate %}</div></td>
+        {% if by_take_home %}
+        <td class="num"><input type="text" inputmode="numeric" name="pay_{{ r.emp.pk }}" value="{{ r.pay_value }}" class="amount-input" data-col="pay" autocomplete="off" aria-label="{% blocktranslate with name=r.emp.full_name %}Take-home of {{ name }}{% endblocktranslate %}"></td>
+        <td class="num fig{% if 'DAYS_REDUCED' in r.warnings %} reduced{% endif %}" data-k="paid_days">{% if r.result %}{{ r.result.paid_days|num }}{% else %}—{% endif %}</td>
         {% else %}
-        <td colspan="7"></td>
+        <td class="num">{% if r.monthly is not None %}{{ r.monthly|inr }}{% else %}—{% endif %}</td>
         {% endif %}
+        <td class="num fig" data-k="basic" data-v="{{ r.result.basic|default_if_none:'' }}">{% if r.result %}{{ r.result.basic|inr }}{% else %}—{% endif %}</td>
+        <td class="num fig fig-incentive" data-k="incentive" data-v="{{ r.result.incentive|default_if_none:'' }}"><span class="pill">{% if r.result %}{{ r.result.incentive|inr }}{% else %}—{% endif %}</span></td>
+        <td class="num fig" data-k="gross" data-v="{{ r.result.gross|default_if_none:'' }}">{% if r.result %}{{ r.result.gross|inr }}{% else %}—{% endif %}</td>
+        <td class="num fig" data-k="ee_esi" data-v="{{ r.result.ee_esi|default_if_none:'' }}">{% if r.result %}{{ r.result.ee_esi|inr }}{% else %}—{% endif %}</td>
+        <td class="num fig" data-k="ee_pf" data-v="{{ r.result.ee_pf|default_if_none:'' }}">{% if r.result %}{{ r.result.ee_pf|inr }}{% else %}—{% endif %}</td>
+        <td class="num fig strong" data-k="net_pay" data-v="{{ r.result.net_pay|default_if_none:'' }}">{% if r.result %}{{ r.result.net_pay|inr }}{% else %}—{% endif %}</td>
       </tr>
-      {% if r.errors or r.notes %}
-      <tr class="{% if r.errors %}row-error{% else %}has-notes{% endif %} row-note"><td></td><td colspan="11">
+      <tr class="row-note{% if r.errors %} row-error{% else %} has-notes{% endif %}" data-note-for="{{ r.emp.pk }}"{% if not r.errors and not r.notes %} hidden{% endif %}><td></td><td colspan="{% if by_take_home %}10{% else %}9{% endif %}">
         {% for e in r.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
         {% for n in r.notes %}<div>{{ n }}</div>{% endfor %}
       </td></tr>
-      {% endif %}
     {% empty %}
-      <tr><td colspan="12">{% translate "No one is paid this month." %}</td></tr>
+      <tr><td colspan="11">{% translate "No one is paid this month." %}</td></tr>
     {% endfor %}
     </tbody>
+    {% if rows %}
+    <tfoot><tr class="totals">
+      <th colspan="{% if by_take_home %}5{% else %}4{% endif %}">{% translate "Total" %}</th>
+      <td class="num fig" data-total="basic" data-v="{{ totals.basic }}">{{ totals.basic|inr }}</td>
+      <td class="num fig fig-incentive" data-total="incentive" data-v="{{ totals.incentive }}"><span class="pill">{{ totals.incentive|inr }}</span></td>
+      <td class="num fig" data-total="gross" data-v="{{ totals.gross }}">{{ totals.gross|inr }}</td>
+      <td class="num fig" data-total="ee_esi" data-v="{{ totals.ee_esi }}">{{ totals.ee_esi|inr }}</td>
+      <td class="num fig" data-total="ee_pf" data-v="{{ totals.ee_pf }}">{{ totals.ee_pf|inr }}</td>
+      <td class="num fig strong" data-total="net_pay" data-v="{{ totals.net_pay }}">{{ totals.net_pay|inr }}</td>
+    </tr></tfoot>
+    {% endif %}
   </table>
   </div>
   <div class="actions">

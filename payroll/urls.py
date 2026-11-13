@@ -16,4 +16,6 @@ urlpatterns = [
     path("<ym:month>/export.xlsx", views.export, name="export"),
     path("<ym:month>/payments/", payments.payments, name="payments"),
     path("<ym:month>/amounts/", amounts.amounts, name="amounts"),
+    path("<ym:month>/days/", amounts.by_days, name="by_days"),
+    path("<ym:month>/preview/", amounts.preview, name="preview"),
 ]

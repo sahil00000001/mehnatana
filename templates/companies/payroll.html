@@ -7,8 +7,9 @@
     {% include "includes/field.html" with field=form.payroll_start_month %}{% include "includes/field.html" with field=form.weekly_off_days %}
     {% include "includes/field.html" with field=form.salary_divisor %}
   </fieldset>
-  <fieldset><legend>{% translate "Take-home matching" %}</legend>
+  <fieldset><legend>{% translate "Minimum-wage split" %}</legend>
     {% include "includes/field.html" with field=form.amount_paid_mode %}
+    {% include "includes/field.html" with field=form.take_home_esi %}
     <p class="muted">{% translate "Minimum wages are entered once for each state:" %} <a href="{% url 'portal:minimum_wages' %}">{% translate "Minimum wages" %}</a></p>
   </fieldset>
   <fieldset><legend>{% translate "PF, ESI and taxes" %}</legend>

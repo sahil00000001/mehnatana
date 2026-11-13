@@ -2,10 +2,32 @@
 {% block content %}
 {% if emp.status == "RELIEVED" %}<div class="msg msg-info">{% blocktranslate with d=emp.date_of_leaving|dmy r=emp.get_leaving_reason_display %}Relieved. Last working day {{ d }} ({{ r }}).{% endblocktranslate %}</div>{% endif %}
 
+{% if emp.status != "RELIEVED" %}
+<div class="status-box{% if emp.status == 'INACTIVE' %} inactive{% endif %}">
+  {% if emp.status == "INACTIVE" %}
+  <span class="status-pill off">{% translate "Inactive" %}</span>
+  <span>{% blocktranslate with m=emp.inactive_from|month_label %}Left out of the attendance sheet, registers and salary from {{ m }}.{% endblocktranslate %}</span>
+  <form method="post" action="{% url 'employees:set_active' emp.pk %}">
+    {% csrf_token %}<input type="hidden" name="active" value="1">
+    <button type="submit" class="btn btn-primary">{% translate "Make active again" %}</button>
+  </form>
+  {% else %}
+  <span class="status-pill">{% translate "Active" %}</span>
+  <span>{% translate "In the attendance sheet, registers and salary." %}</span>
+  <form method="post" action="{% url 'employees:set_active' emp.pk %}" data-confirm="{% blocktranslate with name=emp.full_name %}Leave {{ name }} out of the attendance sheet, registers and salary from the month chosen?{% endblocktranslate %}">
+    {% csrf_token %}<input type="hidden" name="active" value="0">
+    <label for="inactive-month">{% translate "Make inactive from" %}</label>
+    <select id="inactive-month" name="month">{% for m in inactive_months %}<option value="{{ m|date:'Y-m' }}">{{ m|month_label }}</option>{% endfor %}</select>
+    <button type="submit" class="btn">{% translate "Make inactive" %}</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="actions">
   <a class="btn btn-primary" href="{% url 'employees:edit' emp.pk %}">{% translate "Edit" %}</a>
   <a class="btn" href="{% url 'employees:revise' emp.pk %}">{% translate "Revise salary" %}</a>
-  {% if emp.status == "ACTIVE" %}
+  {% if emp.status != "RELIEVED" %}
     <a class="btn" href="{% url 'advances:add' %}?employee={{ emp.pk }}">{% translate "Give advance" %}</a>
     <a class="btn" href="{% url 'letters:new' 'appointment' %}?employee={{ emp.pk }}">{% translate "Issue appointment letter" %}</a>
     <a class="btn" href="{% url 'employees:relieve' emp.pk %}">{% translate "Relieve employee" %}</a>

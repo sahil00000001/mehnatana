@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import redirect
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _lazy
 from django.utils.translation import ngettext
@@ -94,6 +95,8 @@ def employee_list(request):
         qs = qs.filter(Q(status=Employee.Status.ACTIVE) | Q(date_of_leaving__gte=today))
     elif status == "RELIEVED":
         qs = qs.filter(status=Employee.Status.RELIEVED, date_of_leaving__lt=today)
+    elif status == "INACTIVE":
+        qs = qs.filter(status=Employee.Status.INACTIVE)
     if dept.isdigit() and len(dept) < 10:
         qs = qs.filter(department_id=int(dept))
 
@@ -184,9 +187,50 @@ def employee_detail(request, pk):
     return page(request, "employees/detail.html", emp.full_name,
                 _("Everything about this person in one place. Use the buttons to make changes."),
                 emp=emp, revisions=revisions, advances=advances, payslips=payslips, letters=letters,
-                current=current, has_appointment=has_appointment,
+                current=current, has_appointment=has_appointment, inactive_months=inactive_months(request.company),
                 can_undo=emp.status == Employee.Status.RELIEVED
                 and finalised_month_after(request.company, emp.date_of_leaving) is None)
+
+
+# ---------------------------------------------------------------- active / inactive
+def inactive_months(company):
+    """Months a person can be made inactive from: months not finalised yet, from the first open one."""
+    first = service.first_open_month(company)
+    return [add_months(first, n) for n in range(13)]
+
+
+@require_POST
+@company_required
+def set_active(request, pk):
+    """Inactive: left out of the attendance sheet, registers and salary from a month on (not relieved).
+    Active again: back in every month not finalised yet."""
+    emp = company_get(request, _employees(request), pk=pk)
+    if emp.status == Employee.Status.RELIEVED:
+        messages.info(request, _("%(name)s is relieved. Use Undo relieve instead.") % {"name": emp.full_name})
+        return redirect("employees:detail", pk=emp.pk)
+    before = snapshot(emp)
+    if request.POST.get("active") == "1":
+        if emp.status != Employee.Status.INACTIVE:
+            return redirect("employees:detail", pk=emp.pk)
+        emp.status, emp.inactive_from = Employee.Status.ACTIVE, None
+        emp.save(update_fields=["status", "inactive_from", "updated_at"])
+        audit(request, "employee.active", emp, {"changes": diff(before, snapshot(emp))})
+        messages.success(request, _("%(name)s is active again: in the attendance sheet, registers and salary of "
+                                    "every month not finalised yet.") % {"name": emp.full_name})
+    else:
+        allowed = {m.strftime("%Y-%m"): m for m in inactive_months(request.company)}
+        month = allowed.get(request.POST.get("month", ""))
+        if month is None:
+            messages.error(request, _("Choose a month that is not finalised yet."))
+            return redirect("employees:detail", pk=emp.pk)
+        emp.status, emp.inactive_from = Employee.Status.INACTIVE, month
+        emp.save(update_fields=["status", "inactive_from", "updated_at"])
+        audit(request, "employee.inactive", emp, {"changes": diff(before, snapshot(emp))})
+        messages.success(request, _("%(name)s is inactive from %(month)s: left out of the attendance sheet, "
+                                    "registers and salary from then on. Nothing else changes.")
+                         % {"name": emp.full_name, "month": month_label(month)})
+    _report_draft_problems(request)
+    return redirect("employees:detail", pk=emp.pk)
 
 
 # ---------------------------------------------------------------- relieve

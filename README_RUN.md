@@ -33,7 +33,7 @@ Then open:
 
 If `DATABASE_URL` and `POSTGRES_HOST` are empty, the data is kept in a local `db.sqlite3` file.
 
-Run the tests (301 tests, including all README §17 numbers):
+Run the tests (313 tests, including all README §17 numbers):
 
 ```
 python manage.py test
@@ -100,10 +100,14 @@ and when. Reports → *Annual salary report* shows, for a financial year (April 
 and pending per employee, attendance totals, a month-by-month breakdown and the company's consolidated figures; it
 downloads as an Excel file with one sheet per view.
 
-**Take-home matching.** Settings → Payroll rules → *Take-home matching* (on by default). Enter the state's
-minimum wages once on All companies → *Minimum wages*. Each month press *Paid days and take-home* on the month page and
-copy the owner's list: the payslip's take-home becomes exactly the amount; Basic is the minimum wage for the paid days
-(fewer days are shown if needed), ESI and PF are on Basic, and the incentive makes up the rest.
+**Without the Excel sheet.** On the month page choose *Calculate by days* (days present; the monthly salary in each
+profile is paid for those days) or *Calculate by take-home* (the owner's list of paid days and amounts in hand; the
+take-home becomes exactly the amount). With Settings → Payroll rules → *Minimum-wage split* on (the default) and the
+state's minimum wages entered once on All companies → *Minimum wages*, Basic is the minimum wage and the rest is
+incentive; by take-home ESI is a fixed amount per person (₹158 unless changed). Figures change as you type.
+
+**Inactive staff.** On a person's page, *Make inactive* leaves them out of the attendance sheet, registers and salary
+from a chosen month; *Make active again* brings them back.
 
 **Attendance sheet checks.** Settings → *Attendance sheet checks* switches the optional checks of the monthly sheet on
 or off (overtime and paid-leave limits, days present not above working days, weekly offs filled in, minimum wage).

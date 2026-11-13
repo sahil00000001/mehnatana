@@ -80,6 +80,7 @@ class Employee(CompanyOwned):
 
     class Status(models.TextChoices):
         ACTIVE = "ACTIVE", _("Active")
+        INACTIVE = "INACTIVE", _("Inactive")  # left out of attendance and salary for now, not relieved
         RELIEVED = "RELIEVED", _("Relieved")
 
     class LeavingReason(models.TextChoices):
@@ -145,6 +146,8 @@ class Employee(CompanyOwned):
 
     # ---- exit
     status = models.CharField(_("status"), max_length=8, choices=Status.choices, default=Status.ACTIVE)
+    # Inactive: left out of the attendance sheet, registers and salary from this month (the 1st) on.
+    inactive_from = models.DateField(_("inactive from"), null=True, blank=True)
     date_of_leaving = models.DateField(_("last working day"), null=True, blank=True)
     leaving_reason = models.CharField(_("reason for leaving"), max_length=12, choices=LeavingReason.choices,
                                       blank=True)

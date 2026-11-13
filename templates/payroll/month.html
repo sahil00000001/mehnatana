@@ -18,7 +18,7 @@
   </li>
 
   <li class="step{% if has_lines %} done{% endif %}">
-    <h2>{% if splits_gross %}{% translate "Fill it in Excel and upload it — or just write paid days and take-home amounts" %}{% else %}{% translate "Fill it in Excel and upload it" %}{% endif %}</h2>
+    <h2>{% translate "Fill it in Excel and upload it — or write the days on screen" %}</h2>
     {% if is_final %}
       <p>{% translate "This month is finalised. To change anything, reopen it (step 5)." %}</p>
     {% elif blocker %}
@@ -38,11 +38,21 @@
         </div>
       </form>
       {% if has_lines and not upload_errors and not file_errors and not upload_form.errors %}</details>{% endif %}
-      {% if splits_gross and not has_lines %}
-      <p class="or-line">{% translate "Or skip Excel:" %}</p>
-      <div class="actions">
-        <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% translate "Paid days and take-home" %}</a>
-        <span class="muted">{% translate "Copy each person's paid days and the amount paid in hand from the owner's list. The take-home becomes exactly that amount: Basic at the minimum wage, ESI and PF on Basic, the rest incentive." %}</span>
+      {% if not has_lines %}
+      <p class="or-line">{% translate "Or skip Excel — choose one:" %}</p>
+      <div class="method-choice">
+        <div class="method">
+          <h3>{% translate "1. By days present" %}</h3>
+          <p>{% if splits_gross %}{% translate "You know how many days each person was present. The monthly salary in each profile is paid for those days: Basic at the minimum wage, the rest incentive." %}{% else %}{% translate "You know how many days each person was present. The monthly salary in each profile is paid for those days." %}{% endif %}</p>
+          <a class="btn btn-primary" href="{% url 'payroll:by_days' month %}">{% translate "Calculate by days" %}</a>
+        </div>
+        {% if splits_gross %}
+        <div class="method">
+          <h3>{% translate "2. By take-home" %}</h3>
+          <p>{% translate "The owner gives the amount each person gets in hand. The take-home becomes exactly that amount: Basic at the minimum wage, fixed ESI, the rest incentive." %}</p>
+          <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% translate "Calculate by take-home" %}</a>
+        </div>
+        {% endif %}
       </div>
       {% endif %}
     {% endif %}
@@ -67,10 +77,11 @@
   <li class="step{% if is_final %} done{% elif has_lines %} current{% endif %}" id="review">
     <h2>{% translate "Look at the salary table" %}</h2>
     {% if has_lines %}
-      {% if splits_gross and not is_final %}
+      {% if not is_final %}
       <div class="actions">
-        <a class="btn" href="{% url 'payroll:amounts' month %}">{% translate "Change paid days and take-home" %}</a>
-        <span class="muted">{% translate "Each take-home is the amount written: Basic at the minimum wage for the paid days, the rest incentive." %}</span>
+        <a class="btn" href="{% url 'payroll:by_days' month %}">{% translate "Change by days present" %}</a>
+        {% if splits_gross %}<a class="btn" href="{% url 'payroll:amounts' month %}">{% translate "Change by take-home" %}</a>{% endif %}
+        <span class="muted">{% translate "The figures change as you type; nothing is saved until you press Save." %}</span>
       </div>
       {% endif %}
       <p class="table-tools">
