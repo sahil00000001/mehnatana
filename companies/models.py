@@ -44,8 +44,8 @@ class Company(TimeStamped):
         OLD = "OLD", _("Old regime")
 
     class AmountPaid(models.TextChoices):
-        GROSS = "GROSS", _("On: each person has one gross salary a month. Basic is paid at the minimum wage and the "
-                           "rest as incentive; absent days cut both; ESI and PF are worked out on Basic")
+        GROSS = "GROSS", _("On: the gross salary is paid exactly. Basic is the minimum wage for the paid days "
+                           "(fewer days are shown if needed), the rest is incentive, ESI and PF are on Basic")
         OFF = "OFF", _("Off: pay each salary head as entered (Basic, DA, HRA …)")
 
     class PayslipStyle(models.TextChoices):
@@ -94,8 +94,9 @@ class Company(TimeStamped):
                                       default=Divisor.CALENDAR)
     amount_paid_mode = models.CharField(
         _("gross salary split"), max_length=8, choices=AmountPaid.choices, default=AmountPaid.GROSS,
-        help_text=_("Needs the minimum wages of your state (All companies → Minimum wages). Each month, the gross "
-                    "salary is cut for absent days, and the take-home pay is what remains after ESI and PF."))
+        help_text=_("Needs the minimum wages of your state (All companies → Minimum wages). Each month write the "
+                    "paid days and gross salaries (month page → Paid days and gross salaries) or upload the sheet. "
+                    "The take-home pay is the gross less ESI and PF."))
     # Optional checks of the attendance sheet (see payroll/checks.py); empty = the defaults.
     sheet_checks = models.JSONField(_("attendance sheet checks"), default=dict, blank=True)
     pf_enabled = models.BooleanField(_("PF applies"), default=True)

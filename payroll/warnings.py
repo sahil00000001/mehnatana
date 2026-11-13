@@ -18,8 +18,8 @@ MESSAGES = {
     "TDS_OVERRIDE_HIGH": _("The TDS override is more than 30% of the salary — please check."),
     "WEEK_OFF_EMPTY": _("Weekly offs were left empty, so those days were counted as LOP — please check."),
     "BELOW_MINIMUM_WAGE": _("Basic + DA + other allowance is below the minimum wage for the days paid."),
-    "GROSS_BELOW_MINIMUM": _("The gross salary is below the minimum wage, so the minimum wage is paid. Raise the "
-                             "salary with Revise salary."),
+    "DAYS_REDUCED": _("Paid days were reduced so that Basic (minimum wage for the days) stays within the gross "
+                      "salary."),
 }
 
 

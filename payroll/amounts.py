@@ -1,9 +1,9 @@
-"""Gross salaries page (company setting 'Gross salary split' on).
+"""Gross salaries page (company setting 'Gross salary split' on), filled from the owner's monthly list.
 
-Each person has one gross salary a month (kept as their salary structure). Basic is paid at the minimum wage and
-the rest of the gross as incentive; absent days cut both; ESI and PF are worked out on Basic. This page shows the
-gross of everyone paid in the month, lets you change it (from this month on), and - before the month is started -
-takes absent days instead of an attendance sheet (everyone else counts as present on every working day).
+For each person: the paid days and the gross salary for the month. The gross is paid exactly as given: Basic is
+the minimum wage for the paid days (days are reduced if that would be more than the gross), the rest is
+incentive, ESI and PF are worked out on Basic, and the take-home pay is what remains. A changed gross is kept as
+the person's salary from this month on. No attendance sheet is needed.
 """
 from decimal import Decimal
 
@@ -14,16 +14,15 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 
 from companies.models import Company, MinimumWage
-from core.formatting import month_label
+from core.formatting import month_label, plain_number
 from core.forms import WholeRupeesField
 from core.tenancy import company_required, page
 from statutory.rates import MissingRate
 
 from . import service
 from .models import PayrollRun
-from .warnings import message_for
 
-NOTE_CODES = ("GROSS_BELOW_MINIMUM",)
+NOTE_CODES = ("DAYS_REDUCED",)
 
 
 def _days(raw):
@@ -33,29 +32,29 @@ def _days(raw):
     try:
         value = Decimal(raw)
     except ArithmeticError:
-        raise ValidationError(_("Write the absent days as a number, like 2 or 1.5."))
+        raise ValidationError(_("Write the paid days as a number, like 26 or 25.5."))
     if value < 0 or value * 2 != (value * 2).to_integral_value():
-        raise ValidationError(_("Use whole or half days only, like 2 or 1.5."))
+        raise ValidationError(_("Use whole or half days only, like 26 or 25.5."))
     return value
 
 
 def _read(post, people):
-    """{employee id: (absent days or None, gross or None)} and {employee id: [errors]} from the form."""
+    """{employee id: (paid days or None, gross or None)} and {employee id: [errors]} from the form."""
     field = WholeRupeesField(required=False)
     values, errors = {}, {}
     for emp in people:
-        problems, gross, absent = [], None, None
+        problems, gross, paid = [], None, None
         try:
             gross = field.clean(post.get(f"gross_{emp.pk}", ""))
         except ValidationError as exc:
             problems += exc.messages
         try:
-            absent = _days(post.get(f"absent_{emp.pk}", ""))
+            paid = _days(post.get(f"days_{emp.pk}", ""))
         except ValidationError as exc:
             problems += exc.messages
         if problems:
             errors[emp.pk] = problems
-        values[emp.pk] = (absent, gross)
+        values[emp.pk] = (paid, gross)
     return values, errors
 
 
@@ -105,16 +104,20 @@ def amounts(request, month):
     for item in rows:
         emp = item["emp"]
         item["errors"] = errors.get(emp.pk, [])
-        item["notes"] = [str(message_for(code)) for code in item["warnings"] if code in NOTE_CODES]
+        item["notes"] = []
+        result = item["result"]
+        if result is not None and "DAYS_REDUCED" in item["warnings"]:
+            item["notes"] = [_("Paid days shown as %(paid)s (not %(given)s): at the minimum wage, %(given)s days "
+                               "would be more than the gross salary.") % {
+                "paid": plain_number(result.paid_days), "given": plain_number(item["row"].days_given)}]
         if request.method == "POST":
             item["gross_value"] = request.POST.get(f"gross_{emp.pk}", "")
-            item["absent_value"] = request.POST.get(f"absent_{emp.pk}", "")
+            item["days_input"] = request.POST.get(f"days_{emp.pk}", "")
         else:
             item["gross_value"] = "" if item["current"] is None else f"{item['current']:.0f}"
-            item["absent_value"] = ""
-        item["days"] = item["line"].paid_days if item["line"] is not None else item["working"]
+            item["days_input"] = plain_number(item["days_value"])
     return page(request, "payroll/amounts.html", _("Gross salaries — %(month)s") % {"month": month_label(month)},
-                _("Check each person's gross salary a month and press Save. PayCore cuts it for absent days and "
-                  "works out ESI, PF and the take-home pay."),
+                _("Write each person's paid days and gross salary from the owner's list and press Save. PayCore "
+                  "works out Basic, incentive, ESI, PF and the take-home pay."),
                 run=run, month=month, rows=rows, has_errors=bool(errors), started=started,
                 minimum_wages=MinimumWage.in_force(company.state, month))

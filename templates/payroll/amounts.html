@@ -1,9 +1,8 @@
 {% extends "base.html" %}{% load i18n mtn %}
 {% block content %}
 <div class="box">
-  <p>{% translate "Each person has one gross salary a month. PayCore pays Basic at the minimum wage for the person's skill and the rest as incentive, cuts both for absent days, works out ESI and PF (for PF members) on Basic, and shows the take-home pay." %}</p>
-  <p>{% if started %}{% translate "The days come from this month's attendance. To change someone's days, press Edit on the salary table of the month." %}{% else %}{% translate "No attendance sheet is needed: everyone counts as present on every working day, with the weekly offs. Write absent days only for someone who missed work." %}{% endif %}
-    {% translate "A gross salary you change here is kept from this month on." %}</p>
+  <p>{% translate "Write the paid days and the gross salary of each person, as on the owner's list. The gross salary is paid exactly as written: PayCore pays Basic at the minimum wage for the paid days, the rest as incentive, works out ESI and PF (for PF members) on Basic, and shows the take-home pay." %}</p>
+  <p>{% translate "If Basic for the paid days would be more than the gross salary, PayCore shows fewer paid days, so that Basic stays at the minimum wage within the gross. A gross salary you change here is kept from this month on." %}</p>
   <p class="muted">{% if minimum_wages %}{% blocktranslate with state=minimum_wages.get_state_display from=minimum_wages.effective_from|month_label %}Minimum wages used: {{ state }}, from {{ from }}.{% endblocktranslate %}{% endif %}
     <a href="{% url 'portal:minimum_wages' %}">{% translate "See or change minimum wages" %}</a></p>
 </div>
@@ -17,11 +16,12 @@
   <table class="ledger compact amounts-table">
     <thead><tr>
       <th>{% translate "Code" %}</th><th>{% translate "Name" %}</th>
-      {% if started %}<th class="num">{% translate "Paid days" %}</th>{% else %}<th class="num">{% translate "Working days" %}</th><th class="num">{% translate "Absent days" %}</th>{% endif %}
-      <th class="num">{% translate "Gross salary a month ₹" %}</th>
+      <th class="num">{% translate "Paid days" %}</th>
+      <th class="num">{% translate "Gross salary ₹" %}</th>
       <th class="num">{% translate "Minimum wage / month" %}</th>
+      <th class="num">{% translate "Days shown" %}</th>
       <th class="num">{% translate "Basic" %}</th><th class="num">{% translate "Incentive" %}</th>
-      <th class="num">{% translate "Gross this month" %}</th>
+      <th class="num">{% translate "Gross" %}</th>
       <th class="num">{% translate "ESI (emp)" %}</th><th class="num">{% translate "PF (emp)" %}</th>
       <th class="num">{% translate "Take-home" %}</th>
     </tr></thead>
@@ -30,21 +30,21 @@
       <tr class="{% if r.errors %}row-error{% elif r.notes %}has-notes{% endif %}">
         <td>{{ r.emp.emp_code }}</td>
         <td class="nowrap"><a href="{% url 'employees:detail' r.emp.pk %}">{{ r.emp.full_name }}</a></td>
-        {% if started %}<td class="num">{{ r.days|num }}</td>{% else %}<td class="num">{{ r.days }}</td>
-        <td class="num"><input type="text" inputmode="decimal" name="absent_{{ r.emp.pk }}" value="{{ r.absent_value }}" class="days-input" placeholder="0" aria-label="{% blocktranslate with name=r.emp.full_name %}Absent days of {{ name }}{% endblocktranslate %}"></td>{% endif %}
+        <td class="num"><input type="text" inputmode="decimal" name="days_{{ r.emp.pk }}" value="{{ r.days_input }}" class="days-input" aria-label="{% blocktranslate with name=r.emp.full_name %}Paid days of {{ name }}{% endblocktranslate %}"></td>
         <td class="num"><input type="text" inputmode="numeric" name="gross_{{ r.emp.pk }}" value="{{ r.gross_value }}" class="amount-input" aria-label="{% blocktranslate with name=r.emp.full_name %}Gross salary of {{ name }}{% endblocktranslate %}"></td>
         <td class="num">{% if r.minimum %}{{ r.minimum|inr }}{% else %}—{% endif %}<div class="muted small">{{ r.emp.get_skill_category_display }}</div></td>
         {% if r.result %}
+        <td class="num{% if r.notes %} strong{% endif %}">{{ r.result.paid_days|num }}</td>
         <td class="num">{{ r.result.basic|inr }}</td><td class="num">{{ r.result.incentive|inr }}</td>
         <td class="num">{{ r.result.gross|inr }}</td>
         <td class="num">{{ r.result.ee_esi|inr }}</td><td class="num">{{ r.result.ee_pf|inr }}</td>
         <td class="num strong">{{ r.result.net_pay|inr }}</td>
         {% else %}
-        <td colspan="6"></td>
+        <td colspan="7"></td>
         {% endif %}
       </tr>
       {% if r.errors or r.notes %}
-      <tr class="{% if r.errors %}row-error{% else %}has-notes{% endif %} row-note"><td></td><td colspan="{% if started %}10{% else %}11{% endif %}">
+      <tr class="{% if r.errors %}row-error{% else %}has-notes{% endif %} row-note"><td></td><td colspan="11">
         {% for e in r.errors %}<div class="field-error">{{ e }}</div>{% endfor %}
         {% for n in r.notes %}<div>{{ n }}</div>{% endfor %}
       </td></tr>

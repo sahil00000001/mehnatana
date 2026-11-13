@@ -94,6 +94,9 @@ class PayrollLine(CompanyOwned):
     ot_amount_override = money(null=True, blank=True, default=None)
     incentive = money()
     increment = money()
+    # Gross salary split: paid days as written, when PayCore had to reduce them so that Basic (minimum wage for
+    # the days) stays within the gross. The day fields above then hold the reduced days.
+    days_given = days(null=True, blank=True, default=None)
     advance_deduction = money()
     other_deduction = money()
     other_deduction_reason = models.CharField(max_length=200, blank=True)

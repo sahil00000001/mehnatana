@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 
 from companies.models import Company
-from core.formatting import indian_format, month_label
+from core.formatting import indian_format, month_label, plain_number
 from core.tenancy import company_get, company_required, page
 from excel_io import builders
 from excel_io.common import as_number, table_workbook, xlsx_response
@@ -32,7 +32,15 @@ def _kind(month):
 
 
 def _note_texts(line):
-    return [str(message_for(code)) for code in line.warnings]
+    texts = []
+    for code in line.warnings:
+        if code == "DAYS_REDUCED" and line.days_given is not None:
+            texts.append(_("Paid days reduced from %(given)s to %(paid)s so that Basic (minimum wage for the days) "
+                           "stays within the gross salary.") % {"given": plain_number(line.days_given),
+                                                                 "paid": plain_number(line.paid_days)})
+        else:
+            texts.append(str(message_for(code)))
+    return texts
 
 
 @company_required

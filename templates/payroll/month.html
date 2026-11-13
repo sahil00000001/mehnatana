@@ -18,7 +18,7 @@
   </li>
 
   <li class="step{% if has_lines %} done{% endif %}">
-    <h2>{% if splits_gross %}{% translate "Fill it in Excel and upload it — or just write absent days" %}{% else %}{% translate "Fill it in Excel and upload it" %}{% endif %}</h2>
+    <h2>{% if splits_gross %}{% translate "Fill it in Excel and upload it — or just write paid days and gross salaries" %}{% else %}{% translate "Fill it in Excel and upload it" %}{% endif %}</h2>
     {% if is_final %}
       <p>{% translate "This month is finalised. To change anything, reopen it (step 5)." %}</p>
     {% elif blocker %}
@@ -41,8 +41,8 @@
       {% if splits_gross and not has_lines %}
       <p class="or-line">{% translate "Or skip Excel:" %}</p>
       <div class="actions">
-        <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% translate "Gross salaries and absent days" %}</a>
-        <span class="muted">{% translate "Everyone counts as present on every working day unless you write absent days. The gross salary is cut for absent days; ESI, PF and take-home are worked out." %}</span>
+        <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% translate "Paid days and gross salaries" %}</a>
+        <span class="muted">{% translate "Copy each person's paid days and gross salary from the owner's list. PayCore pays the gross exactly: Basic at the minimum wage, the rest incentive, ESI and PF on Basic." %}</span>
       </div>
       {% endif %}
     {% endif %}
@@ -69,8 +69,8 @@
     {% if has_lines %}
       {% if splits_gross and not is_final %}
       <div class="actions">
-        <a class="btn" href="{% url 'payroll:amounts' month %}">{% translate "See or change gross salaries" %}</a>
-        <span class="muted">{% translate "Basic at the minimum wage, the rest of the gross as incentive, both cut for absent days." %}</span>
+        <a class="btn" href="{% url 'payroll:amounts' month %}">{% translate "Change paid days and gross salaries" %}</a>
+        <span class="muted">{% translate "The gross is paid exactly: Basic at the minimum wage for the paid days, the rest incentive." %}</span>
       </div>
       {% endif %}
       <p class="table-tools">
