@@ -333,6 +333,8 @@ def split_gross(ctx, emp, row, gross=None):
     dim = D(engine.days_in_month(y, m))
     counted = row.present + row.paid_leave + row.week_off_holiday
     lop = row.lop if row.lop is not None else max(ZERO, dim - counted)
+    if dim - lop <= 0:
+        monthly = ZERO  # no paid days: nothing is paid this month, whatever the person's gross salary
     person = engine_employee(emp)
 
     def basic_for(lop_days):
@@ -737,6 +739,7 @@ def gross_page(company, month, entries=None):
             row = RowInput.from_line(line)  # keep the days as uploaded (paid leave, holidays ...)
         else:
             row = days_row(ctx, emp, days, RowInput.from_line(line) if line is not None else None)
+        row.incentive = ZERO  # the gross written here is the whole month's pay: its incentive is worked out
         try:
             current = structure_for_month(emp, month).gross()
         except PayrollError:

@@ -138,6 +138,14 @@ class GrossSalariesPageTest(SplitCase):
         self.assertContains(page, 'name="days_%s" value="31"' % self.employee("E003").pk)  # the days as written
         self.assertContains(page, "Paid days shown as 19 (not 31)")
 
+    def test_no_days_means_no_pay_and_typed_incentives_are_replaced(self):
+        self.run_for().lines.filter(employee__emp_code="E005").update(incentive=2590)  # typed by hand earlier
+        self.post(days_E002="0", gross_E005="20000")
+        e2, e5 = self.line("E002"), self.line("E005")
+        self.assertEqual((e2.paid_days, e2.gross, e2.net_pay), (D(0), D(0), D(0)))
+        self.assertEqual(self.employee("E002").structure_on(NOV).gross, D(18000))  # salary not touched
+        self.assertEqual((e5.incentive, e5.gross), (D(0), D(20000)))
+
     def test_started_month_change_days_and_gross(self):
         page = self.client.get(self.url())
         self.assertContains(page, "Gross salaries — November 2026")

@@ -2,7 +2,7 @@
 {% block content %}
 <div class="box">
   <p>{% translate "Write the paid days and the gross salary of each person, as on the owner's list. The gross salary is paid exactly as written: PayCore pays Basic at the minimum wage for the paid days, the rest as incentive, works out ESI and PF (for PF members) on Basic, and shows the take-home pay." %}</p>
-  <p>{% translate "If Basic for the paid days would be more than the gross salary, PayCore shows fewer paid days, so that Basic stays at the minimum wage within the gross. A gross salary you change here is kept from this month on." %}</p>
+  <p>{% translate "If Basic for the paid days would be more than the gross salary, PayCore shows fewer paid days, so that Basic stays at the minimum wage within the gross. A gross salary you change here is kept from this month on. 0 paid days means the person is not paid this month." %}</p>
   <p class="muted">{% if minimum_wages %}{% blocktranslate with state=minimum_wages.get_state_display from=minimum_wages.effective_from|month_label %}Minimum wages used: {{ state }}, from {{ from }}.{% endblocktranslate %}{% endif %}
     <a href="{% url 'portal:minimum_wages' %}">{% translate "See or change minimum wages" %}</a></p>
 </div>
