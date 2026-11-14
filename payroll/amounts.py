@@ -1,7 +1,8 @@
 """The two quick entry pages of a month (no attendance sheet needed), filled from the owner's monthly list.
 
-By days present: each person's days present. The monthly salary in the person's profile is paid for those days.
-With the minimum-wage split on (Payroll rules), Basic is the minimum wage for the days and the rest is incentive.
+By days present: each person's days present. The monthly salary in the person's profile is paid for those days,
+never raised to the minimum wage. With the minimum-wage split on (Payroll rules), Basic is the minimum wage for the
+days and the rest is incentive (a salary below the minimum wage is all Basic).
 
 By take-home (minimum-wage split on): one take-home amount per person. PayCore derives paid days from the full
 month's minimum wage for the person's skill, fixed employee ESI and PF on Basic; incentive then makes net pay exactly
@@ -19,7 +20,7 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 
 from companies.models import Company, MinimumWage
-from core.formatting import month_label, plain_number
+from core.formatting import indian_format, month_label, plain_number
 from core.forms import WholeRupeesField
 from core.tenancy import company_required, page
 from statutory.rates import MissingRate
@@ -69,9 +70,11 @@ def _notes(item):
     if "TAKE_HOME_NOT_EXACT" in item["warnings"]:
         notes.append(_("The take-home could not be made exactly the amount (a deduction changes in steps). "
                        "Please check."))
-    if "SALARY_BELOW_MINIMUM_WAGE" in item["warnings"]:
-        notes.append(_("The monthly salary in the profile is below the minimum wage, so Basic is paid at the "
-                       "minimum wage. Revise the salary."))
+    if "SALARY_BELOW_MINIMUM_WAGE" in item["warnings"] and item["monthly"] is not None and item["minimum"]:
+        notes.append(_("The monthly salary in the profile (₹%(salary)s) is below the minimum wage for %(skill)s "
+                       "(₹%(minimum)s). It is paid as in the profile.") % {
+            "salary": indian_format(item["monthly"]), "minimum": indian_format(item["minimum"]),
+            "skill": item["emp"].get_skill_category_display().lower()})
     return notes
 
 

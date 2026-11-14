@@ -307,10 +307,10 @@ def split_by_days(ctx, emp, row):
     """By days present (minimum-wage split on, no take-home written for the month).
 
     The monthly salary in the person's profile (salary structure, plus a raise written for the month) is paid for
-    the paid days. Basic is the minimum wage for the person's skill for those days and the rest is incentive; ESI
-    and PF are worked out on Basic. A profile salary below the minimum wage still gets Basic at the minimum wage.
-    A one-time incentive written for the month is paid on top. Returns (engine.Line, structure used, the profile
-    salary is below the minimum wage).
+    the paid days, always: the minimum wage never raises it. Basic is the minimum wage for the person's skill for
+    those days and the rest is incentive; a salary below the minimum wage is all Basic. ESI and PF are worked out on
+    Basic. A one-time incentive written for the month is paid on top. Returns (engine.Line, structure used, the
+    profile salary is below the minimum wage).
     """
     wage = ctx.minimum_wage(emp)
     if not wage:
@@ -322,10 +322,12 @@ def split_by_days(ctx, emp, row):
     counted = row.present + row.paid_leave + row.week_off_holiday
     lop = row.lop if row.lop is not None else max(ZERO, dim - counted)
     factor, _outside = engine.pay_factor(y, m, engine_employee(emp), lop, ctx.settings)
-    # Structure for ESI coverage and the tax projection: Basic at the minimum wage, the rest as a monthly
-    # incentive. This month's incentive is set so that the gross is exactly the monthly salary for the days.
-    structure = engine.Structure(basic=wage, incentive=max(ZERO, monthly - wage))
-    earned, basic = engine.rupee(max(monthly, wage) * factor), engine.rupee(wage * factor)
+    # Structure for ESI coverage and the tax projection: Basic at the minimum wage (or the whole salary, when it is
+    # lower), the rest as a monthly incentive. This month's incentive is set so that the gross is exactly the
+    # monthly salary for the days.
+    monthly_basic = min(monthly, wage)
+    structure = engine.Structure(basic=monthly_basic, incentive=monthly - monthly_basic)
+    earned, basic = engine.rupee(monthly * factor), engine.rupee(monthly_basic * factor)
     inp = row.to_engine()
     inp.increment = ZERO  # already in the monthly salary
     inp.incentive = (earned - basic) - engine.rupee(structure.incentive * factor) + (row.incentive or ZERO)
@@ -500,7 +502,7 @@ def _minimum_wage_errors(ctx, emp, row, result, warnings):
     note = _("(This check is set in Settings → Attendance sheet checks.)")
     if not ctx.minimum_wage(emp):
         return [("present", ctx.no_minimum_wage_message(emp))]
-    if "BELOW_MINIMUM_WAGE" in warnings:
+    if "BELOW_MINIMUM_WAGE" in warnings or "SALARY_BELOW_MINIMUM_WAGE" in warnings:
         return [("present", _("Basic + DA + other allowance (₹%(earned)s) is below the minimum wage for the days "
                               "paid (₹%(minimum)s). Revise the salary. %(note)s") % {
             "earned": indian_format(result.basic + result.da + result.other),

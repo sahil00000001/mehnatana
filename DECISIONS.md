@@ -146,8 +146,11 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
 - **By days present** (page "By days present", or the attendance sheet): the monthly salary in the profile (one
   amount, kept in Basic of the salary structure, plus a raise written for the month) is paid for the paid days.
   Basic = the minimum wage for the person's skill (`MinimumWage.in_force`, state of the company) for those days;
-  the rest is incentive. A profile salary below the minimum wage still gets Basic at the minimum wage (note
-  SALARY_BELOW_MINIMUM_WAGE). ESI (0.75%) and PF are on Basic (Labour Code wages: the 50% rule applies).
+  the rest is incentive. The pay is always the profile salary for the days: the minimum wage never raises it.
+  A profile salary below the minimum wage is paid as it is, all as Basic, with the note SALARY_BELOW_MINIMUM_WAGE
+  (and refused only if the company switches on the sheet check "Stop when the pay is below the minimum wage").
+  Decided by the owner on 14-11-2026: attendance pay follows the salary each person is actually paid. Until then
+  Basic was raised to the minimum wage. ESI (0.75%) and PF are on Basic (Labour Code wages: the 50% rule applies).
 - **By take-home** (page "By take-home"): the owner enters one amount per person: the net pay to be received.
   Basic is the full month's minimum wage for the person's skill, prorated by whole calendar days. PayCore chooses
   the greatest paid-day count for which Basic less employee ESI and PF is within the amount; employee ESI is fixed

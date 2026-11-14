@@ -45,11 +45,11 @@ class ByDaysTest(SplitCase):
         self.assertEqual((e2.ee_esi, e2.ee_pf, e2.net_pay), (D(105), D(1674), D(14421)))  # on Basic only
         self.assertIsNone(e2.take_home)
 
-    def test_a_salary_below_the_minimum_wage_still_gets_it(self):
-        e1 = self.line("E001")  # 12,000 + 500 raise, unskilled 14,000
+    def test_a_salary_below_the_minimum_wage_is_paid_as_it_is(self):
+        e1 = self.line("E001")  # 12,000 + 500 raise, unskilled 14,000, the full month
         self.assertIn("SALARY_BELOW_MINIMUM_WAGE", e1.warnings)
-        self.assertEqual(e1.rate_basic, D(14000))
-        self.assertEqual(e1.incentive_pay, e1.incentive)  # nothing above Basic but the one-time incentive
+        self.assertEqual((e1.paid_days, e1.rate_basic, e1.earned_basic), (D(30), D(12500), D(12500)))  # not 14,000
+        self.assertEqual(e1.incentive_pay, e1.incentive)  # all of the salary is Basic; only the one-time incentive
 
     def test_minimum_wage_needed(self):
         MinimumWage.objects.all().delete()
@@ -276,6 +276,37 @@ class ByDaysPageTest(SplitCase):
         self.post(E002="15")
         e2 = self.line("E002")
         self.assertEqual((e2.gross, e2.incentive_pay), (D(9000), D(0)))
+
+    def test_below_the_minimum_wage_the_profile_salary_is_paid_for_the_days(self):
+        """The owner's case: semi-skilled, 20,371 a month in the profile, minimum wage 22,568, 28 of 31 days.
+        Pay is 20,371 x 28 / 31 = 18,400, never 22,568 x 28 / 31 = 20,384."""
+        self.srks.salary_divisor = "CALENDAR"
+        self.srks.save()
+        MinimumWage.objects.create(state=self.srks.state, effective_from=DEC, **dict(RATES, semi_skilled=22568))
+        SalaryRevision.objects.create(company=self.srks, employee=self.employee("E002"), effective_from=DEC,
+                                      basic=20371)
+        with self.today_is(date(2026, 12, 31)):
+            self.finalise_november()
+        e2 = self.employee("E002")
+        data = self.client.get(reverse("payroll:preview", args=[DEC]), {"method": "days", "emp": e2.pk,
+                                                                         "days": "28"}).json()
+        self.assertEqual((data["figures"]["basic"], data["figures"]["incentive"], data["figures"]["gross"]),
+                         (18400, 0, 18400))
+        self.assertEqual(data["notes"], ["The monthly salary in the profile (₹20,371) is below the minimum wage for "
+                                         "semi-skilled (₹22,568). It is paid as in the profile."])
+        self.post(month=DEC, E002="28")
+        line = self.line("E002", month=DEC)
+        self.assertEqual((line.paid_days, line.earned_basic, line.incentive_pay, line.gross),
+                         (D(28), D(18400), D(0), D(18400)))
+        self.assertEqual(line.rate_basic, D(20371))  # the profile salary, for the payslip's monthly rate
+
+    def test_the_minimum_wage_check_still_stops_it_when_switched_on(self):
+        self.client.post(reverse("companies:checks"), {
+            "days_filled_on": "on", "other_reason_on": "on", "ot_limit_on": "on", "ot_limit_limit": "300",
+            "paid_leave_limit_limit": "4", "min_wage_on": "on"})
+        page = self.post()  # E001: 12,500 a month, unskilled minimum wage 14,000
+        self.assertContains(page, "is below the minimum wage for the days paid")
+        self.assertNotIn("SALARY_BELOW_MINIMUM_WAGE", self.line("E002").warnings)  # 18,000: above, not stopped
 
 
 class LivePreviewTest(SplitCase):

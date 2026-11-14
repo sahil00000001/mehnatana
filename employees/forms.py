@@ -299,7 +299,8 @@ def one_gross_salary(form, company):
         form.fields.pop(name, None)
     form.fields["basic"].label = _("Monthly salary ₹")
     form.fields["basic"].help_text = _("The salary for a full month. A month worked out by days present pays it for "
-                                       "the days: Basic at the minimum wage, the rest incentive. A month worked out "
+                                       "the days, as it is: Basic at the minimum wage (or all of it, if it is "
+                                       "lower), the rest incentive. A month worked out "
                                        "by take-home uses the amounts written for that month instead.")
 
 

@@ -20,8 +20,8 @@ MESSAGES = {
     "BELOW_MINIMUM_WAGE": _("Basic + DA + other allowance is below the minimum wage for the days paid."),
     "DAYS_REDUCED": _("Paid days were reduced so that Basic (minimum wage for the days) stays within the take-home "
                       "amount."),
-    "SALARY_BELOW_MINIMUM_WAGE": _("The monthly salary in the profile is below the minimum wage, so Basic is paid "
-                                   "at the minimum wage. Revise the salary."),
+    "SALARY_BELOW_MINIMUM_WAGE": _("The monthly salary in the profile is below the minimum wage for the person's "
+                                   "skill. It is paid as in the profile."),
     "TAKE_HOME_NOT_EXACT": _("The take-home could not be made exactly the amount written (a deduction changes in "
                              "steps). Please check."),
 }
