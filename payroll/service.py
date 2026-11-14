@@ -58,7 +58,7 @@ class RowInput:
     other_reason: str = ""
     tds_override: Optional[D] = None
     remarks: str = ""
-    days_given: Optional[D] = None  # take-home method: paid days as written, before PayCore reduced them
+    days_given: Optional[D] = None  # paid days as written, when an earlier version reduced them (not any more)
     take_home: Optional[D] = None  # take-home method: the amount to pay in hand this month (None: by days)
 
     def to_engine(self):
@@ -303,18 +303,6 @@ def minimum_for_days(ctx, emp, result):
     return engine.rupee(D(wage) * factor)
 
 
-def _take_days_off(row, count):
-    """`row` with `count` paid days fewer: from days present first, then paid leave, then weekly offs."""
-    left, out = count, replace(row)
-    for name in ("present", "paid_leave", "week_off_holiday"):
-        take = min(left, getattr(out, name))
-        setattr(out, name, getattr(out, name) - take)
-        left -= take
-    if out.lop is not None:
-        out.lop += count
-    return out
-
-
 def split_by_days(ctx, emp, row):
     """By days present (minimum-wage split on, no take-home written for the month).
 
@@ -344,67 +332,79 @@ def split_by_days(ctx, emp, row):
     return _engine_line(ctx, emp, structure, structure, inp), structure, monthly < wage
 
 
+def take_home_basic(ctx, emp):
+    """Basic for a whole month on the take-home method: the company's figure (Payroll rules), else the full month's
+    minimum wage for the person's skill. Never less than the minimum wage."""
+    wage = ctx.minimum_wage(emp)
+    if not wage:
+        raise PayrollError(ctx.no_minimum_wage_message(emp))
+    fixed = ctx.company.take_home_basic
+    return max(D(wage), D(fixed)) if fixed else D(wage)
+
+
 def match_take_home(ctx, emp, row):
     """By take-home (minimum-wage split on, an amount written for the month): the take-home pay is exactly the
     amount the owner pays.
 
-    Basic is the minimum wage for the person's skill, for the paid days. ESI is the company's fixed amount per
-    person (Payroll rules, Rs 158 unless changed; empty = 0.75% of Basic) and PF is worked out on Basic. If Basic
-    less ESI, PF and the other deductions would already be more than the amount, paid days are taken off one at a
-    time (days present first) and the payslip and registers show the reduced days (the days as written are kept
-    in days_given). Then the incentive is set so that the take-home is exactly the amount: take-home rises by at
-    most Rs 1 for each Rs 1 of incentive, so stepping by the gap lands on it.
-    Returns (engine.Line, structure used, the row actually used, days were reduced, exact).
+    Basic is fixed: the whole month's Basic (take_home_basic), whatever the days present, cut only for days before
+    joining or after leaving. The paid days are the days as written; they are never changed. ESI is the company's
+    fixed amount per person (Rs 158 unless changed; empty = 0.75% of Basic) and PF is worked out on Basic. The
+    incentive is set so that the take-home is exactly the amount: take-home rises by at most Rs 1 for each Rs 1 of
+    incentive, so stepping by the gap lands on it. An amount below Basic less the deductions would pay less than
+    the minimum wage: it is refused (PayrollError) with the least that must be paid.
+    Returns (engine.Line, structure used, the row used, exact).
     """
-    wage = ctx.minimum_wage(emp)
-    if not wage:
-        raise PayrollError(ctx.no_minimum_wage_message(emp))
-    wage, target = D(wage), row.take_home
+    full, target = take_home_basic(ctx, emp), row.take_home
     fixed_esi = ctx.company.take_home_esi
     y, m = ctx.month.year, ctx.month.month
     dim = D(engine.days_in_month(y, m))
     counted = row.present + row.paid_leave + row.week_off_holiday
     lop = row.lop if row.lop is not None else max(ZERO, dim - counted)
-    if dim - lop <= 0:
-        target = ZERO  # no paid days: nothing is paid this month
     person = engine_employee(emp)
+    factor, _outside = engine.pay_factor(y, m, person, lop, ctx.settings)
+    employed, _outside = engine.pay_factor(y, m, person, dim - D(days_employed(emp, ctx.month)), ctx.settings)
+    basic = engine.rupee(full * employed)
+    if dim - lop <= 0:
+        basic, target = ZERO, ZERO  # no paid days: nothing is paid this month
 
-    def run(days_off, incentive):
-        """(engine line or None if the deductions do not fit, row used, structure) for these days and incentive."""
-        used = _take_days_off(row, days_off) if days_off else replace(row)
-        factor, _outside = engine.pay_factor(y, m, person, lop + days_off, ctx.settings)
+    def run(incentive):
+        """The engine line for this incentive, or None if the deductions do not fit."""
         # The structure carries this month's incentive as a monthly figure, for ESI coverage and the tax
         # projection; the month's input makes the incentive paid exactly `incentive`.
-        structure = engine.Structure(basic=wage, incentive=(incentive / factor) if factor else ZERO)
-        inp = used.to_engine()
+        structure = engine.Structure(basic=full, incentive=(incentive / factor) if factor else ZERO)
+        inp = row.to_engine()
         inp.increment = ZERO
         inp.incentive = incentive - engine.rupee(structure.incentive * factor)
-        inp.ee_esi = fixed_esi
+        inp.ee_esi, inp.basic = fixed_esi, basic
         try:
-            return _engine_line(ctx, emp, structure, structure, inp), used, structure
+            return _engine_line(ctx, emp, structure, structure, inp), structure
         except ValueError as exc:
             if "deductions are more than earnings" in str(exc):
-                return None, used, structure
+                return None, structure
             raise
 
-    days_off = ZERO
-    line, used, structure = run(days_off, ZERO)
-    while line is not None and line.net_pay > target and counted - days_off >= 1:
-        days_off += 1
-        line, used, structure = run(days_off, ZERO)
+    line, structure = run(ZERO)
+    if line is not None and line.net_pay > target:
+        parts = [_("Basic ₹%(basic)s") % {"basic": indian_format(line.basic)}]
+        for amount, name in ((line.ee_esi, _("ESI")), (line.ee_pf, _("PF")), (line.pt, _("professional tax")),
+                             (line.tds, _("income tax")), (line.advance, _("advance")),
+                             (line.other_deduction, _("other deduction"))):
+            if amount:
+                parts.append(_("%(name)s ₹%(amount)s") % {"name": name, "amount": indian_format(amount)})
+        raise PayrollError(_("₹%(amount)s is less than the minimum wage. With %(parts)s, at least ₹%(least)s must "
+                             "be paid in hand. Write that much or more.") % {
+            "amount": indian_format(target), "parts": " − ".join(parts), "least": indian_format(line.net_pay)})
     if line is None or line.net_pay < target:
         incentive = target - (line.net_pay if line is not None else ZERO)
         for _step in range(80):
-            line, used, structure = run(days_off, incentive)
+            line, structure = run(incentive)
             gap = target - (line.net_pay if line is not None else ZERO)
             if gap == 0:
                 break
             incentive = max(ZERO, incentive + gap)
         if line is None:
             raise ValueError(f"{emp.emp_code}: deductions are more than earnings")
-    if days_off and used.days_given is None:
-        used.days_given = dim - lop
-    return line, structure, used, bool(days_off), line.net_pay == target
+    return line, structure, row, line.net_pay == target
 
 
 def compute(ctx, emp, row):
@@ -419,12 +419,12 @@ def compute(ctx, emp, row):
         if below:
             warnings.append("SALARY_BELOW_MINIMUM_WAGE")
     elif ctx.splits:
-        result, used, used_row, reduced, exact = match_take_home(ctx, emp, row)
+        if row.days_given is not None:  # worked out before days were kept as written: the days as written
+            row = days_row(ctx, emp, row.days_given, row)
+        result, used, used_row, exact = match_take_home(ctx, emp, row)
         result.row_used = used_row
         base_gross = used.gross()
         warnings = list(result.warnings)
-        if reduced or (used_row.days_given is not None and used_row.days_given != result.paid_days):
-            warnings.append("DAYS_REDUCED")
         if not exact:
             warnings.append("TAKE_HOME_NOT_EXACT")
     else:

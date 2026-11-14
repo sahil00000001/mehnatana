@@ -18,8 +18,8 @@ from datetime import date, timedelta
 from decimal import Decimal as D, ROUND_HALF_UP, ROUND_CEILING, ROUND_FLOOR
 from typing import Optional
 
-ENGINE_VERSION = "1.3"  # 1.1: salary per working day (weekly offs) as a divisor; 1.2: incentive in the structure;
-# 1.3: a fixed employee ESI amount (take-home method)
+ENGINE_VERSION = "1.4"  # 1.1: salary per working day (weekly offs) as a divisor; 1.2: incentive in the structure;
+# 1.3: a fixed employee ESI amount (take-home method); 1.4: a fixed Basic for the month (take-home method)
 
 ZERO = D("0")
 HUNDRED = D("100")
@@ -133,6 +133,7 @@ class MonthInput:
     other_deduction: D = ZERO
     tds_override: Optional[D] = None
     ee_esi: Optional[D] = None  # a fixed employee ESI amount instead of 0.75% (company setting, take-home method)
+    basic: Optional[D] = None  # Basic paid this month instead of the rate for the paid days (take-home method)
 
 
 @dataclass
@@ -381,7 +382,8 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
     L.ncp_days = int(max(ZERO, lop - not_employed).to_integral_value(rounding=ROUND_FLOOR))
 
     # 3. earnings
-    L.basic, L.da, L.hra = rupee(s.basic * factor), rupee(s.da * factor), rupee(s.hra * factor)
+    L.basic = rupee(inp.basic) if inp.basic is not None else rupee(s.basic * factor)
+    L.da, L.hra = rupee(s.da * factor), rupee(s.hra * factor)
     L.conveyance, L.other = rupee(s.conveyance * factor), rupee(s.other * factor)
     if inp.ot_amount is not None:
         L.ot_pay = rupee(inp.ot_amount)

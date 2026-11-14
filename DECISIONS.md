@@ -149,20 +149,25 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
   the rest is incentive. A profile salary below the minimum wage still gets Basic at the minimum wage (note
   SALARY_BELOW_MINIMUM_WAGE). ESI (0.75%) and PF are on Basic (Labour Code wages: the 50% rule applies).
 - **By take-home** (page "By take-home"): the owner's list gives paid days and the amount paid in hand. The
-  payslip's take-home is exactly that amount. Basic = the minimum wage for the paid days; employee ESI is the
-  company's fixed amount (`Company.take_home_esi`, ₹158 as the owner asked on 14-11-2026; empty = 0.75% of Basic;
-  the employer share stays 3.25% of ESI wages); PF on Basic. If Basic less the deductions would already be more
-  than the amount, paid days are taken off one at a time (present days first) and the payslip shows the reduced
-  days (`PayrollLine.days_given` keeps the days as written; note DAYS_REDUCED). The owner chose this over keeping
-  Basic at a full month with an extra deduction. Then the incentive is found by stepping by the gap until take-home
-  = amount. An advance repaid that month is covered by the incentive too. The page starts from last month's
-  amounts; an amount is needed for everyone with paid days.
+  payslip's take-home is exactly that amount. Basic is **fixed** for the month, whatever the days present: the
+  company's figure (`Company.take_home_basic`) or, empty, the full month's minimum wage of the person's skill;
+  never below the minimum wage; cut only for days before joining or after leaving. Employee ESI is the company's
+  fixed amount (`Company.take_home_esi`, ₹158 as the owner asked on 14-11-2026; empty = 0.75% of Basic; the
+  employer share stays 3.25% of ESI wages); PF on Basic. The incentive is found by stepping by the gap until
+  take-home = amount; an advance repaid that month is covered by it too. The page starts from last month's amounts;
+  an amount is needed for everyone with paid days.
+- **No disguising pay below the minimum wage.** An amount below Basic less the deductions is refused with the least
+  that must be paid in hand. Until 14-11-2026 paid days were cut so that a pro-rated Basic fitted a low amount;
+  the owner pointed out that this shows fewer days than were worked and does not make the pay meet the minimum
+  wage, so the days written are now never changed. A made-up deduction to fit the amount was not built for the
+  same reason: the payslip must show what was really worked and paid. (`days_given` stays for lines worked out
+  before; working them out again uses the days as written.)
 - Both pages work the figures out again as you type (`payroll:preview`, JSON, nothing saved; `static/js/entry.js`
   counts the changed figures up or down and makes them glow). The server does the arithmetic, so the preview is
   what Save stores.
 - History of the rule on 13-14 November: (1) typed amount matched as take-home or gross, (2) one fixed gross cut
   for absent days, (3) gross paid exactly, (4) take-home = the listed amount. (5) The two ways above, with fixed
-  ESI by take-home.
+  ESI by take-home. (6) Fixed Basic by take-home; days never cut; amounts below the minimum refused.
 - **Minimum wages** are entered per state and month (All companies → Minimum wages), not shipped with the app.
   Saving them works out every company's drafts in that state again.
 - With OFF, when minimum wages are entered, a line whose Basic + DA + other allowance is below the minimum for the

@@ -33,7 +33,7 @@ Then open:
 
 If `DATABASE_URL` and `POSTGRES_HOST` are empty, the data is kept in a local `db.sqlite3` file.
 
-Run the tests (313 tests, including all README §17 numbers):
+Run the tests (315 tests, including all README §17 numbers):
 
 ```
 python manage.py test
@@ -104,7 +104,8 @@ downloads as an Excel file with one sheet per view.
 profile is paid for those days) or *Calculate by take-home* (the owner's list of paid days and amounts in hand; the
 take-home becomes exactly the amount). With Settings → Payroll rules → *Minimum-wage split* on (the default) and the
 state's minimum wages entered once on All companies → *Minimum wages*, Basic is the minimum wage and the rest is
-incentive; by take-home ESI is a fixed amount per person (₹158 unless changed). Figures change as you type.
+incentive; by take-home Basic is fixed at the full month's minimum wage and ESI is a fixed amount per person
+(₹158 unless changed), and an amount below the minimum wage cannot be saved. Figures change as you type.
 
 **Inactive staff.** On a person's page, *Make inactive* leaves them out of the attendance sheet, registers and salary
 from a chosen month; *Make active again* brings them back.
