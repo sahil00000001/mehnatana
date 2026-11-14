@@ -3,11 +3,9 @@
 By days present: each person's days present. The monthly salary in the person's profile is paid for those days.
 With the minimum-wage split on (Payroll rules), Basic is the minimum wage for the days and the rest is incentive.
 
-By take-home (minimum-wage split on): each person's paid days and the amount the owner pays in hand that month.
-The take-home pay is made exactly that amount: Basic is the month's Basic (the full month's minimum wage, or the
-company's figure) for the days written, the paid days are never changed, ESI is the company's fixed amount, PF is worked out on Basic and the
-incentive makes up the rest. An amount that would pay less than the minimum wage is refused, with the least that
-must be paid.
+By take-home (minimum-wage split on): one take-home amount per person. PayCore derives paid days from the full
+month's minimum wage for the person's skill, fixed employee ESI and PF on Basic; incentive then makes net pay exactly
+the amount.
 
 The figures are worked out again as you type (preview, nothing saved); Save stores the whole month.
 """
@@ -53,10 +51,11 @@ def _typed(data, emp, method):
             pay = WholeRupeesField(required=False).clean(data.get(f"pay_{emp.pk}", ""))
         except ValidationError as exc:
             problems += exc.messages
-    try:
-        paid = _days(data.get(f"days_{emp.pk}", ""))
-    except ValidationError as exc:
-        problems += exc.messages
+    else:
+        try:
+            paid = _days(data.get(f"days_{emp.pk}", ""))
+        except ValidationError as exc:
+            problems += exc.messages
     return (paid, pay), problems
 
 
@@ -64,9 +63,9 @@ def _notes(item):
     notes = []
     result = item["result"]
     if result is not None and "DAYS_REDUCED" in item["warnings"]:
-        notes.append(_("Paid days shown as %(paid)s (not %(given)s): at the minimum wage, %(given)s days would pay "
-                       "more than the take-home amount.") % {
-            "paid": plain_number(result.paid_days), "given": plain_number(item["row"].days_given)})
+        notes.append(_("Paid days set to %(paid)s of %(employed)s from the take-home amount. This is a payroll "
+                       "calculation, not an attendance record.") % {
+            "paid": plain_number(result.paid_days), "employed": plain_number(item["employed"])})
     if "TAKE_HOME_NOT_EXACT" in item["warnings"]:
         notes.append(_("The take-home could not be made exactly the amount (a deduction changes in steps). "
                        "Please check."))
@@ -149,8 +148,8 @@ def _entry(request, month, method):
             item["days_input"] = plain_number(item["days_value"])
     if method == service.BY_TAKE_HOME:
         title = _("By take-home — %(month)s") % {"month": month_label(month)}
-        instruction = _("Write each person's paid days and the amount the owner pays in hand, from the owner's "
-                        "list. The figures change as you type; press Save when done.")
+        instruction = _("Write the amount the owner pays each person in hand. PayCore works out paid days and "
+                        "incentive; the figures change as you type. Press Save when done.")
     else:
         title = _("By days present — %(month)s") % {"month": month_label(month)}
         instruction = _("Write the days each person was present. The salary in each profile is paid for those "
@@ -159,7 +158,7 @@ def _entry(request, month, method):
                 run=run, month=month, rows=rows, has_errors=bool(errors), started=started, method=method,
                 by_take_home=method == service.BY_TAKE_HOME, totals=totals,
                 splits=company.amount_paid_mode == Company.AmountPaid.GROSS,
-                take_home_esi=company.take_home_esi, take_home_basic=company.take_home_basic, minimum_wages=MinimumWage.in_force(company.state, month))
+                minimum_wages=MinimumWage.in_force(company.state, month))
 
 
 @company_required

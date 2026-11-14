@@ -148,29 +148,21 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
   Basic = the minimum wage for the person's skill (`MinimumWage.in_force`, state of the company) for those days;
   the rest is incentive. A profile salary below the minimum wage still gets Basic at the minimum wage (note
   SALARY_BELOW_MINIMUM_WAGE). ESI (0.75%) and PF are on Basic (Labour Code wages: the 50% rule applies).
-- **By take-home** (page "By take-home"): the owner's list gives paid days and the amount paid in hand. The
-  payslip's take-home is exactly that amount. Basic is the month's Basic for the **days written**: the company's
-  figure (`Company.take_home_basic`) or, empty, the full month's minimum wage of the person's skill; never below
-  the minimum wage. (For one day on 14-11-2026 Basic was paid in full whatever the days; that made real part-month
-  attendance impossible to pay, so it is pro rata again.) Employee ESI is the company's
-  fixed amount (`Company.take_home_esi`, ₹158 as the owner asked on 14-11-2026; empty = 0.75% of Basic; the
-  employer share stays 3.25% of ESI wages); PF on Basic. The incentive is found by stepping by the gap until
-  take-home = amount; an advance repaid that month is covered by it too. The page starts from last month's amounts;
-  an amount is needed for everyone with paid days.
-- **No disguising pay below the minimum wage.** An amount below Basic less the deductions is refused with the least
-  that must be paid in hand. Until 14-11-2026 paid days were cut so that a pro-rated Basic fitted a low amount;
-  the owner pointed out that this shows fewer days than were worked and does not make the pay meet the minimum
-  wage, so the days written are now never changed. A made-up deduction to fit the amount was not built for the
-  same reason: the payslip must show what was really worked and paid. On 14-11-2026 the owner asked again for
-  PayCore to mark people absent so that a full month's work fits a lower amount; that was declined. PayCore pays
-  the days the user writes and never invents absences. (`days_given` stays for lines worked out
-  before; working them out again uses the days as written.)
+- **By take-home** (page "By take-home"): the owner enters one amount per person: the net pay to be received.
+  Basic is the full month's minimum wage for the person's skill, prorated by whole calendar days. PayCore chooses
+  the greatest paid-day count for which Basic less employee ESI and PF is within the amount; employee ESI is fixed
+  at ₹158 for ESI-covered people, and PF is calculated on Basic. Incentive is adjusted so net pay equals the amount
+  after payroll deductions. The days are a calculation from the take-home amount, not an attendance record; they
+  may be lower even when the person worked the full month. Legacy `Company.take_home_basic` and
+  `Company.take_home_esi` values are ignored. The page starts from last month's amount.
+- This method intentionally writes the calculated paid days to the payslip and salary register. Use "By days
+  present" or the attendance sheet when the recorded attendance must determine paid days.
 - Both pages work the figures out again as you type (`payroll:preview`, JSON, nothing saved; `static/js/entry.js`
   counts the changed figures up or down and makes them glow). The server does the arithmetic, so the preview is
   what Save stores.
 - History of the rule on 13-14 November: (1) typed amount matched as take-home or gross, (2) one fixed gross cut
-  for absent days, (3) gross paid exactly, (4) take-home = the listed amount. (5) The two ways above, with fixed
-  ESI by take-home. (6) Days never cut; amounts below the minimum wage for the days written refused.
+  for absent days, (3) gross paid exactly, (4) take-home = the listed amount. (5) The two entry methods, with
+  fixed ESI by take-home. (6) Days on take-home are again derived from the amount; see the current rule above.
 - **Minimum wages** are entered per state and month (All companies → Minimum wages), not shipped with the app.
   Saving them works out every company's drafts in that state again.
 - With OFF, when minimum wages are entered, a line whose Basic + DA + other allowance is below the minimum for the

@@ -58,7 +58,7 @@ class RowInput:
     other_reason: str = ""
     tds_override: Optional[D] = None
     remarks: str = ""
-    days_given: Optional[D] = None  # paid days as written, when an earlier version reduced them (not any more)
+    days_given: Optional[D] = None  # original paid days kept for legacy lines
     take_home: Optional[D] = None  # take-home method: the amount to pay in hand this month (None: by days)
 
     def to_engine(self):
@@ -332,56 +332,69 @@ def split_by_days(ctx, emp, row):
     return _engine_line(ctx, emp, structure, structure, inp), structure, monthly < wage
 
 
-def take_home_basic(ctx, emp):
-    """Basic for a whole month on the take-home method: the company's figure (Payroll rules), else the full month's
-    minimum wage for the person's skill. Never less than the minimum wage."""
-    wage = ctx.minimum_wage(emp)
-    if not wage:
-        raise PayrollError(ctx.no_minimum_wage_message(emp))
-    fixed = ctx.company.take_home_basic
-    return max(D(wage), D(fixed)) if fixed else D(wage)
-
-
 def match_take_home(ctx, emp, row):
-    """By take-home (minimum-wage split on, an amount written for the month): the take-home pay is exactly the
-    amount the owner pays.
+    """Derive paid days from the amount, then make net pay exactly that amount.
 
-    Basic is the month's Basic (take_home_basic: the company's figure or the full month's minimum wage) for the
-    paid days as written. The days are never changed by PayCore. ESI is the company's fixed amount per person
-    (Rs 158 unless changed; empty = 0.75% of Basic) and PF is worked out on Basic. The incentive is set so that the
-    take-home is exactly the amount: take-home rises by at most Rs 1 for each Rs 1 of incentive, so stepping by the
-    gap lands on it. An amount below Basic less the deductions would pay less than the minimum wage for the days
-    written: it is refused (PayrollError) with the least that must be paid.
-    Returns (engine.Line, structure used, the row used, exact).
+    The monthly Basic is the employee's skill minimum wage. Whole calendar days are
+    reduced until Basic less employee ESI and PF fits the target; incentive covers
+    the remaining net-pay gap. ESI and PF are kept on their fixed take-home bases.
     """
-    full, target = take_home_basic(ctx, emp), row.take_home
-    fixed_esi = ctx.company.take_home_esi
+    full, target = ctx.minimum_wage(emp), row.take_home
+    if not full:
+        raise PayrollError(ctx.no_minimum_wage_message(emp))
+    full = D(full)
     y, m = ctx.month.year, ctx.month.month
     dim = D(engine.days_in_month(y, m))
-    counted = row.present + row.paid_leave + row.week_off_holiday
-    lop = row.lop if row.lop is not None else max(ZERO, dim - counted)
+    employed = days_employed(emp, ctx.month)
     person = engine_employee(emp)
-    factor, _outside = engine.pay_factor(y, m, person, lop, ctx.settings)
-    if dim - lop <= 0:
-        target = ZERO  # no paid days: nothing is paid this month
+    fixed_esi = D("158")
+    if target == ZERO:
+        row.ot_hours = ZERO
+        row.ot_amount = None
+        row.incentive = ZERO
+        row.advance = ZERO
+        row.other_deduction = ZERO
+        row.other_reason = ""
+        row.tds_override = ZERO
 
-    def run(incentive):
-        """The engine line for this incentive, or None if the deductions do not fit."""
-        # The structure carries this month's incentive as a monthly figure, for ESI coverage and the tax
-        # projection; the month's input makes the incentive paid exactly `incentive`.
-        structure = engine.Structure(basic=full, incentive=(incentive / factor) if factor else ZERO)
-        inp = row.to_engine()
-        inp.increment = ZERO
-        inp.incentive = incentive - engine.rupee(structure.incentive * factor)
+    def run(incentive, paid_days, contributions_only=False):
+        used_row = days_row(ctx, emp, D(paid_days), RowInput() if contributions_only else row)
+        used_row.ot_hours = ZERO
+        used_row.ot_amount = None
+        used_row.incentive = ZERO
+        used_row.increment = ZERO
+        structure = engine.Structure(basic=full)
+        inp = used_row.to_engine()
+        inp.basic = engine.rupee(full * D(paid_days) / dim)
+        inp.pf_wage_override = inp.basic
         inp.ee_esi = fixed_esi
+        inp.incentive = incentive
+        inp.increment = ZERO
+        settings = ctx.settings
+        if contributions_only:
+            inp.advance = ZERO
+            inp.other_deduction = ZERO
+            inp.tds_override = ZERO
+            settings = replace(settings, pt_enabled=False, tds_enabled=False)
         try:
-            return _engine_line(ctx, emp, structure, structure, inp), structure
+            result = engine.compute_line(y, m, person, structure, structure, inp, settings, ctx.rates,
+                                        ctx.ytd.get(emp.pk, engine.YTD()))
+            return result, structure, used_row
         except ValueError as exc:
             if "deductions are more than earnings" in str(exc):
-                return None, structure
+                return None, structure, used_row
             raise
 
-    line, structure = run(ZERO)
+    # Choose the greatest whole-day count whose Basic after employee ESI/PF does
+    # not exceed the owner's amount. Attendance is not an input to this method.
+    for paid_days in range(employed, -1, -1):
+        base, _structure, _used_row = run(ZERO, paid_days, contributions_only=True)
+        if base is not None and base.basic - base.ee_esi - base.ee_pf <= target:
+            break
+    else:
+        paid_days = 0
+
+    line, structure, used_row = run(ZERO, paid_days)
     if line is not None and line.net_pay > target:
         parts = [_("Basic ₹%(basic)s") % {"basic": indian_format(line.basic)}]
         for amount, name in ((line.ee_esi, _("ESI")), (line.ee_pf, _("PF")), (line.pt, _("professional tax")),
@@ -396,14 +409,15 @@ def match_take_home(ctx, emp, row):
     if line is None or line.net_pay < target:
         incentive = target - (line.net_pay if line is not None else ZERO)
         for _step in range(80):
-            line, structure = run(incentive)
+            line, structure, used_row = run(incentive, paid_days)
             gap = target - (line.net_pay if line is not None else ZERO)
             if gap == 0:
                 break
             incentive = max(ZERO, incentive + gap)
         if line is None:
             raise ValueError(f"{emp.emp_code}: deductions are more than earnings")
-    return line, structure, row, line.net_pay == target
+    used_row.take_home = target
+    return line, structure, used_row, line.net_pay == target
 
 
 def compute(ctx, emp, row):
@@ -418,12 +432,12 @@ def compute(ctx, emp, row):
         if below:
             warnings.append("SALARY_BELOW_MINIMUM_WAGE")
     elif ctx.splits:
-        if row.days_given is not None:  # worked out before days were kept as written: the days as written
-            row = days_row(ctx, emp, row.days_given, row)
         result, used, used_row, exact = match_take_home(ctx, emp, row)
         result.row_used = used_row
         base_gross = used.gross()
         warnings = list(result.warnings)
+        if result.paid_days < D(days_employed(emp, ctx.month)):
+            warnings.append("DAYS_REDUCED")
         if not exact:
             warnings.append("TAKE_HOME_NOT_EXACT")
     else:
@@ -766,37 +780,41 @@ def last_take_home(company, month, employee_ids):
 def entry_row(ctx, emp, line, method, typed_days=None, typed_pay=None, last_pay=None):
     """One person on an entry page: by days present (BY_DAYS) or by take-home (BY_TAKE_HOME).
 
-    Paid days default to the days written before (or the days employed in the month). By take-home the amount
-    defaults to the amount written before for this month, else last month's. Returns the row as a dict with the
-    worked-out line ("result", None if it could not be worked out) and "errors".
+    By take-home, the amount defaults to the amount written before for this month, else last month's; paid days
+    are derived from that amount. Returns the row as a dict with the worked-out line ("result", None if it could
+    not be worked out) and "errors".
     """
     month = ctx.month
     employed = D(days_employed(emp, month))
-    given = (line.days_given if line is not None and line.days_given is not None
-             else line.paid_days if line is not None else employed)
-    days = typed_days if typed_days is not None else given
-    if line is not None and days == line.paid_days and line.days_given is None:
-        row = RowInput.from_line(line)  # keep the days as uploaded (paid leave, holidays ...)
-    else:
-        row = days_row(ctx, emp, days, RowInput.from_line(line) if line is not None else None)
-    try:
-        monthly = structure_for_month(emp, month).gross()
-    except PayrollError:
-        monthly = None
-    pay = None
     if method == BY_TAKE_HOME:
-        row.incentive = ZERO  # the take-home written is the whole month's pay: its incentive is worked out
+        days = employed
+        row = RowInput.from_line(line) if line is not None else RowInput(advance=ctx.suggested_advance(emp))
+        row.incentive = ZERO
+        row = days_row(ctx, emp, days, row)
         pay = typed_pay if typed_pay is not None else (
             line.take_home if line is not None and line.take_home is not None else last_pay)
         if pay is None and days == 0:
             pay = ZERO
+    else:
+        given = (line.days_given if line is not None and line.days_given is not None
+                 else line.paid_days if line is not None else employed)
+        days = typed_days if typed_days is not None else given
+        if line is not None and days == line.paid_days and line.days_given is None:
+            row = RowInput.from_line(line)
+        else:
+            row = days_row(ctx, emp, days, RowInput.from_line(line) if line is not None else None)
+        pay = None
+    try:
+        monthly = structure_for_month(emp, month).gross()
+    except PayrollError:
+        monthly = None
     row.take_home = pay
     item = {"emp": emp, "row": row, "line": line, "days_value": days, "employed": employed, "pay": pay,
             "monthly": monthly, "minimum": ctx.minimum_wage(emp), "result": None, "warnings": []}
     problems = []
     if method == BY_TAKE_HOME and pay is None:
-        problems = [_("Write the take-home amount (or 0 paid days).")]
-    elif days > employed:
+        problems = [_("Write the take-home amount.")]
+    elif method == BY_DAYS and days > employed:
         problems = [_("Paid days (%(d)s) cannot be more than the %(e)s days employed in %(month)s.")
                     % {"d": plain_number(days), "e": plain_number(employed), "month": month_label(month)}]
     if not problems:
@@ -805,6 +823,7 @@ def entry_row(ctx, emp, line, method, typed_days=None, typed_pay=None, last_pay=
         try:
             item["result"], _used, item["warnings"] = compute(ctx, emp, row)
             item["row"] = getattr(item["result"], "row_used", row)
+            item["days_value"] = item["result"].paid_days
         except PayrollError as exc:
             problems = [str(exc)]
         except ValueError as exc:
@@ -816,7 +835,7 @@ def entry_row(ctx, emp, line, method, typed_days=None, typed_pay=None, last_pay=
 def entry_page(company, month, method, entries=None):
     """Rows of an entry page (by days present or by take-home): everyone paid in the month.
 
-    entries: {employee id: (paid days or None, take-home or None)} as typed.
+    entries: {employee id: (paid days or None, take-home or None)} as typed; take-home ignores paid days.
     Returns (rows, errors {employee id: [messages]}, started).
     """
     month = month_start(month)

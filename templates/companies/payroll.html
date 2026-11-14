@@ -9,8 +9,6 @@
   </fieldset>
   <fieldset><legend>{% translate "Minimum-wage split" %}</legend>
     {% include "includes/field.html" with field=form.amount_paid_mode %}
-    {% include "includes/field.html" with field=form.take_home_basic %}
-    {% include "includes/field.html" with field=form.take_home_esi %}
     <p class="muted">{% translate "Minimum wages are entered once for each state:" %} <a href="{% url 'portal:minimum_wages' %}">{% translate "Minimum wages" %}</a></p>
   </fieldset>
   <fieldset><legend>{% translate "PF, ESI and taxes" %}</legend>

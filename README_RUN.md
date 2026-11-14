@@ -101,11 +101,12 @@ and pending per employee, attendance totals, a month-by-month breakdown and the 
 downloads as an Excel file with one sheet per view.
 
 **Without the Excel sheet.** On the month page choose *Calculate by days* (days present; the monthly salary in each
-profile is paid for those days) or *Calculate by take-home* (the owner's list of paid days and amounts in hand; the
-take-home becomes exactly the amount). With Settings → Payroll rules → *Minimum-wage split* on (the default) and the
-state's minimum wages entered once on All companies → *Minimum wages*, Basic is the minimum wage and the rest is
-incentive; by take-home Basic is the minimum wage for the days written and ESI is a fixed amount per person
-(₹158 unless changed), and an amount below the minimum wage cannot be saved. Figures change as you type.
+profile is paid for those days) or *Calculate by take-home* (enter only each person's in-hand amount). With Settings
+→ Payroll rules → *Minimum-wage split* on (the default) and the state's minimum wages entered once on All companies
+→ *Minimum wages*, Basic is the minimum wage and the rest is incentive. By take-home, PayCore calculates paid days
+from full-month Basic for the person's skill, fixed ESI of ₹158 for ESI-covered people and PF on Basic; incentive
+makes take-home exactly the amount after deductions. The calculated paid days are not an attendance record and may
+be fewer even when the person worked the full month. Figures change as you type.
 
 **Inactive staff.** On a person's page, *Make inactive* leaves them out of the attendance sheet, registers and salary
 from a chosen month; *Make active again* brings them back.

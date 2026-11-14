@@ -93,81 +93,69 @@ class TakeHomePageTest(SplitCase):
     def post(self, month=NOV, **fields):
         data = {}
         for e in service.employees_for_month(self.srks, month):
-            data[f"pay_{e.pk}"], data[f"days_{e.pk}"] = "25000", ""  # above everyone's minimum
+            data[f"pay_{e.pk}"] = "25000"  # above everyone's minimum
         for name, value in fields.items():
             kind, code = name.split("_", 1)
             data[f"{kind}_{self.employee(code).pk}"] = value
         return self.client.post(self.url(month), data)
 
-    def test_the_owners_list(self):
-        """The owner's October list (14-11-2026): Basic at Delhi's unskilled minimum wage Rs 20,358 a month for the
-        days written, ESI fixed at Rs 158, no professional tax, PF only for some, a 31-day month. Amounts that would
-        pay less than the minimum wage for those days are refused, with the least that must be paid; PayCore never
-        changes the days."""
+    def set_up_owner_list(self):
         with self.today_is(date(2026, 11, 30)):
             self.finalise_november()
         self.srks.pt_enabled = False
+        self.srks.tds_enabled = False
+        self.srks.esi_enabled = True
         self.srks.save()
         Employee.objects.filter(company=self.srks).update(skill_category="Unskilled", esi_override="AUTO",
                                                          pf_member=False, eps_member=False)
         Employee.objects.filter(company=self.srks, emp_code__in=["E001", "E003"]).update(pf_member=True)
         MinimumWage.objects.update(unskilled=D(20358))
+
+    def test_the_owners_list(self):
+        """A 31-day month, unskilled minimum wage Rs 20,358, fixed ESI and no PF for E002."""
+        self.set_up_owner_list()
         self.assertContains(self.client.get(reverse("payroll:month", args=[DEC])), "Calculate by take-home")
-        amounts = {e.emp_code: ("31", 30000) for e in service.employees_for_month(self.srks, DEC)}
-        amounts.update({"E001": ("31", 25000), "E002": ("31", 24000), "E003": ("31", 13000), "E004": ("30", 17000),
-                        "E005": ("26", 16000)})
-
-        def send():
-            fields = {}
-            for code, (days, pay) in amounts.items():
-                fields[f"days_{code}"], fields[f"pay_{code}"] = days, str(pay)
-            return self.post(DEC, **fields)
-
-        page = send()
-        self.assertContains(page, "Nothing was saved.")
-        self.assertContains(page, "₹13,000 is less than the minimum wage for 31 paid days. With Basic ₹20,358 − "
-                                  "ESI ₹158 − PF ₹2,443, at least ₹17,757 must be paid in hand.")
-        self.assertContains(page, "₹17,000 is less than the minimum wage for 30 paid days. With Basic ₹19,701 − "
-                                  "ESI ₹158, at least ₹19,543 must be paid in hand.")
-        self.assertContains(page, "₹16,000 is less than the minimum wage for 26 paid days.")
-        self.assertFalse(PayrollRun.objects.filter(company=self.srks, month=DEC).exists())
-
-        amounts.update({"E003": ("31", 17757), "E004": ("30", 20200), "E005": ("26", 21000)})
-        response = send()
-        self.assertRedirects(response, reverse("payroll:month", args=[DEC]) + "#review",
-                             fetch_redirect_response=False)
-        for code, (days, pay) in amounts.items():
-            line = self.line(code, DEC)
-            self.assertEqual(line.net_pay, D(pay), code)  # take-home = the owner's figure
-            self.assertEqual(line.paid_days, D(days), code)  # the days as written
-            self.assertEqual(line.earned_basic, engine.rupee(D(20358) * line.paid_days / 31), code)
-            self.assertEqual(line.ee_esi, D(158), code)  # fixed ESI
-            self.assertEqual(line.gross, line.earned_basic + line.incentive_pay, code)
-            self.assertNotIn("DAYS_REDUCED", line.warnings, code)
-        e1, e2, e3, e5 = (self.line(code, DEC) for code in ("E001", "E002", "E003", "E005"))
-        self.assertEqual((e1.ee_pf, e1.advance, e1.incentive_pay), (D(2443), D(1000), D(8243)))  # covers the advance
-        self.assertEqual((e2.ee_pf, e2.incentive_pay), (D(0), D(3800)))
-        self.assertEqual((e3.ee_pf, e3.incentive_pay), (D(2443), D(0)))  # the least: no incentive
-        self.assertEqual((e5.paid_days, e5.earned_basic, e5.incentive_pay), (D(26), D(17074), D(4084)))
-        self.assertEqual(self.employee("E003").structure_on(DEC).gross, D(40000))  # salary not changed
         page = self.client.get(self.url(DEC))
-        self.assertContains(page, 'name="days_%s" value="31"' % self.employee("E003").pk)
-        self.assertContains(page, 'name="pay_%s" value="17757"' % self.employee("E003").pk)
+        self.assertContains(page, "Paid days (calculated)")
+        self.assertNotContains(page, 'name="days_')
+        self.post(DEC, pay_E002="12000", days_E002="31")
+        e2 = self.line("E002", DEC)
+        self.assertEqual((e2.paid_days, e2.earned_basic, e2.ee_esi, e2.ee_pf, e2.incentive_pay, e2.net_pay),
+                         (D(18), D(11821), D(158), D(0), D(337), D(12000)))
+        self.assertIn("DAYS_REDUCED", e2.warnings)
+        self.assertContains(self.client.get(self.url(DEC)), "Paid days set to 18 of 31")
+        self.assertContains(self.client.get(reverse("payroll:month", args=[DEC])),
+                            "calculated days, not an attendance record")
+        self.assertEqual(self.employee("E002").structure_on(DEC).gross, D(18000))
+
+    def test_pf_is_calculated_on_basic_and_days_fit_net_amount(self):
+        self.set_up_owner_list()
+        # E001 is PF-covered in the owner-list setup; its PF stays on Basic even if incentive is large.
+        self.post(DEC, pay_E001="12000")
+        e1 = self.line("E001", DEC)
+        self.assertEqual((e1.paid_days, e1.earned_basic, e1.ee_esi, e1.ee_pf, e1.net_pay),
+                         (D(21), D(13791), D(158), D(1655), D(12000)))
+        self.post(DEC, pay_E001="40000")
+        self.assertEqual(self.line("E001", DEC).ee_pf, D(2443))
 
     def test_basic_setting_never_below_the_minimum_wage(self):
+        settings = self.client.get(reverse("companies:payroll"))
+        self.assertNotContains(settings, "Basic per month, take-home method")
+        self.assertNotContains(settings, "ESI per person, take-home method")
         self.srks.take_home_basic = D(20358)
         self.srks.save()
-        self.post(pay_E002="25000", days_E002="20")
-        e2 = self.line("E002")  # semi-skilled minimum 15,500: the company's Basic is more; 20 of 30 days
-        self.assertEqual((e2.paid_days, e2.earned_basic, e2.net_pay), (D(20), D(13572), D(25000)))
+        Employee.objects.filter(pk=self.employee("E002").pk).update(skill_category="Semi-skilled")
+        self.post(pay_E002="25000")
+        e2 = self.line("E002")  # the legacy company Basic setting is ignored
+        self.assertEqual((e2.paid_days, e2.earned_basic, e2.net_pay), (D(30), D(15500), D(25000)))
         self.srks.take_home_basic = D(10000)
         self.srks.save()
-        self.post(pay_E002="25000", days_E002="20")
-        self.assertEqual(self.line("E002").earned_basic, D(10333))  # 15,500 x 20/30: never below the minimum
+        self.post(pay_E002="25000")
+        self.assertEqual(self.line("E002").earned_basic, D(15500))
 
     def test_basic_for_the_days_written(self):
         Employee.objects.filter(pk=self.employee("E005").pk).update(date_of_joining=date(2026, 11, 16))
-        self.post(pay_E005="9000", days_E005="15")
+        self.post(pay_E005="9000")
         e5 = self.line("E005")  # skilled 17,000; employed 15 of 30 days
         self.assertEqual((e5.paid_days, e5.earned_basic, e5.net_pay), (D(15), D(8500), D(9000)))
 
@@ -175,19 +163,19 @@ class TakeHomePageTest(SplitCase):
         page = self.client.get(self.url())
         self.assertContains(page, "By take-home — November 2026")
         self.assertContains(page, "js/entry.js")  # the figures change as you type
-        self.post(pay_E005="22000", days_E005="28")
+        self.post(pay_E005="22000")
         e5 = self.line("E005")
-        self.assertEqual((e5.paid_days, e5.net_pay, e5.take_home, e5.ee_esi), (D(28), D(22000), D(22000), D(158)))
-        self.assertEqual(e5.earned_basic, D(15867))  # skilled 17,000 for 28 of 30 days
+        self.assertEqual((e5.paid_days, e5.net_pay, e5.take_home, e5.ee_esi), (D(30), D(22000), D(22000), D(158)))
+        self.assertEqual(e5.earned_basic, D(17000))
         self.assertEqual(self.employee("E005").structure_on(NOV).gross, D(20000))  # monthly salary not changed
 
-    def test_empty_esi_setting_means_three_quarters_of_a_percent(self):
+    def test_empty_esi_setting_still_uses_fixed_amount(self):
         self.srks.take_home_esi = None
         self.srks.save()
-        self.post(pay_E005="22000", days_E005="28")
+        self.post(pay_E005="22000")
         e5 = self.line("E005")
         self.assertEqual(e5.net_pay, D(22000))
-        self.assertEqual(e5.ee_esi, engine.rupee_up(e5.esi_wage * D("0.0075")))
+        self.assertEqual(e5.ee_esi, D(158))
 
     def test_next_month_starts_from_last_months_amounts(self):
         self.post(pay_E005="22000")
@@ -197,7 +185,7 @@ class TakeHomePageTest(SplitCase):
 
     def test_no_days_means_no_pay_and_typed_incentives_are_replaced(self):
         self.run_for().lines.filter(employee__emp_code="E005").update(incentive=2590)  # typed by hand earlier
-        self.post(days_E002="0", pay_E005="20000")
+        self.post(pay_E002="0", pay_E005="20000")
         e2, e5 = self.line("E002"), self.line("E005")
         self.assertEqual((e2.paid_days, e2.gross, e2.net_pay), (D(0), D(0), D(0)))
         self.assertEqual((e5.incentive, e5.net_pay), (D(0), D(20000)))
@@ -205,15 +193,13 @@ class TakeHomePageTest(SplitCase):
     def test_mistakes_save_nothing(self):
         page = self.post(pay_E005="abc", days_E001="1.3", days_E002="99")
         self.assertContains(page, "Write an amount in rupees")
-        self.assertContains(page, "Use whole or half days only")
+        self.assertNotContains(page, "Use whole or half days only")
         self.assertContains(page, "Nothing was saved.")
         with self.today_is(date(2026, 11, 30)):
             self.finalise_november()
-        page = self.post(DEC, days_E002="99")
-        self.assertContains(page, "cannot be more than the 31 days employed")
-        self.assertFalse(PayrollRun.objects.filter(company=self.srks, month=DEC).exists())
         page = self.post(DEC, pay_E002="")
-        self.assertContains(page, "Write the take-home amount (or 0 paid days).")
+        self.assertContains(page, "Write the take-home amount.")
+        self.assertFalse(PayrollRun.objects.filter(company=self.srks, month=DEC).exists())
 
     def test_page_needs_the_setting_on_and_months_in_order(self):
         response = self.client.get(self.url(DEC))
@@ -278,7 +264,7 @@ class ByDaysPageTest(SplitCase):
             data[f"days_{e.pk}"], data[f"pay_{e.pk}"] = "", "25000"
         self.client.post(reverse("payroll:amounts", args=[NOV]), data)
         self.assertEqual((self.line("E002").net_pay, self.line("E002").take_home), (D(25000), D(25000)))
-        self.post()  # by days present, the same days: the profile salary again
+        self.post(E002="27")  # by days present, the same days: the profile salary again
         e2 = self.line("E002")
         self.assertIsNone(e2.take_home)
         self.assertEqual((e2.gross, e2.net_pay, e2.ee_esi), (D(16200), D(14421), D(105)))
@@ -301,19 +287,20 @@ class LivePreviewTest(SplitCase):
         data = self.preview(method="take-home", emp=e2.pk, days="27", pay="16000").json()
         self.assertTrue(data["ok"])
         self.assertEqual((data["figures"]["net_pay"], data["figures"]["ee_esi"]), (16000, 158))
+        self.assertEqual(data["figures"]["paid_days"], "30")
         self.assertEqual(data["figures"]["gross"], data["figures"]["basic"] + data["figures"]["incentive"])
         data = self.preview(method="days", emp=e2.pk, days="15").json()
         self.assertEqual((data["figures"]["gross"], data["figures"]["incentive"]), (9000, 1250))
         self.assertEqual(self.line("E002").net_pay, before)  # nothing saved
 
-    def test_below_the_minimum_wage_and_mistakes(self):
+    def test_auto_days_below_full_month_and_mistakes(self):
         e2 = self.employee("E002")
         data = self.preview(method="take-home", emp=e2.pk, days="30", pay="5000").json()
-        self.assertFalse(data["ok"])
-        self.assertTrue(any("less than the minimum wage" in e for e in data["errors"]))
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["figures"]["paid_days"], "11")
         data = self.preview(method="take-home", emp=e2.pk, days="1.3", pay="abc").json()
         self.assertFalse(data["ok"])
-        self.assertTrue(any("half days" in e for e in data["errors"]))
+        self.assertTrue(any("amount in rupees" in e for e in data["errors"]))
         self.assertFalse(self.preview(method="days", emp=e2.pk, days="45").json()["ok"])
 
     def test_only_this_companys_people(self):

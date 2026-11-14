@@ -18,8 +18,9 @@ from datetime import date, timedelta
 from decimal import Decimal as D, ROUND_HALF_UP, ROUND_CEILING, ROUND_FLOOR
 from typing import Optional
 
-ENGINE_VERSION = "1.4"  # 1.1: salary per working day (weekly offs) as a divisor; 1.2: incentive in the structure;
-# 1.3: a fixed employee ESI amount (take-home method); 1.4: a fixed Basic for the month (take-home method)
+ENGINE_VERSION = "1.5"  # 1.1: salary per working day (weekly offs) as a divisor; 1.2: incentive in the structure;
+# 1.3: a fixed employee ESI amount (take-home method); 1.4: a fixed Basic for the month (take-home method);
+# 1.5: PF wage override (take-home method)
 
 ZERO = D("0")
 HUNDRED = D("100")
@@ -132,8 +133,9 @@ class MonthInput:
     advance: D = ZERO
     other_deduction: D = ZERO
     tds_override: Optional[D] = None
-    ee_esi: Optional[D] = None  # a fixed employee ESI amount instead of 0.75% (company setting, take-home method)
+    ee_esi: Optional[D] = None  # a fixed employee ESI amount instead of 0.75% (take-home method)
     basic: Optional[D] = None  # Basic paid this month instead of the rate for the paid days (take-home method)
+    pf_wage_override: Optional[D] = None  # PF wage base instead of code wages (take-home method)
 
 
 @dataclass
@@ -400,15 +402,16 @@ def compute_line(year: int, month: int, emp: Employee, structure: Structure,
         L.warnings.append("STRUCTURE_BELOW_50")
 
     # 5. PF
-    if settings.pf_enabled and emp.pf_member and L.code_wages > 0:
+    pf_wage = L.code_wages if inp.pf_wage_override is None else rupee(inp.pf_wage_override)
+    if settings.pf_enabled and emp.pf_member and pf_wage > 0:
         cap = rates.pf_ceiling
-        L.epf_wage = min(L.code_wages, cap) if settings.pf_restrict_to_ceiling else L.code_wages
+        L.epf_wage = min(pf_wage, cap) if settings.pf_restrict_to_ceiling else pf_wage
         # No date of birth on record (brought over from an older system): EPS follows the eps_member tick.
         too_old = emp.dob is not None and age_on(emp.dob, month_start) >= rates.eps_max_age
         if too_old and emp.eps_member:
             L.warnings.append("EPS_STOPPED_AGE_58")
-        L.eps_wage = min(L.code_wages, cap) if (emp.eps_member and not too_old) else ZERO
-        L.edli_wage = min(L.code_wages, cap)
+        L.eps_wage = min(pf_wage, cap) if (emp.eps_member and not too_old) else ZERO
+        L.edli_wage = min(pf_wage, cap)
         L.ee_pf = rupee(pct(L.epf_wage, settings.pf_ee_rate))
         er_total = rupee(pct(L.epf_wage, rates.pf_er_rate))
         L.er_eps = rupee(pct(L.eps_wage, rates.eps_rate))

@@ -3,12 +3,12 @@
 {% block content %}
 <div class="box">
   {% if by_take_home %}
-  <p>{% translate "Write the paid days and the amount the owner pays in hand to each person, as on the owner's list. The take-home pay on the payslip becomes exactly that amount." %}</p>
+  <p>{% translate "Write the amount the owner pays each person in hand, as on the owner's list. The take-home pay on the payslip becomes exactly that amount." %}</p>
   <ul class="plain-list">
-    <li>{% if take_home_basic %}{% blocktranslate with basic=take_home_basic|inr %}Basic is ₹{{ basic }} a month (never less than the minimum wage), paid for the days you write.{% endblocktranslate %}{% else %}{% translate "Basic is the full month's minimum wage of each person's skill, paid for the days you write." %}{% endif %} {% translate "PayCore never changes the days." %}</li>
-    <li>{% if take_home_esi is not None %}{% blocktranslate with esi=take_home_esi|inr %}ESI is ₹{{ esi }} for each ESI-covered person{% endblocktranslate %}{% else %}{% translate "ESI is 0.75% of Basic" %}{% endif %}{% translate ", and PF (for PF members) is on Basic." %}</li>
-    <li>{% translate "The incentive makes up the rest, so that the take-home is exactly the amount." %}</li>
-    <li>{% translate "An amount less than Basic minus ESI and PF would pay less than the minimum wage for those days. It cannot be saved; the row shows the least that must be paid." %}</li>
+    <li>{% translate "Basic is the full month's minimum wage for the person's skill, prorated by the paid days PayCore works out." %}</li>
+    <li>{% translate "For ESI-covered people, ESI is fixed at ₹158. PF (for PF members) is calculated on Basic." %}</li>
+    <li>{% translate "PayCore lowers the paid days until Basic less employee ESI and PF fits the amount. The incentive covers the remaining deductions and makes take-home exact." %}</li>
+    <li>{% translate "Paid days here are calculated from the take-home amount; they are not an attendance record. They may be fewer even when the person worked the full month." %}</li>
   </ul>
   <p class="muted">{% translate "The amount can be different every month. 0 paid days means the person is not paid this month." %}
     <a href="{% url 'payroll:by_days' month %}">{% translate "Work out by days present instead" %}</a></p>
@@ -38,7 +38,7 @@
     <thead><tr>
       <th>{% translate "Code" %}</th><th>{% translate "Name" %}</th>
       {% if by_take_home %}
-      <th class="num">{% translate "Paid days" %}</th>
+      <th class="num">{% translate "Paid days (calculated)" %}</th>
       <th class="num">{% translate "Take-home to pay ₹" %}</th>
       {% else %}
       <th class="num">{% translate "Days present" %}</th>
@@ -54,10 +54,11 @@
       <tr class="entry-row{% if r.errors %} row-error{% elif r.notes %} has-notes{% endif %}" data-emp="{{ r.emp.pk }}">
         <td>{{ r.emp.emp_code }}</td>
         <td class="nowrap"><a href="{% url 'employees:detail' r.emp.pk %}">{{ r.emp.full_name }}</a><div class="muted small">{{ r.emp.get_skill_category_display }}</div></td>
-        <td class="num"><input type="text" inputmode="decimal" name="days_{{ r.emp.pk }}" value="{{ r.days_input }}" class="days-input" data-col="days" autocomplete="off" aria-label="{% blocktranslate with name=r.emp.full_name %}Paid days of {{ name }}{% endblocktranslate %}"><div class="muted small">{% blocktranslate with n=r.employed|num %}of {{ n }}{% endblocktranslate %}</div></td>
         {% if by_take_home %}
+        <td class="num fig" data-k="paid_days" data-v="{{ r.result.paid_days|default_if_none:'' }}">{% if r.result %}{{ r.result.paid_days|num }}{% else %}—{% endif %}<div class="muted small">{% blocktranslate with n=r.employed|num %}of {{ n }}{% endblocktranslate %}</div></td>
         <td class="num"><input type="text" inputmode="numeric" name="pay_{{ r.emp.pk }}" value="{{ r.pay_value }}" class="amount-input" data-col="pay" autocomplete="off" aria-label="{% blocktranslate with name=r.emp.full_name %}Take-home of {{ name }}{% endblocktranslate %}"></td>
         {% else %}
+        <td class="num"><input type="text" inputmode="decimal" name="days_{{ r.emp.pk }}" value="{{ r.days_input }}" class="days-input" data-col="days" autocomplete="off" aria-label="{% blocktranslate with name=r.emp.full_name %}Paid days of {{ name }}{% endblocktranslate %}"><div class="muted small">{% blocktranslate with n=r.employed|num %}of {{ n }}{% endblocktranslate %}</div></td>
         <td class="num">{% if r.monthly is not None %}{{ r.monthly|inr }}{% else %}—{% endif %}</td>
         {% endif %}
         <td class="num fig" data-k="basic" data-v="{{ r.result.basic|default_if_none:'' }}">{% if r.result %}{{ r.result.basic|inr }}{% else %}—{% endif %}</td>

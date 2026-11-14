@@ -123,8 +123,7 @@ class PayrollRulesForm(ModelErrorsOnPage, WeeklyOffMixin, IndianDatesMixin, form
     class Meta:
         model = Company
         fields = [
-            "payroll_start_month", "weekly_off_days", "salary_divisor", "amount_paid_mode", "take_home_basic", "take_home_esi",
-            "pf_enabled",
+            "payroll_start_month", "weekly_off_days", "salary_divisor", "amount_paid_mode", "pf_enabled",
             "pf_employee_rate", "pf_restrict_to_ceiling", "esi_enabled", "pt_enabled", "pt_state", "tds_enabled",
             "default_tax_regime", "ot_multiplier", "ot_days_divisor", "ot_hours_per_day", "notice_period_days",
             "probation_months", "higher_wages_avenue",

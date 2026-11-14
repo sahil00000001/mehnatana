@@ -38,6 +38,9 @@ def _note_texts(line):
             texts.append(_("Paid days reduced from %(given)s to %(paid)s so that Basic (minimum wage for the days) "
                            "stays within the take-home amount.") % {"given": plain_number(line.days_given),
                                                                  "paid": plain_number(line.paid_days)})
+        elif code == "DAYS_REDUCED":
+            texts.append(_("Paid days set to %(paid)s from the take-home amount; these are calculated days, not an "
+                           "attendance record.") % {"paid": plain_number(line.paid_days)})
         else:
             texts.append(str(message_for(code)))
     return texts

@@ -44,9 +44,8 @@ class Company(TimeStamped):
         OLD = "OLD", _("Old regime")
 
     class AmountPaid(models.TextChoices):
-        GROSS = "GROSS", _("On: Basic is the minimum wage for the paid days, ESI and PF are on Basic, the rest is "
-                           "incentive. Each month: by days present (salary from the profile) or by take-home "
-                           "(amounts from the owner's list)")
+        GROSS = "GROSS", _("On: Basic is the minimum wage; by take-home, paid days are calculated from the amount "
+                           "and incentive makes net pay exact")
         OFF = "OFF", _("Off: pay each salary head as entered (Basic, DA, HRA …)")
 
     class PayslipStyle(models.TextChoices):
@@ -96,19 +95,16 @@ class Company(TimeStamped):
     amount_paid_mode = models.CharField(
         _("minimum-wage split"), max_length=8, choices=AmountPaid.choices, default=AmountPaid.GROSS,
         help_text=_("Needs the minimum wages of your state (All companies → Minimum wages). By days present: the "
-                    "monthly salary in the profile is paid for the days. By take-home: the take-home pay is "
-                    "exactly the amount written for the month."))
+                    "monthly salary in the profile is paid for the days. By take-home: enter the amount paid in "
+                    "hand; PayCore calculates paid days and incentive."))
     take_home_basic = models.DecimalField(
         _("Basic per month, take-home method ₹"), max_digits=8, decimal_places=0, null=True, blank=True,
         validators=[MinValueValidator(0), MaxValueValidator(999999)],
-        help_text=_("Basic for a full month for each person paid by take-home, paid for the days written. Leave "
-                    "it empty for the full month's minimum wage of each person's skill. It is never less than the "
-                    "minimum wage."))
+        help_text=_("Legacy field; take-home Basic is always the full month's minimum wage for the person's skill."))
     take_home_esi = models.DecimalField(
         _("ESI per person, take-home method ₹"), max_digits=8, decimal_places=0, null=True, blank=True,
         default=Decimal("158"), validators=[MinValueValidator(0), MaxValueValidator(9999)],
-        help_text=_("Each ESI-covered person paid by take-home has exactly this deducted as ESI. Leave it empty "
-                    "for 0.75% of Basic."))
+        help_text=_("Legacy field; take-home ESI is fixed at ₹158 for ESI-covered people."))
     # Optional checks of the attendance sheet (see payroll/checks.py); empty = the defaults.
     sheet_checks = models.JSONField(_("attendance sheet checks"), default=dict, blank=True)
     pf_enabled = models.BooleanField(_("PF applies"), default=True)
