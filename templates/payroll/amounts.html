@@ -34,7 +34,9 @@
   {% csrf_token %}
   <p class="live-hint js-only" aria-live="polite"><span class="live-dot"></span> {% translate "Live: the figures change as you type. Nothing is saved until you press Save." %}</p>
   <div class="table-wrap">
-  <table class="ledger compact amounts-table live" data-live="{% url 'payroll:preview' month %}" data-method="{{ method }}">
+  <table class="ledger compact amounts-table live" data-live="{% url 'payroll:preview' month %}" data-method="{{ method }}"
+         data-failed="{% translate "These figures could not be worked out just now. Type the figure again, or press Save: Save always works them out." %}"
+         data-logged-out="{% translate "You have been logged out, so these figures could not be worked out. Log in again in another tab, then type the figure again." %}">
     <thead><tr>
       <th>{% translate "Code" %}</th><th>{% translate "Name" %}</th>
       {% if by_take_home %}

@@ -89,7 +89,7 @@
     totals();
   }
 
-  function ask(row) {
+  function ask(row, retried) {
     var id = row.getAttribute("data-emp");
     var days = row.querySelector('input[data-col="days"]');
     var pay = row.querySelector('input[data-col="pay"]');
@@ -100,6 +100,8 @@
     row.classList.add("is-working");
     fetch(url + query, { credentials: "same-origin", headers: { "Accept": "application/json" } })
       .then(function (response) {
+        // The preview never redirects: a redirect is the login page (logged out).
+        if (response.redirected) { throw new Error("logged-out"); }
         if (!response.ok) { throw new Error(String(response.status)); }
         return response.json();
       })
@@ -108,9 +110,17 @@
         row.classList.remove("is-working");
         fill(row, data);
       })
-      .catch(function () {
+      .catch(function (error) {
         if (asked[id] !== ticket) { return; }
-        row.classList.remove("is-working"); // the figures come with Save instead
+        var loggedOut = error && error.message === "logged-out";
+        if (!retried && !loggedOut) { // try once more (a slow or busy server), unless a new figure is typed
+          timers[id] = window.setTimeout(function () { ask(row, true); }, 800);
+          return;
+        }
+        // Never leave the figures of what was typed before: they would look like the figures for this one.
+        row.classList.remove("is-working");
+        fill(row, { ok: false, errors: [table.getAttribute(loggedOut ? "data-logged-out" : "data-failed")],
+                    notes: [] });
       });
   }
 
