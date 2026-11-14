@@ -101,9 +101,9 @@ class Company(TimeStamped):
     take_home_basic = models.DecimalField(
         _("Basic per month, take-home method ₹"), max_digits=8, decimal_places=0, null=True, blank=True,
         validators=[MinValueValidator(0), MaxValueValidator(999999)],
-        help_text=_("Basic paid to each person paid by take-home, whatever the days present. Leave it empty for "
-                    "the full month's minimum wage of each person's skill. It is never less than the minimum "
-                    "wage."))
+        help_text=_("Basic for a full month for each person paid by take-home, paid for the days written. Leave "
+                    "it empty for the full month's minimum wage of each person's skill. It is never less than the "
+                    "minimum wage."))
     take_home_esi = models.DecimalField(
         _("ESI per person, take-home method ₹"), max_digits=8, decimal_places=0, null=True, blank=True,
         default=Decimal("158"), validators=[MinValueValidator(0), MaxValueValidator(9999)],

@@ -100,10 +100,10 @@ class TakeHomePageTest(SplitCase):
         return self.client.post(self.url(month), data)
 
     def test_the_owners_list(self):
-        """The owner's October list (14-11-2026): Basic fixed at Delhi's unskilled minimum wage Rs 20,358 for the
-        whole month whatever the days, ESI fixed at Rs 158, no professional tax, PF only for some, a 31-day month.
-        Amounts that would pay less than the minimum wage are refused, with the least that must be paid; the days
-        written are never changed."""
+        """The owner's October list (14-11-2026): Basic at Delhi's unskilled minimum wage Rs 20,358 a month for the
+        days written, ESI fixed at Rs 158, no professional tax, PF only for some, a 31-day month. Amounts that would
+        pay less than the minimum wage for those days are refused, with the least that must be paid; PayCore never
+        changes the days."""
         with self.today_is(date(2026, 11, 30)):
             self.finalise_november()
         self.srks.pt_enabled = False
@@ -125,11 +125,11 @@ class TakeHomePageTest(SplitCase):
 
         page = send()
         self.assertContains(page, "Nothing was saved.")
-        self.assertContains(page, "₹13,000 is less than the minimum wage. With Basic ₹20,358 − ESI ₹158 − PF "
-                                  "₹2,443, at least ₹17,757 must be paid in hand.")
-        self.assertContains(page, "₹17,000 is less than the minimum wage. With Basic ₹20,358 − ESI ₹158, at least "
-                                  "₹20,200 must be paid in hand.")
-        self.assertContains(page, "₹16,000 is less than the minimum wage.")
+        self.assertContains(page, "₹13,000 is less than the minimum wage for 31 paid days. With Basic ₹20,358 − "
+                                  "ESI ₹158 − PF ₹2,443, at least ₹17,757 must be paid in hand.")
+        self.assertContains(page, "₹17,000 is less than the minimum wage for 30 paid days. With Basic ₹19,701 − "
+                                  "ESI ₹158, at least ₹19,543 must be paid in hand.")
+        self.assertContains(page, "₹16,000 is less than the minimum wage for 26 paid days.")
         self.assertFalse(PayrollRun.objects.filter(company=self.srks, month=DEC).exists())
 
         amounts.update({"E003": ("31", 17757), "E004": ("30", 20200), "E005": ("26", 21000)})
@@ -139,15 +139,16 @@ class TakeHomePageTest(SplitCase):
         for code, (days, pay) in amounts.items():
             line = self.line(code, DEC)
             self.assertEqual(line.net_pay, D(pay), code)  # take-home = the owner's figure
-            self.assertEqual((line.earned_basic, line.ee_esi), (D(20358), D(158)), code)  # fixed Basic and ESI
             self.assertEqual(line.paid_days, D(days), code)  # the days as written
+            self.assertEqual(line.earned_basic, engine.rupee(D(20358) * line.paid_days / 31), code)
+            self.assertEqual(line.ee_esi, D(158), code)  # fixed ESI
             self.assertEqual(line.gross, line.earned_basic + line.incentive_pay, code)
             self.assertNotIn("DAYS_REDUCED", line.warnings, code)
         e1, e2, e3, e5 = (self.line(code, DEC) for code in ("E001", "E002", "E003", "E005"))
         self.assertEqual((e1.ee_pf, e1.advance, e1.incentive_pay), (D(2443), D(1000), D(8243)))  # covers the advance
         self.assertEqual((e2.ee_pf, e2.incentive_pay), (D(0), D(3800)))
         self.assertEqual((e3.ee_pf, e3.incentive_pay), (D(2443), D(0)))  # the least: no incentive
-        self.assertEqual((e5.paid_days, e5.incentive_pay), (D(26), D(800)))
+        self.assertEqual((e5.paid_days, e5.earned_basic, e5.incentive_pay), (D(26), D(17074), D(4084)))
         self.assertEqual(self.employee("E003").structure_on(DEC).gross, D(40000))  # salary not changed
         page = self.client.get(self.url(DEC))
         self.assertContains(page, 'name="days_%s" value="31"' % self.employee("E003").pk)
@@ -157,14 +158,14 @@ class TakeHomePageTest(SplitCase):
         self.srks.take_home_basic = D(20358)
         self.srks.save()
         self.post(pay_E002="25000", days_E002="20")
-        e2 = self.line("E002")  # semi-skilled minimum 15,500: the company's Basic is more, whatever the days
-        self.assertEqual((e2.paid_days, e2.earned_basic, e2.net_pay), (D(20), D(20358), D(25000)))
+        e2 = self.line("E002")  # semi-skilled minimum 15,500: the company's Basic is more; 20 of 30 days
+        self.assertEqual((e2.paid_days, e2.earned_basic, e2.net_pay), (D(20), D(13572), D(25000)))
         self.srks.take_home_basic = D(10000)
         self.srks.save()
         self.post(pay_E002="25000", days_E002="20")
-        self.assertEqual(self.line("E002").earned_basic, D(15500))
+        self.assertEqual(self.line("E002").earned_basic, D(10333))  # 15,500 x 20/30: never below the minimum
 
-    def test_basic_is_cut_only_for_days_not_employed(self):
+    def test_basic_for_the_days_written(self):
         Employee.objects.filter(pk=self.employee("E005").pk).update(date_of_joining=date(2026, 11, 16))
         self.post(pay_E005="9000", days_E005="15")
         e5 = self.line("E005")  # skilled 17,000; employed 15 of 30 days
@@ -177,7 +178,7 @@ class TakeHomePageTest(SplitCase):
         self.post(pay_E005="22000", days_E005="28")
         e5 = self.line("E005")
         self.assertEqual((e5.paid_days, e5.net_pay, e5.take_home, e5.ee_esi), (D(28), D(22000), D(22000), D(158)))
-        self.assertEqual(e5.earned_basic, D(17000))  # skilled: the full month's minimum wage, whatever the days
+        self.assertEqual(e5.earned_basic, D(15867))  # skilled 17,000 for 28 of 30 days
         self.assertEqual(self.employee("E005").structure_on(NOV).gross, D(20000))  # monthly salary not changed
 
     def test_empty_esi_setting_means_three_quarters_of_a_percent(self):

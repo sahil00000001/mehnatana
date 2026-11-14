@@ -49,7 +49,7 @@
         {% if splits_gross %}
         <div class="method">
           <h3>{% translate "2. By take-home" %}</h3>
-          <p>{% translate "The owner gives the amount each person gets in hand. The take-home becomes exactly that amount: Basic fixed at the full month's minimum wage, fixed ESI, the rest incentive." %}</p>
+          <p>{% translate "The owner gives the amount each person gets in hand. The take-home becomes exactly that amount: Basic at the minimum wage for the days written, fixed ESI, the rest incentive." %}</p>
           <a class="btn btn-primary" href="{% url 'payroll:amounts' month %}">{% translate "Calculate by take-home" %}</a>
         </div>
         {% endif %}

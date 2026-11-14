@@ -5,10 +5,10 @@
   {% if by_take_home %}
   <p>{% translate "Write the paid days and the amount the owner pays in hand to each person, as on the owner's list. The take-home pay on the payslip becomes exactly that amount." %}</p>
   <ul class="plain-list">
-    <li>{% if take_home_basic %}{% blocktranslate with basic=take_home_basic|inr %}Basic is ₹{{ basic }} for everyone, whatever the days (never less than the minimum wage).{% endblocktranslate %}{% else %}{% translate "Basic is the full month's minimum wage of each person's skill, whatever the days." %}{% endif %} {% translate "The paid days are the days you write; they are never changed." %}</li>
+    <li>{% if take_home_basic %}{% blocktranslate with basic=take_home_basic|inr %}Basic is ₹{{ basic }} a month (never less than the minimum wage), paid for the days you write.{% endblocktranslate %}{% else %}{% translate "Basic is the full month's minimum wage of each person's skill, paid for the days you write." %}{% endif %} {% translate "PayCore never changes the days." %}</li>
     <li>{% if take_home_esi is not None %}{% blocktranslate with esi=take_home_esi|inr %}ESI is ₹{{ esi }} for each ESI-covered person{% endblocktranslate %}{% else %}{% translate "ESI is 0.75% of Basic" %}{% endif %}{% translate ", and PF (for PF members) is on Basic." %}</li>
     <li>{% translate "The incentive makes up the rest, so that the take-home is exactly the amount." %}</li>
-    <li>{% translate "An amount less than Basic minus ESI and PF would pay less than the minimum wage. It cannot be saved; the row shows the least that must be paid." %}</li>
+    <li>{% translate "An amount less than Basic minus ESI and PF would pay less than the minimum wage for those days. It cannot be saved; the row shows the least that must be paid." %}</li>
   </ul>
   <p class="muted">{% translate "The amount can be different every month. 0 paid days means the person is not paid this month." %}
     <a href="{% url 'payroll:by_days' month %}">{% translate "Work out by days present instead" %}</a></p>

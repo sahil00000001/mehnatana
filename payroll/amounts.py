@@ -4,8 +4,8 @@ By days present: each person's days present. The monthly salary in the person's 
 With the minimum-wage split on (Payroll rules), Basic is the minimum wage for the days and the rest is incentive.
 
 By take-home (minimum-wage split on): each person's paid days and the amount the owner pays in hand that month.
-The take-home pay is made exactly that amount: Basic is fixed (the full month's minimum wage, or the company's
-figure), the paid days are never changed, ESI is the company's fixed amount, PF is worked out on Basic and the
+The take-home pay is made exactly that amount: Basic is the month's Basic (the full month's minimum wage, or the
+company's figure) for the days written, the paid days are never changed, ESI is the company's fixed amount, PF is worked out on Basic and the
 incentive makes up the rest. An amount that would pay less than the minimum wage is refused, with the least that
 must be paid.
 

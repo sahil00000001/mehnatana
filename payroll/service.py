@@ -346,12 +346,12 @@ def match_take_home(ctx, emp, row):
     """By take-home (minimum-wage split on, an amount written for the month): the take-home pay is exactly the
     amount the owner pays.
 
-    Basic is fixed: the whole month's Basic (take_home_basic), whatever the days present, cut only for days before
-    joining or after leaving. The paid days are the days as written; they are never changed. ESI is the company's
-    fixed amount per person (Rs 158 unless changed; empty = 0.75% of Basic) and PF is worked out on Basic. The
-    incentive is set so that the take-home is exactly the amount: take-home rises by at most Rs 1 for each Rs 1 of
-    incentive, so stepping by the gap lands on it. An amount below Basic less the deductions would pay less than
-    the minimum wage: it is refused (PayrollError) with the least that must be paid.
+    Basic is the month's Basic (take_home_basic: the company's figure or the full month's minimum wage) for the
+    paid days as written. The days are never changed by PayCore. ESI is the company's fixed amount per person
+    (Rs 158 unless changed; empty = 0.75% of Basic) and PF is worked out on Basic. The incentive is set so that the
+    take-home is exactly the amount: take-home rises by at most Rs 1 for each Rs 1 of incentive, so stepping by the
+    gap lands on it. An amount below Basic less the deductions would pay less than the minimum wage for the days
+    written: it is refused (PayrollError) with the least that must be paid.
     Returns (engine.Line, structure used, the row used, exact).
     """
     full, target = take_home_basic(ctx, emp), row.take_home
@@ -362,10 +362,8 @@ def match_take_home(ctx, emp, row):
     lop = row.lop if row.lop is not None else max(ZERO, dim - counted)
     person = engine_employee(emp)
     factor, _outside = engine.pay_factor(y, m, person, lop, ctx.settings)
-    employed, _outside = engine.pay_factor(y, m, person, dim - D(days_employed(emp, ctx.month)), ctx.settings)
-    basic = engine.rupee(full * employed)
     if dim - lop <= 0:
-        basic, target = ZERO, ZERO  # no paid days: nothing is paid this month
+        target = ZERO  # no paid days: nothing is paid this month
 
     def run(incentive):
         """The engine line for this incentive, or None if the deductions do not fit."""
@@ -375,7 +373,7 @@ def match_take_home(ctx, emp, row):
         inp = row.to_engine()
         inp.increment = ZERO
         inp.incentive = incentive - engine.rupee(structure.incentive * factor)
-        inp.ee_esi, inp.basic = fixed_esi, basic
+        inp.ee_esi = fixed_esi
         try:
             return _engine_line(ctx, emp, structure, structure, inp), structure
         except ValueError as exc:
@@ -391,9 +389,10 @@ def match_take_home(ctx, emp, row):
                              (line.other_deduction, _("other deduction"))):
             if amount:
                 parts.append(_("%(name)s ₹%(amount)s") % {"name": name, "amount": indian_format(amount)})
-        raise PayrollError(_("₹%(amount)s is less than the minimum wage. With %(parts)s, at least ₹%(least)s must "
-                             "be paid in hand. Write that much or more.") % {
-            "amount": indian_format(target), "parts": " − ".join(parts), "least": indian_format(line.net_pay)})
+        raise PayrollError(_("₹%(amount)s is less than the minimum wage for %(days)s paid days. With %(parts)s, at "
+                             "least ₹%(least)s must be paid in hand. Write that much or more.") % {
+            "amount": indian_format(target), "days": plain_number(line.paid_days), "parts": " − ".join(parts),
+            "least": indian_format(line.net_pay)})
     if line is None or line.net_pay < target:
         incentive = target - (line.net_pay if line is not None else ZERO)
         for _step in range(80):
