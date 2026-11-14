@@ -27,6 +27,7 @@
 {% endif %}
 
 <h2 id="rates">{% if editing %}{% translate "Change minimum wages" %}{% else %}{% translate "Add minimum wages" %}{% endif %}</h2>
+<p class="muted">{% translate "The October 2026 default rates are available for every state. Each state's rates are shared by all companies in that state; change them here when needed." %}</p>
 <form method="post" class="form" novalidate>
   {% csrf_token %}
   {% include "includes/form_errors.html" %}

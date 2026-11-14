@@ -27,6 +27,7 @@ class SplitCase(DemoTestCase):
         super().setUp()
         self.srks.amount_paid_mode = "GROSS"
         self.srks.save()
+        MinimumWage.objects.filter(state=self.srks.state, effective_from=date(2026, 10, 1)).delete()
         MinimumWage.objects.create(state=self.srks.state, effective_from=date(2026, 4, 1), **RATES)
         service.recompute_run(self.run_for())
 
@@ -70,7 +71,7 @@ class ByDaysTest(SplitCase):
 
     def test_new_minimum_wages_work_drafts_out_again(self):
         self.client.post(reverse("portal:minimum_wages"), dict(
-            state=self.srks.state, effective_from="01-04-2026", unskilled="14000", semi_skilled="16000",
+            state=self.srks.state, effective_from="01-10-2026", unskilled="14000", semi_skilled="16000",
             skilled="17000", highly_skilled="19000"))
         e2 = self.line("E002")
         self.assertEqual((e2.earned_basic, e2.gross, e2.net_pay), (D(14400), D(16200), D(14364)))  # more Basic
@@ -354,14 +355,14 @@ class MinimumWagesPageTest(DemoTestCase):
         data = {"state": "DL", "effective_from": "15-04-2026", "unskilled": "18456", "semi_skilled": "20371",
                 "skilled": "22411", "highly_skilled": ""}
         self.assertRedirects(self.client.post(self.url, data), self.url, fetch_redirect_response=False)
-        row = MinimumWage.objects.get()
+        row = MinimumWage.objects.get(state="DL", effective_from=date(2026, 4, 1))
         self.assertEqual((row.effective_from, row.unskilled, row.highly_skilled), (date(2026, 4, 1), D(18456), None))
         self.client.post(self.url, dict(data, unskilled="18500"))  # same state and month: replaced
-        self.assertEqual(MinimumWage.objects.get().unskilled, D(18500))
+        self.assertEqual(MinimumWage.objects.get(state="DL", effective_from=date(2026, 4, 1)).unskilled, D(18500))
         page = self.client.get(self.url)
         self.assertContains(page, "18,500")
         self.client.post(self.url, {"delete": row.pk})
-        self.assertFalse(MinimumWage.objects.exists())
+        self.assertFalse(MinimumWage.objects.filter(state="DL", effective_from=date(2026, 4, 1)).exists())
 
     def test_at_least_one_amount(self):
         page = self.client.post(self.url, {"state": "DL", "effective_from": "01-04-2026"})
@@ -369,10 +370,25 @@ class MinimumWagesPageTest(DemoTestCase):
 
     def test_in_force_picks_the_latest_before_the_month(self):
         MinimumWage.objects.create(state="DL", effective_from=date(2026, 4, 1), unskilled=D(18000))
-        MinimumWage.objects.create(state="DL", effective_from=date(2026, 10, 1), unskilled=D(18500))
+        MinimumWage.objects.filter(state="DL", effective_from=date(2026, 10, 1)).update(unskilled=D(18500))
         self.assertEqual(MinimumWage.in_force("DL", date(2026, 9, 1)).unskilled, D(18000))
         self.assertEqual(MinimumWage.in_force("DL", NOV).unskilled, D(18500))
         self.assertIsNone(MinimumWage.in_force("DL", date(2026, 3, 1)))
+
+    def test_october_defaults_apply_to_every_state_and_can_be_changed(self):
+        from companies.states import STATE_CHOICES
+
+        for state, _ in STATE_CHOICES:
+            wages = MinimumWage.in_force(state, date(2026, 10, 1))
+            self.assertIsNotNone(wages, state)
+            self.assertEqual((wages.unskilled, wages.semi_skilled, wages.skilled, wages.highly_skilled),
+                             (D(20358), D(22568), D(22411), None), state)
+
+        data = {"state": "DL", "effective_from": "01-10-2026", "unskilled": "21000", "semi_skilled": "22568",
+                "skilled": "22411", "highly_skilled": ""}
+        self.assertRedirects(self.client.post(self.url, data), self.url, fetch_redirect_response=False)
+        self.assertEqual(MinimumWage.in_force("DL", NOV).unskilled, D(21000))
+        self.assertEqual(MinimumWage.in_force("KA", NOV).unskilled, D(20358))
 
 
 class SheetChecksTest(DemoTestCase):

@@ -155,6 +155,9 @@ README §0 rule 6: where the README was unclear, the simplest behaviour that kee
   after payroll deductions. The days are a calculation from the take-home amount, not an attendance record; they
   may be lower even when the person worked the full month. Legacy `Company.take_home_basic` and
   `Company.take_home_esi` values are ignored. The page starts from last month's amount.
+- October 2026 default minimum wages are seeded for all 36 states and union territories: Unskilled ₹20,358,
+  Semi-skilled ₹22,568, Skilled ₹22,411, and Highly skilled unset. Rates are shared by all companies in each state
+  and can be changed on All companies → Minimum wages.
 - This method intentionally writes the calculated paid days to the payslip and salary register. Use "By days
   present" or the attendance sheet when the recorded attendance must determine paid days.
 - Both pages work the figures out again as you type (`payroll:preview`, JSON, nothing saved; `static/js/entry.js`
