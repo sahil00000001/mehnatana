@@ -74,6 +74,13 @@ The app connects straight to Supabase's PostgreSQL database, so it needs the **d
 whose LIN starts with `DEMO-LIN-` are ever reset or deleted, so a real business is never touched.
 Delete the demo businesses before real use.
 
+**Deleting a salary month on the live site** (to do it again from the start). GitHub → Actions → *Delete a
+salary month* → Run workflow: write the month (`2026-10`), optionally one company code, and run `dry-run`
+first; it lists what would go. `delete` then removes that month for every company (or the one named): its
+employee lines and payments marked, advance recoveries (the advances are owed again), increments from its
+sheet and its uploaded sheets. Employees, advances and settings stay. If a later month is already finalised,
+nothing is deleted until that month is reopened. Locally: `python manage.py delete_month 2026-10 --dry-run`.
+
 ## 3. One login, many companies
 
 There is one login for the whole portal; it sees every company. (The old separate admin and business logins

@@ -1040,6 +1040,68 @@ def reopen(run, user, reason, request=None):
     return run
 
 
+# ---------------------------------------------------------------- deleting a month (manage.py delete_month)
+def delete_run_blockers(run):
+    later = (PayrollRun.objects.filter(company=run.company, month__gt=run.month, status=PayrollRun.Status.FINALISED)
+             .order_by("-month").first())
+    if later:
+        return [_("%(later)s is finalised. Reopen it first: months are deleted from the latest back.")
+                % {"later": later.label}]
+    return []
+
+
+def month_upload_names(run):
+    """Every stored copy of the month's uploaded sheets (each upload is kept under its own name)."""
+    storage = run.uploaded_file.storage
+    folder = f"private/uploads/{run.company.code}/{run.month:%Y-%m}"
+    names = {run.uploaded_file.name} if run.uploaded_file else set()
+    try:
+        names.update(f"{folder}/{name}" for name in storage.listdir(folder)[1])
+    except FileNotFoundError:
+        pass
+    return sorted(names)
+
+
+def delete_run_summary(run):
+    recoveries = AdvanceRecovery.objects.filter(payroll_line__run=run)
+    return {
+        "company": run.company.code, "month": run.label, "status": run.get_status_display(),
+        "lines": run.lines.count(),
+        "recoveries": recoveries.count(), "recovered": recoveries.aggregate(t=Coalesce(Sum("amount"), ZERO))["t"],
+        "increments": SalaryRevision.objects.filter(payroll_run=run).count(),
+        "files": len(month_upload_names(run)),
+        "later_drafts": PayrollRun.objects.filter(company=run.company, month__gt=run.month,
+                                                  status=PayrollRun.Status.DRAFT).count(),
+    }
+
+
+def delete_run(run, request=None):
+    """Remove a salary month completely, as if it was never started, so it can be done again.
+
+    Takes back what finalising did (advance recoveries, increments from the sheet), deletes the lines,
+    the month and its uploaded sheets, then works out later draft months again. Returns (summary, problems)
+    where problems are later drafts that could not be worked out (see recalculate_drafts).
+    """
+    with transaction.atomic():
+        run = PayrollRun.objects.select_for_update().select_related("company").get(pk=run.pk)
+        problems = delete_run_blockers(run)
+        if problems:
+            raise PayrollError(problems[0])
+        summary = delete_run_summary(run)
+        storage, files = run.uploaded_file.storage, month_upload_names(run)
+        recoveries = AdvanceRecovery.objects.filter(payroll_line__run=run)
+        advance_ids = set(recoveries.values_list("advance_id", flat=True))
+        recoveries.delete()
+        for adv in Advance.objects.filter(pk__in=advance_ids):
+            adv.refresh_status()
+        SalaryRevision.objects.filter(payroll_run=run).delete()
+        audit(request, "payroll.delete_month", run, {"month": str(run.month), **summary}, company=run.company)
+        run.lines.all().delete()
+        run.delete()
+        transaction.on_commit(lambda: [storage.delete(name) for name in files])
+    return summary, recalculate_drafts(run.company)
+
+
 def recalculate_drafts(company):
     """Work out every draft month again after a change to staff, salary or rules.
 

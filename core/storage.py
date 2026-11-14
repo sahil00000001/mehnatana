@@ -37,6 +37,17 @@ class DatabaseStorage(Storage):
     def delete(self, name):
         self._model().objects.filter(name=name).delete()
 
+    def listdir(self, path):
+        prefix = path.rstrip("/") + "/"
+        dirs, files = set(), []
+        for name in self._model().objects.filter(name__startswith=prefix).values_list("name", flat=True):
+            rest = name[len(prefix):]
+            if "/" in rest:
+                dirs.add(rest.split("/", 1)[0])
+            else:
+                files.append(rest)
+        return sorted(dirs), sorted(files)
+
     def size(self, name):
         row = self._model().objects.filter(name=name).only("size").first()
         if row is None:

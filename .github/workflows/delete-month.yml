@@ -1,0 +1,57 @@
+# Manual only (GitHub → Actions → Delete a salary month → Run workflow): remove one salary month
+# from the live database, for every company or for one, so that month can be done again from the start.
+# Choose "dry-run" first: it only lists what would be deleted. See `python manage.py delete_month --help`.
+name: Delete a salary month
+
+on:
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Month as YYYY-MM, for example 2026-10"
+        type: string
+        required: true
+      company:
+        description: "Company code (leave empty for every company)"
+        type: string
+        required: false
+        default: ""
+      mode:
+        description: "dry-run lists what would be deleted; delete removes it"
+        type: choice
+        options: [dry-run, delete]
+        default: dry-run
+
+concurrency:
+  group: database
+  cancel-in-progress: false
+
+jobs:
+  delete-month:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Delete the month on the live database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          POSTGRES_SCHEMA: mehnatana
+          DEBUG: "False"
+          SECRET_KEY: delete-month-only-not-used-for-requests
+          FILE_STORAGE: database
+          MONTH: ${{ inputs.month }}
+          COMPANY: ${{ inputs.company }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret is not set."; exit 1; fi
+          args=("$MONTH")
+          if [ -n "$COMPANY" ]; then args+=(--company "$COMPANY"); fi
+          case "$MODE" in
+            dry-run) args+=(--dry-run) ;;
+            delete) ;;
+            *) echo "Unknown mode: $MODE"; exit 1 ;;
+          esac
+          python manage.py delete_month "${args[@]}"
